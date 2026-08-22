@@ -21,6 +21,27 @@
 	});
 })();
 
+// Update-available banner (layout.html): dismissing it hides it for the
+// rest of this browser until a newer version ships, at which point the
+// stored version no longer matches data-dismiss-version and it reappears.
+(function () {
+	const banner = document.getElementById("update-banner");
+	if (!banner) return;
+	try {
+		if (localStorage.getItem("sd-update-dismissed") === banner.dataset.dismissVersion) {
+			banner.remove();
+			return;
+		}
+	} catch (e) {}
+	const dismiss = document.getElementById("update-banner-dismiss");
+	if (dismiss) {
+		dismiss.addEventListener("click", () => {
+			try { localStorage.setItem("sd-update-dismissed", banner.dataset.dismissVersion); } catch (e) {}
+			banner.remove();
+		});
+	}
+})();
+
 // Node picker: auto-submits its <form> on change (volumes/images pages'
 // node <select>), replacing an inline onchange= that CSP's script-src
 // blocks (nonces only cover <script> elements, not event-handler attrs).

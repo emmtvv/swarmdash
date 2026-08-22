@@ -5,7 +5,16 @@ Notable changes to swarmdash are tracked here, following
 does not yet follow strict semantic versioning across releases — see the
 README's "Known gaps" section for what's still evolving.
 
-## [Unreleased]
+## [1.0.2] - 2026-08-22
+
+### Added
+
+- Update check: the admin UI now compares the running version against the
+  latest GitHub release (github.com/emmtvv/swarmdash) every 15 minutes and
+  shows a dismissible banner when a newer version is available. The current
+  version is a constant in `internal/updatecheck` - bump it by hand
+  alongside each new entry here, since not every deployment is built via
+  `make build`/`make docker`.
 
 ## [1.0.1] - 2026-08-22
 

@@ -935,6 +935,33 @@ label:has(> input[type=checkbox]) {
 
 .error-box { background: var(--red-dim); color: var(--red); border: 1px solid color-mix(in srgb, var(--red) 35%, transparent); padding: 10px 12px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 13px; }
 
+.update-banner {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	background: var(--accent-2-dim, rgba(240,169,64,.14));
+	color: var(--accent-2);
+	border: 1px solid color-mix(in srgb, var(--accent-2) 35%, transparent);
+	padding: 10px 14px;
+	border-radius: var(--radius-sm);
+	margin-bottom: 16px;
+	font-size: 13px;
+}
+.update-banner span { flex: 1; color: var(--text); }
+.update-banner strong { color: var(--accent-2); }
+.update-banner a { color: var(--accent-2); font-weight: 600; white-space: nowrap; }
+.update-banner-dismiss {
+	background: none;
+	border: none;
+	color: var(--text-dim);
+	font-size: 18px;
+	line-height: 1;
+	cursor: pointer;
+	padding: 2px 4px;
+	flex: none;
+}
+.update-banner-dismiss:hover { color: var(--text); }
+
 .breadcrumb { color: var(--text-dim); margin-bottom: 16px; font-size: 13px; }
 
 #terminal { height: 70vh; background: #000; border-radius: var(--radius); padding: 8px; }
