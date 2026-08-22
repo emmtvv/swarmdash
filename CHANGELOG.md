@@ -7,6 +7,15 @@ README's "Known gaps" section for what's still evolving.
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-08-22
+
+### Fixed
+
+- Node picker on the Volumes and Images pages, and the Reset password
+  action on the Users settings page, were using inline event handlers
+  (`onchange=`/`onsubmit=`) that violate the app's Content-Security-Policy
+  and get blocked by browsers. Moved this behavior into `app.js`.
+
 ## [1.0.0] - 2026-08-22
 
 - First public release.
