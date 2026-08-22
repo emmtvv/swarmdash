@@ -6,7 +6,7 @@
   <a href="https://github.com/emmtvv/swarmdash/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/emmtv/swarmdash/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://hub.docker.com/r/mathwave/swarmdash"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/mathwave/swarmdash"></a>
   <a href="go.mod"><img alt="Go version" src="https://img.shields.io/badge/go-1.25-00ADD8?logo=go&logoColor=white"></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/MathWave/swarmdash"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/emmtvv/swarmdash"></a>
 </p>
 
 <p align="center">
@@ -76,7 +76,7 @@ mode if this node isn't in it yet, builds the image, deploys the stack, and
 prints the panel's URL plus the generated bootstrap admin credentials):
 
 ```
-git clone https://github.com/MathWave/swarmdash.git
+git clone https://github.com/emmtvv/swarmdash.git
 cd swarmdash
 make up
 ```
@@ -488,7 +488,7 @@ and the Dockerfile's base images on weekly update PRs.
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and feature requests:
-[open an issue](https://github.com/MathWave/swarmdash/issues). This project
+[open an issue](https://github.com/emmtvv/swarmdash/issues). This project
 follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Security
