@@ -1,0 +1,29 @@
+{{define "stack_detail.html"}}
+<div class="breadcrumb"><a href="/stacks">Stacks</a> / {{.Name}}</div>
+<div class="page-header">
+	<h1>{{.Name}}</h1>
+	<div class="actions">
+		<a href="/stacks/{{.Name}}/export.yml" class="btn secondary">Export compose</a>
+		<form method="post" action="/stacks/{{.Name}}/restart" data-confirm="Restart every service in stack {{.Name}}?">
+			<button type="submit" class="btn secondary">Restart all</button>
+		</form>
+		<form method="post" action="/stacks/{{.Name}}/delete" data-confirm="Remove all services in stack {{.Name}}?">
+			<button type="submit" class="btn danger">Delete stack</button>
+		</form>
+	</div>
+</div>
+
+<table>
+	<thead><tr><th>Service</th><th>Mode</th><th>Replicas</th><th>Image</th></tr></thead>
+	<tbody>
+	{{range .Services}}
+		<tr>
+			<td><a href="/services/{{.Spec.Name}}">{{.Spec.Name}}</a></td>
+			<td>{{if .Spec.Mode.Replicated}}replicated{{else}}global{{end}}</td>
+			<td>{{if .ServiceStatus}}{{.ServiceStatus.RunningTasks}}/{{.ServiceStatus.DesiredTasks}}{{else}}-{{end}}</td>
+			<td class="muted mono">{{imageName .Spec.TaskTemplate.ContainerSpec.Image}}</td>
+		</tr>
+	{{end}}
+	</tbody>
+</table>
+{{end}}

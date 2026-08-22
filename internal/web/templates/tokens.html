@@ -1,0 +1,47 @@
+{{define "tokens.html"}}
+<h1>API tokens</h1>
+<p class="muted">For CI/CD or scripts: pass <span class="mono">Authorization: Bearer &lt;token&gt;</span> to call any swarmdash endpoint without a browser session. Scoped the same way as user accounts - admin tokens are full-access, viewer tokens are read-only. Tokens created before roles existed have no stored role and are treated as admin.</p>
+
+{{if .NewToken}}
+<div class="card" style="border-color:var(--green);">
+	<strong>Token created - copy it now, it won't be shown again:</strong>
+	<div class="mono" style="margin-top:8px;padding:8px;background:var(--bg);border-radius:6px;word-break:break-all;">{{.NewToken}}</div>
+</div>
+{{end}}
+
+<div class="card">
+	<h2 style="margin-top:0;">Create token</h2>
+	<form method="post" action="/settings/tokens">
+		<div class="card-row">
+			<input type="text" name="name" placeholder="e.g. ci-deploy" required>
+			<select name="role">
+				<option value="admin">admin</option>
+				<option value="viewer">viewer</option>
+			</select>
+			<button type="submit" class="btn">Create</button>
+		</div>
+	</form>
+</div>
+
+<table>
+	<thead><tr><th>Name</th><th>Role</th><th>Created</th><th>Created by</th><th>Last used</th><th></th></tr></thead>
+	<tbody>
+	{{range .Tokens}}
+		<tr>
+			<td>{{.Name}}</td>
+			<td><span class="mono">{{if .Role}}{{.Role}}{{else}}admin (legacy){{end}}</span></td>
+			<td class="muted">{{ago .CreatedAt}}</td>
+			<td class="muted">{{.CreatedBy}}</td>
+			<td class="muted">{{ago .LastUsedAt}}</td>
+			<td>
+				<form class="inline" method="post" action="/settings/tokens/{{.ID}}/delete" data-confirm="Revoke token {{.Name}}?">
+					<button type="submit" class="btn danger small">Revoke</button>
+				</form>
+			</td>
+		</tr>
+	{{else}}
+		<tr><td colspan="6" class="muted">No API tokens.</td></tr>
+	{{end}}
+	</tbody>
+</table>
+{{end}}

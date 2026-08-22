@@ -1,0 +1,22 @@
+{{define "events.html"}}
+<h1>Task events</h1>
+<p class="muted">Task state transitions observed by the background poller (every 10s) - durable history beyond the live rollout view on a service's page.</p>
+{{if .Service}}<p class="muted">Filtered to service <span class="mono">{{.Service}}</span> - <a href="/events">clear filter</a></p>{{end}}
+<table>
+	<thead><tr><th>Time</th><th>Service</th><th>Node</th><th>State</th><th>Message</th></tr></thead>
+	<tbody>
+	{{range .Events}}
+		<tr>
+			<td class="muted">{{ago .Time}}</td>
+			<td><a href="/events?service={{.ServiceName}}">{{.ServiceName}}</a></td>
+			<td class="muted">{{.Node}}</td>
+			<td><span class="badge state-{{.State}}">{{.State}}</span></td>
+			<td class="muted">{{.Message}}</td>
+		</tr>
+	{{else}}
+		<tr><td colspan="5" class="muted">No task events recorded yet (or the poller hasn't ticked since admin started).</td></tr>
+	{{end}}
+	</tbody>
+</table>
+{{template "pagination" .Pagination}}
+{{end}}

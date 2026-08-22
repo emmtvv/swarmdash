@@ -1,0 +1,36 @@
+{{define "stacks.html"}}
+<div class="page-header">
+	<h1>Stacks</h1>
+	<a href="/stacks/deploy" class="btn">Deploy stack</a>
+</div>
+<table>
+	<thead><tr><th>Name</th><th>Services</th></tr></thead>
+	<tbody>
+	{{range .Stacks}}
+		<tr>
+			<td><a href="/stacks/{{.Name}}">{{.Name}}</a></td>
+			<td>{{len .Services}}</td>
+		</tr>
+	{{else}}
+		<tr><td colspan="2" class="muted">No stacks found.</td></tr>
+	{{end}}
+	</tbody>
+</table>
+
+{{if .Standalone}}
+<h2>Standalone services</h2>
+<table>
+	<thead><tr><th>Name</th><th>Mode</th><th>Replicas</th><th>Image</th></tr></thead>
+	<tbody>
+	{{range .Standalone}}
+		<tr>
+			<td><a href="/services/{{.Spec.Name}}">{{.Spec.Name}}</a></td>
+			<td>{{if .Spec.Mode.Replicated}}replicated{{else}}global{{end}}</td>
+			<td>{{if .ServiceStatus}}{{.ServiceStatus.RunningTasks}}/{{.ServiceStatus.DesiredTasks}}{{else}}-{{end}}</td>
+			<td class="muted mono">{{imageName .Spec.TaskTemplate.ContainerSpec.Image}}</td>
+		</tr>
+	{{end}}
+	</tbody>
+</table>
+{{end}}
+{{end}}

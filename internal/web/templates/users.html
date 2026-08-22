@@ -1,0 +1,62 @@
+{{define "users.html"}}
+<h1>Users</h1>
+<p class="muted">Admins have full access. Viewers are read-only: no create/update/delete actions, no console access, and Settings pages are hidden.</p>
+
+<div class="card">
+	<h2 style="margin-top:0;">Add user</h2>
+	<form method="post" action="/settings/users">
+		<div class="card-row">
+			<div>
+				<label for="username">Username</label>
+				<input type="text" id="username" name="username" required>
+			</div>
+			<div>
+				<label for="password">Password</label>
+				<input type="password" id="password" name="password">
+			</div>
+			<div>
+				<label for="role">Role</label>
+				<select id="role" name="role">
+					<option value="viewer">viewer</option>
+					<option value="admin">admin</option>
+				</select>
+			</div>
+			<div>
+				<label>&nbsp;</label>
+				<button type="submit" class="btn">Create</button>
+			</div>
+		</div>
+		<label style="margin-top:12px;display:flex;align-items:center;gap:8px;font-weight:400;">
+			<input type="checkbox" name="sso_account" style="width:auto;">
+			SSO account (no local password - see <a href="/settings/sso">Settings &rarr; SSO</a>)
+		</label>
+	</form>
+</div>
+
+<table>
+	<thead><tr><th>Username</th><th>Role</th><th>Auth</th><th>Created</th><th></th></tr></thead>
+	<tbody>
+	{{range .Users}}
+		<tr>
+			<td>{{.Username}}</td>
+			<td><span class="mono">{{.Role}}</span></td>
+			<td>{{if eq .AuthSource "sso"}}<span class="mono">sso</span>{{else}}<span class="muted">local</span>{{end}}</td>
+			<td class="muted">{{ago .CreatedAt}}</td>
+			<td>
+				{{if ne .AuthSource "sso"}}
+				<form class="inline" method="post" action="/settings/users/{{.Username}}/password" onsubmit="var p = prompt('New password for {{.Username}}:'); if (!p) return false; this.password.value = p;">
+					<input type="hidden" name="password" value="">
+					<button type="submit" class="btn small">Reset password</button>
+				</form>
+				{{end}}
+				<form class="inline" method="post" action="/settings/users/{{.Username}}/delete" data-confirm="Delete user {{.Username}}?">
+					<button type="submit" class="btn danger small">Delete</button>
+				</form>
+			</td>
+		</tr>
+	{{else}}
+		<tr><td colspan="5" class="muted">No users.</td></tr>
+	{{end}}
+	</tbody>
+</table>
+{{end}}

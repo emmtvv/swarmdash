@@ -1,0 +1,77 @@
+{{define "topology.html"}}
+<h1>Cluster topology</h1>
+<p class="muted">Services connected by a shared overlay network. Drag nodes to rearrange, scroll to zoom, click a node to trace its connections.</p>
+
+{{if .HasGraph}}
+<div class="card" style="padding:0;overflow:hidden;">
+	<div class="topology-toolbar">
+		<input type="text" id="topo-search" class="table-search" placeholder="Filter by name…" style="margin-bottom:0;">
+		<button type="button" class="btn secondary small" id="topo-reset">Reset view</button>
+		<div class="topology-legend">
+			<span><span class="legend-dot"></span>Service (colored by stack)</span>
+			<span><span class="legend-diamond"></span>Overlay network</span>
+			<span><span class="legend-ring ok"></span>Healthy</span>
+			<span><span class="legend-ring warn"></span>Degraded</span>
+			<span><span class="legend-ring crit"></span>Down</span>
+		</div>
+	</div>
+	<svg id="topology-svg"></svg>
+	<div id="topo-info" class="muted" style="padding:10px 16px;border-top:1px solid var(--border);min-height:16px;">Click a node for details.</div>
+</div>
+{{else}}
+<div class="card muted">No services are attached to an overlay network yet.</div>
+{{end}}
+
+{{if .Isolated}}
+<h2>Not on an overlay network</h2>
+<p class="muted">These services don't share an overlay network with anything else, so they don't appear on the map above.</p>
+<table>
+	<thead><tr><th>Name</th><th>Stack</th><th>Mode</th><th>Replicas</th></tr></thead>
+	<tbody>
+	{{range .Isolated}}
+		<tr>
+			<td><a href="/services/{{.Spec.Name}}">{{.Spec.Name}}</a></td>
+			<td class="muted">{{index .Spec.Labels "com.docker.stack.namespace"}}</td>
+			<td>{{if .Spec.Mode.Replicated}}replicated{{else}}global{{end}}</td>
+			<td>{{if .ServiceStatus}}{{.ServiceStatus.RunningTasks}}/{{.ServiceStatus.DesiredTasks}}{{else}}-{{end}}</td>
+		</tr>
+	{{end}}
+	</tbody>
+</table>
+{{end}}
+
+<script src="/static/topology.js" defer></script>
+<script nonce="{{cspNonce}}">
+document.addEventListener("DOMContentLoaded", function () {
+	const svg = document.getElementById("topology-svg");
+	if (!svg) return;
+	const graph = {{.GraphJSON}};
+	const info = document.getElementById("topo-info");
+
+	let resetFn = null;
+	renderTopology(svg, graph, {
+		onResetRef: (fn) => { resetFn = fn; },
+		onSearchRef: (fn) => {
+			document.getElementById("topo-search").addEventListener("input", (e) => fn(e.target.value));
+		},
+		onSelect: (node) => {
+			if (!node) { info.textContent = "Click a node for details."; return; }
+			if (node.type === "network") {
+				info.innerHTML = `<strong>${node.label}</strong> <span class="muted">overlay network${node.ingress ? " · ingress" : ""}</span>`;
+			} else {
+				const link = document.createElement("a");
+				link.href = "/services/" + encodeURIComponent(node.label);
+				link.textContent = node.label;
+				info.innerHTML = "";
+				info.appendChild(link);
+				const meta = document.createElement("span");
+				meta.className = "muted";
+				meta.textContent = ` · ${node.stack ? "stack " + node.stack : "standalone"} · ${node.mode} · ${node.running}/${node.desired} running`;
+				info.appendChild(meta);
+			}
+		},
+	});
+	document.getElementById("topo-reset").addEventListener("click", () => resetFn && resetFn());
+});
+</script>
+{{end}}

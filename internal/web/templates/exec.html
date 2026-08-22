@@ -1,0 +1,291 @@
+{{define "exec.html"}}
+<link rel="stylesheet" href="/static/vendor/xterm.css">
+<script src="/static/vendor/xterm.js"></script>
+<script src="/static/vendor/xterm-addon-fit.js"></script>
+
+<div class="breadcrumb"><a href="/services">Services</a> / console</div>
+<div class="page-header">
+	<h1>Console <span class="muted mono" style="font-size:14px;">{{shortID .TaskID}}</span> <span id="status" class="badge state-active">connected</span> <span id="shell-status" class="muted mono" style="font-size:12px;"></span></h1>
+	<div class="actions">
+		<select id="shell-select" class="btn secondary small">
+			<option value="auto" selected>Shell: auto</option>
+			<option value="/bin/bash">bash</option>
+			<option value="/bin/sh">sh</option>
+			<option value="/bin/ash">ash</option>
+			<option value="/bin/dash">dash</option>
+			<option value="/bin/zsh">zsh</option>
+		</select>
+		<button class="btn secondary small" data-tab="term">Terminal</button>
+		<button class="btn secondary small" data-tab="logs">Logs</button>
+		<button class="btn secondary small" data-tab="stats">Stats</button>
+		<button class="btn secondary small" data-tab="files">Files</button>
+		<a href="/logs/{{.TaskID}}/download" class="btn secondary small">Download logs</a>
+	</div>
+</div>
+
+<div id="panel-term">
+	<div id="terminal"></div>
+</div>
+<div id="panel-logs" style="display:none;">
+	<pre id="logs-out" class="card mono" style="height:70vh;overflow:auto;white-space:pre-wrap;"></pre>
+</div>
+<div id="panel-stats" style="display:none;">
+	<div class="card-row">
+		<div class="card" style="flex:1;">
+			<div class="muted">CPU <span id="cpu-pct" class="mono"></span></div>
+			<canvas id="cpu-chart" width="600" height="80" style="width:100%;height:80px;"></canvas>
+		</div>
+		<div class="card" style="flex:1;">
+			<div class="muted">Memory <span id="mem-pct" class="mono"></span></div>
+			<canvas id="mem-chart" width="600" height="80" style="width:100%;height:80px;"></canvas>
+		</div>
+	</div>
+	<pre id="stats-out" class="card mono" style="height:50vh;overflow:auto;"></pre>
+</div>
+<div id="panel-files" style="display:none;">
+	<div class="card-row" style="margin-bottom:8px;justify-content:space-between;">
+		<span id="files-path" class="mono muted"></span>
+		<button id="files-up" class="btn small secondary">Up</button>
+	</div>
+	<table>
+		<thead><tr><th>Name</th><th>Size</th><th></th></tr></thead>
+		<tbody id="files-body"></tbody>
+	</table>
+</div>
+
+<script nonce="{{cspNonce}}">
+(function() {
+	const taskID = {{.TaskID}};
+	const wsProto = location.protocol === "https:" ? "wss://" : "ws://";
+	const panels = { term: document.getElementById("panel-term"), logs: document.getElementById("panel-logs"), stats: document.getElementById("panel-stats"), files: document.getElementById("panel-files") };
+	const statusEl = document.getElementById("status");
+
+	document.querySelectorAll("[data-tab]").forEach(btn => {
+		btn.addEventListener("click", () => {
+			for (const k in panels) panels[k].style.display = (k === btn.dataset.tab) ? "" : "none";
+			if (btn.dataset.tab === "logs") startLogs();
+			if (btn.dataset.tab === "stats") startStats();
+			if (btn.dataset.tab === "files") loadFiles(currentPath);
+		});
+	});
+
+	function esc(s) { return (s || "").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+	// autoConnect wraps a WebSocket with reconnect-with-backoff so a flaky
+	// connection (or an agent restart) doesn't strand the user on a dead
+	// socket - it just quietly reconnects.
+	// onFailedAttempt (optional) is called only when a connection attempt
+	// closes without ever having opened - e.g. the agent rejected `exec
+	// create` because the requested shell doesn't exist in the image. If it
+	// returns true, autoConnect retries immediately (no backoff), letting the
+	// caller swap the URL (via urlFn) to try the next candidate shell first.
+	function autoConnect(urlFn, { binary, onOpen, onMessage, onFailedAttempt } = {}) {
+		let closed = false, socket, attempt = 0, timer, openedThisAttempt;
+		function setStatus(s) { if (statusEl) { statusEl.textContent = s; statusEl.className = "badge state-" + (s === "connected" ? "active" : "pending"); } }
+		function connect() {
+			openedThisAttempt = false;
+			socket = new WebSocket(urlFn());
+			if (binary) socket.binaryType = "arraybuffer";
+			socket.onopen = () => { openedThisAttempt = true; attempt = 0; setStatus("connected"); onOpen && onOpen(socket); };
+			socket.onmessage = onMessage;
+			socket.onclose = () => {
+				if (closed) return;
+				if (!openedThisAttempt && onFailedAttempt && onFailedAttempt()) {
+					connect();
+					return;
+				}
+				setStatus("reconnecting");
+				attempt++;
+				timer = setTimeout(connect, Math.min(1000 * attempt, 5000));
+			};
+			socket.onerror = () => socket.close();
+		}
+		connect();
+		return {
+			send: (data) => { if (socket && socket.readyState === WebSocket.OPEN) socket.send(data); },
+			close: () => { closed = true; clearTimeout(timer); if (socket) socket.close(); },
+		};
+	}
+
+	// --- terminal (exec) ---
+	const term = new Terminal({ convertEol: true, fontSize: 13, theme: { background: "#000000" } });
+	const fitAddon = new FitAddon.FitAddon();
+	term.loadAddon(fitAddon);
+	term.open(document.getElementById("terminal"));
+	fitAddon.fit();
+	window.addEventListener("resize", () => { fitAddon.fit(); sendResize(); });
+
+	// Not every image ships bash - minimal/distroless images may only have
+	// /bin/sh, or nothing at all under some names. "auto" walks this chain
+	// until one shell actually starts; the dropdown also lets a user force a
+	// specific one (e.g. to get bash's line editing when it is available).
+	const SHELL_CHAIN = ["/bin/bash", "/bin/sh", "/bin/ash", "/bin/dash"];
+	const shellSelect = document.getElementById("shell-select");
+	const shellStatusEl = document.getElementById("shell-status");
+	let shellChain = SHELL_CHAIN.slice();
+	let shellIdx = 0;
+	let execConn;
+
+	function startExec() {
+		if (execConn) execConn.close();
+		shellIdx = 0;
+		execConn = autoConnect(
+			() => wsProto + location.host + "/ws/exec/" + taskID + "?cmd=" + encodeURIComponent(shellChain[shellIdx]) + "&cols=" + term.cols + "&rows=" + term.rows,
+			{
+				binary: true,
+				onOpen: () => { sendResize(); shellStatusEl.textContent = "(" + shellChain[shellIdx] + ")"; },
+				onMessage: (ev) => term.write(new Uint8Array(ev.data)),
+				onFailedAttempt: () => {
+					if (shellIdx < shellChain.length - 1) { shellIdx++; return true; }
+					return false;
+				},
+			}
+		);
+	}
+	shellSelect.addEventListener("change", () => {
+		shellChain = shellSelect.value === "auto" ? SHELL_CHAIN.slice() : [shellSelect.value];
+		startExec();
+	});
+	startExec();
+
+	term.onData(data => {
+		const bytes = new TextEncoder().encode(data);
+		const frame = new Uint8Array(bytes.length + 1);
+		frame[0] = 0; // frameStdin
+		frame.set(bytes, 1);
+		execConn.send(frame);
+	});
+	function sendResize() {
+		const payload = new TextEncoder().encode(JSON.stringify({ cols: term.cols, rows: term.rows }));
+		const frame = new Uint8Array(payload.length + 1);
+		frame[0] = 1; // frameResize
+		frame.set(payload, 1);
+		execConn.send(frame);
+	}
+
+	// --- logs (lazy) ---
+	let logsConn = null;
+	function startLogs() {
+		if (logsConn) return;
+		const out = document.getElementById("logs-out");
+		logsConn = autoConnect(() => wsProto + location.host + "/ws/logs/" + taskID + "?tail=500&follow=true", {
+			onMessage: (ev) => { out.textContent += ev.data; out.scrollTop = out.scrollHeight; },
+		});
+	}
+
+	// --- stats (lazy) ---
+	// makeSparkline returns a function that appends one value (0-100) and
+	// redraws a simple auto-scaled line chart - no charting library, just
+	// canvas, since this is one rolling window per tab, not worth a dep.
+	function makeSparkline(canvasID, maxPoints) {
+		const canvas = document.getElementById(canvasID);
+		const ctx = canvas.getContext("2d");
+		const values = [];
+		return function push(v) {
+			values.push(v);
+			if (values.length > maxPoints) values.shift();
+			// Re-measure every push (cheap, ~1/sec) so the chart tracks the
+			// card's actual rendered size and devicePixelRatio instead of a
+			// fixed low-res bitmap - keeps it crisp on wide cards and retina
+			// screens, and makes it recover automatically on window resize.
+			const dpr = window.devicePixelRatio || 1;
+			const w = canvas.clientWidth, h = canvas.clientHeight;
+			if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+				canvas.width = w * dpr;
+				canvas.height = h * dpr;
+			}
+			ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+			ctx.clearRect(0, 0, w, h);
+			const max = Math.max(100, ...values);
+			ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue("--accent") || "#4f8cff";
+			ctx.lineWidth = 2;
+			ctx.beginPath();
+			values.forEach((val, i) => {
+				const x = (i / Math.max(1, maxPoints - 1)) * w;
+				const y = h - (val / max) * h;
+				i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+			});
+			ctx.stroke();
+		};
+	}
+	const pushCPU = makeSparkline("cpu-chart", 60);
+	const pushMem = makeSparkline("mem-chart", 60);
+
+	let statsConn = null;
+	function startStats() {
+		if (statsConn) return;
+		const out = document.getElementById("stats-out");
+		let prev = null;
+		statsConn = autoConnect(() => wsProto + location.host + "/ws/stats/" + taskID, {
+			onMessage: (ev) => {
+				let d;
+				try { d = JSON.parse(ev.data); } catch (e) { return; }
+				out.textContent = JSON.stringify(d, null, 2);
+
+				const cpuDelta = d.cpu_stats.cpu_usage.total_usage - (prev ? prev.cpu_stats.cpu_usage.total_usage : d.precpu_stats.cpu_usage.total_usage || 0);
+				const sysDelta = d.cpu_stats.system_cpu_usage - (prev ? prev.cpu_stats.system_cpu_usage : d.precpu_stats.system_cpu_usage || 0);
+				const cpuPct = sysDelta > 0 ? (cpuDelta / sysDelta) * (d.cpu_stats.online_cpus || 1) * 100 : 0;
+				const memPct = d.memory_stats.limit ? (d.memory_stats.usage / d.memory_stats.limit) * 100 : 0;
+
+				document.getElementById("cpu-pct").textContent = cpuPct.toFixed(1) + "%";
+				document.getElementById("mem-pct").textContent = memPct.toFixed(1) + "% (" + (d.memory_stats.usage / 1048576).toFixed(0) + " MiB)";
+				pushCPU(Math.max(0, cpuPct));
+				pushMem(Math.max(0, memPct));
+				prev = d;
+			},
+		});
+	}
+
+	// --- files (lazy, plain HTTP) ---
+	let currentPath = "/";
+	function loadFiles(path) {
+		currentPath = path;
+		document.getElementById("files-path").textContent = path;
+		fetch("/files/" + taskID + "?path=" + encodeURIComponent(path))
+			.then(r => r.json())
+			.then(entries => {
+				const body = document.getElementById("files-body");
+				body.innerHTML = "";
+				(entries || []).sort((a, b) => (b.isDir - a.isDir) || a.name.localeCompare(b.name)).forEach(e => {
+					const tr = document.createElement("tr");
+					const nameTd = document.createElement("td");
+					if (e.isDir) {
+						const a = document.createElement("a");
+						a.href = "#"; a.textContent = e.name + "/";
+						a.addEventListener("click", (ev) => { ev.preventDefault(); loadFiles(e.path); });
+						nameTd.appendChild(a);
+					} else {
+						nameTd.textContent = e.name;
+						nameTd.className = "mono";
+					}
+					const sizeTd = document.createElement("td");
+					sizeTd.className = "muted";
+					sizeTd.textContent = e.isDir ? "-" : e.size;
+					const actionTd = document.createElement("td");
+					if (!e.isDir) {
+						const dl = document.createElement("a");
+						dl.href = "/files/" + taskID + "/download?path=" + encodeURIComponent(e.path);
+						dl.className = "btn small secondary";
+						dl.textContent = "Download";
+						actionTd.appendChild(dl);
+					}
+					tr.append(nameTd, sizeTd, actionTd);
+					body.appendChild(tr);
+				});
+			})
+			.catch(() => { document.getElementById("files-body").innerHTML = '<tr><td colspan="3" class="muted">Failed to list directory.</td></tr>'; });
+	}
+	document.getElementById("files-up").addEventListener("click", () => {
+		if (currentPath === "/" || currentPath === "") return;
+		const parent = currentPath.replace(/\/+$/, "").split("/").slice(0, -1).join("/") || "/";
+		loadFiles(parent);
+	});
+
+	window.addEventListener("beforeunload", () => {
+		execConn.close();
+		if (logsConn) logsConn.close();
+		if (statsConn) statsConn.close();
+	});
+})();
+</script>
+{{end}}

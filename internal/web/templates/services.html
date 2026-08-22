@@ -1,0 +1,48 @@
+{{define "services.html"}}
+<h1>Services</h1>
+<form method="post" action="/services/bulk" id="bulk-form" data-confirm="Apply {value} to the selected services?" data-confirm-field="action">
+	<div class="card-row" style="margin-bottom:8px;">
+		<select name="action">
+			<option value="restart">Restart</option>
+			<option value="latest">Update to latest</option>
+			<option value="scale">Scale to...</option>
+			<option value="delete">Delete</option>
+		</select>
+		<input type="number" name="replicas" placeholder="replicas" min="0" style="width:90px;">
+		<button type="submit" class="btn secondary">Apply to selected</button>
+		<span id="bulk-count" class="muted"></span>
+	</div>
+	<div class="table-wrap">
+		<input type="text" class="table-search" data-table-search placeholder="Filter services...">
+		<table data-enhance>
+			<thead><tr><th data-no-sort><input type="checkbox" id="select-all"></th><th>Name</th><th>Stack</th><th>Mode</th><th>Replicas</th><th>Image</th><th>Updated</th></tr></thead>
+			<tbody>
+			{{range .Services}}
+				<tr>
+					<td><input type="checkbox" name="ids" value="{{.Spec.Name}}" class="row-check"></td>
+					<td><a href="/services/{{.Spec.Name}}">{{.Spec.Name}}</a></td>
+					<td class="muted">{{index .Spec.Labels "com.docker.stack.namespace"}}</td>
+					<td>{{if .Spec.Mode.Replicated}}replicated{{else}}global{{end}}</td>
+					<td>{{if .ServiceStatus}}{{.ServiceStatus.RunningTasks}}/{{.ServiceStatus.DesiredTasks}}{{else}}-{{end}}</td>
+					<td class="muted mono">{{imageName .Spec.TaskTemplate.ContainerSpec.Image}}</td>
+					<td class="muted">{{ago .UpdatedAt}}</td>
+				</tr>
+			{{end}}
+			</tbody>
+		</table>
+	</div>
+</form>
+<script nonce="{{cspNonce}}">
+(function() {
+	const selectAll = document.getElementById("select-all");
+	const count = document.getElementById("bulk-count");
+	function checks() { return Array.from(document.querySelectorAll(".row-check")); }
+	function updateCount() {
+		const n = checks().filter(c => c.checked).length;
+		count.textContent = n ? n + " selected" : "";
+	}
+	selectAll.addEventListener("change", () => { checks().forEach(c => c.checked = selectAll.checked); updateCount(); });
+	document.getElementById("bulk-form").addEventListener("change", (e) => { if (e.target.classList.contains("row-check")) updateCount(); });
+})();
+</script>
+{{end}}

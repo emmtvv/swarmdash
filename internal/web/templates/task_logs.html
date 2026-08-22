@@ -1,0 +1,49 @@
+{{define "task_logs.html"}}
+<div class="breadcrumb"><a href="/services">Services</a> / task logs</div>
+<div class="page-header">
+	<h1>Logs <span class="muted mono" style="font-size:14px;">{{shortID .TaskID}}</span> <span id="status" class="badge state-active">connected</span></h1>
+	<div class="actions">
+		<label class="muted small"><input type="checkbox" id="follow" checked> Follow</label>
+		<a href="/exec/{{.TaskID}}" class="btn secondary small">Console</a>
+		<a href="/logs/{{.TaskID}}/download" class="btn secondary small">Download</a>
+	</div>
+</div>
+
+<pre id="logs-out" class="card mono" style="height:75vh;overflow:auto;white-space:pre-wrap;"></pre>
+
+<script nonce="{{cspNonce}}">
+(function() {
+	const taskID = {{.TaskID}};
+	const wsProto = location.protocol === "https:" ? "wss://" : "ws://";
+	const statusEl = document.getElementById("status");
+	const out = document.getElementById("logs-out");
+	const followCheckbox = document.getElementById("follow");
+
+	function setStatus(s) { statusEl.textContent = s; statusEl.className = "badge state-" + (s === "connected" ? "active" : "pending"); }
+
+	let socket, timer, attempt = 0, closed = false;
+	function connect() {
+		socket = new WebSocket(wsProto + location.host + "/ws/logs/" + taskID + "?tail=500&follow=" + followCheckbox.checked);
+		socket.onopen = () => { attempt = 0; setStatus("connected"); };
+		socket.onmessage = (ev) => { out.textContent += ev.data; out.scrollTop = out.scrollHeight; };
+		socket.onclose = () => {
+			if (closed) return;
+			if (!followCheckbox.checked) { setStatus("done"); return; }
+			setStatus("reconnecting");
+			attempt++;
+			timer = setTimeout(connect, Math.min(1000 * attempt, 5000));
+		};
+		socket.onerror = () => socket.close();
+	}
+	followCheckbox.addEventListener("change", () => {
+		out.textContent = "";
+		clearTimeout(timer);
+		if (socket) socket.close();
+		closed = false;
+		connect();
+	});
+	connect();
+	window.addEventListener("beforeunload", () => { closed = true; clearTimeout(timer); if (socket) socket.close(); });
+})();
+</script>
+{{end}}

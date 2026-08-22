@@ -1,0 +1,68 @@
+{{define "node_detail.html"}}
+<div class="breadcrumb"><a href="/nodes">Nodes</a> / {{.Node.Description.Hostname}}</div>
+<h1>{{.Node.Description.Hostname}}</h1>
+
+<div class="card">
+	<div class="field-row">
+		<div class="field"><div class="muted">Role</div><div>{{.Node.Spec.Role}}</div></div>
+		<div class="field"><div class="muted">Status</div><div><span class="badge state-{{.Node.Status.State}}">{{.Node.Status.State}}</span></div></div>
+		<div class="field"><div class="muted">Availability</div><div><span class="badge state-{{.Node.Spec.Availability}}">{{.Node.Spec.Availability}}</span></div></div>
+		<div class="field"><div class="muted">Address</div><div class="mono">{{.Node.Status.Addr}}</div></div>
+		<div class="field"><div class="muted">CPUs</div><div>{{cpus .Node.Description.Resources.NanoCPUs}}</div></div>
+		<div class="field"><div class="muted">Memory</div><div>{{bytesHuman .Node.Description.Resources.MemoryBytes}}</div></div>
+		<div class="field"><div class="muted">Engine</div><div>{{.Node.Description.Engine.EngineVersion}}</div></div>
+		<div class="field"><div class="muted">OS/Arch</div><div>{{.Node.Description.Platform.OS}}/{{.Node.Description.Platform.Architecture}}</div></div>
+	</div>
+</div>
+
+{{/* Populated asynchronously by app.js from /nodes/{id}/stats - see the
+     "Async node resource usage" block - so the page itself renders
+     immediately instead of waiting on every container's agent to be
+     sampled twice. */}}
+<div id="node-usage" data-node-id="{{.Node.ID}}" data-cpu-capacity="{{cpus .Node.Description.Resources.NanoCPUs}}" data-mem-capacity="{{bytesHuman .Node.Description.Resources.MemoryBytes}}">
+	<div class="ring-grid">
+		<div class="ring-card">
+			<div class="ring" style="--pct:0"><div class="ring-pct node-stat-loading">&hellip;</div></div>
+			<div class="ring-info"><div class="l">CPU used</div><div class="n muted node-stat-loading">Loading&hellip;</div></div>
+		</div>
+		<div class="ring-card">
+			<div class="ring" style="--pct:0"><div class="ring-pct node-stat-loading">&hellip;</div></div>
+			<div class="ring-info"><div class="l">Memory used</div><div class="n muted node-stat-loading">Loading&hellip;</div></div>
+		</div>
+		<div class="ring-card">
+			<div class="ring" style="--pct:0"><div class="ring-pct node-stat-loading">&hellip;</div></div>
+			<div class="ring-info"><div class="l">Disk used</div><div class="n muted node-stat-loading">Loading&hellip;</div></div>
+		</div>
+	</div>
+</div>
+
+<h2>Labels</h2>
+<p class="muted">Used for placement constraints (<span class="mono">node.labels.zone==a</span>) and spread preferences.</p>
+<table>
+	<thead><tr><th>Key</th><th>Value</th><th></th></tr></thead>
+	<tbody>
+	{{range $k, $v := .Node.Spec.Annotations.Labels}}
+		<tr>
+			<td class="mono">{{$k}}</td>
+			<td class="mono">{{$v}}</td>
+			<td>
+				<form class="inline" method="post" action="/nodes/{{$.Node.ID}}/labels/{{$k}}/delete">
+					<button type="submit" class="btn danger small">Remove</button>
+				</form>
+			</td>
+		</tr>
+	{{else}}
+		<tr><td colspan="3" class="muted">No labels set.</td></tr>
+	{{end}}
+	</tbody>
+</table>
+
+<div class="card" style="margin-top:20px;">
+	<h2 style="margin-top:0;">Add label</h2>
+	<form class="inline" method="post" action="/nodes/{{.Node.ID}}/labels">
+		<input type="text" name="key" placeholder="zone" required>
+		<input type="text" name="value" placeholder="us-east-1a">
+		<button type="submit" class="btn">Add</button>
+	</form>
+</div>
+{{end}}

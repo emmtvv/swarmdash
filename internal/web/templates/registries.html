@@ -1,0 +1,48 @@
+{{define "registries.html"}}
+<h1>Registry credentials</h1>
+<p class="muted">Used automatically when the image on a service update/create belongs to one of these registries. Passwords are encrypted at rest (keyed off the cluster secret) and never shown again after saving.</p>
+
+<div class="card">
+	<h2 style="margin-top:0;">Add registry</h2>
+	<form method="post" action="/settings/registries">
+		<div class="card-row">
+			<div>
+				<label for="server">Server</label>
+				<input type="text" id="server" name="server" placeholder="docker.io / registry.example.com:5000" required style="width:260px;">
+			</div>
+			<div>
+				<label for="username">Username</label>
+				<input type="text" id="username" name="username" required>
+			</div>
+			<div>
+				<label for="password">Password</label>
+				<input type="password" id="password" name="password" required>
+			</div>
+			<div>
+				<label>&nbsp;</label>
+				<button type="submit" class="btn">Save</button>
+			</div>
+		</div>
+	</form>
+</div>
+
+<table>
+	<thead><tr><th>Server</th><th>Username</th><th>Added</th><th></th></tr></thead>
+	<tbody>
+	{{range .Registries}}
+		<tr>
+			<td class="mono">{{.Server}}</td>
+			<td>{{.Username}}</td>
+			<td class="muted">{{ago .CreatedAt}}</td>
+			<td>
+				<form class="inline" method="post" action="/settings/registries/{{.Server}}/delete" data-confirm="Remove credential for {{.Server}}?">
+					<button type="submit" class="btn danger small">Delete</button>
+				</form>
+			</td>
+		</tr>
+	{{else}}
+		<tr><td colspan="4" class="muted">No registry credentials configured.</td></tr>
+	{{end}}
+	</tbody>
+</table>
+{{end}}

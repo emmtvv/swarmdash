@@ -1,0 +1,11 @@
+{{define "pagination"}}
+{{if gt .TotalPages 1}}
+<div class="pagination">
+	<span class="muted">Page {{.Page}} of {{.TotalPages}} &middot; {{.Total}} total</span>
+	<div class="pagination-nav">
+		{{if .HasPrev}}<a class="btn secondary small" href="{{.PrevURL}}">&larr; Prev</a>{{else}}<span class="btn secondary small disabled">&larr; Prev</span>{{end}}
+		{{if .HasNext}}<a class="btn secondary small" href="{{.NextURL}}">Next &rarr;</a>{{else}}<span class="btn secondary small disabled">Next &rarr;</span>{{end}}
+	</div>
+</div>
+{{end}}
+{{end}}

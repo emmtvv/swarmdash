@@ -1,0 +1,14 @@
+version: "2"
+
+linters:
+  settings:
+    errcheck:
+      exclude-functions:
+        - (io.Closer).Close
+        - (*go.mongodb.org/mongo-driver/v2/mongo.Cursor).Close
+        - (*github.com/docker/docker/client.Client).Close
+        - (*github.com/gorilla/websocket.Conn).Close
+        - (swarmdash/internal/store.Interface).Close
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - fmt.Fprint

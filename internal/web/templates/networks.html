@@ -1,0 +1,53 @@
+{{define "networks.html"}}
+<h1>Networks</h1>
+
+<div class="card">
+	<h2 style="margin-top:0;">Create network</h2>
+	<form method="post" action="/networks">
+		<div class="card-row">
+			<div>
+				<label for="name">Name</label>
+				<input type="text" id="name" name="name" required>
+			</div>
+			<div>
+				<label for="driver">Driver</label>
+				<input type="text" id="driver" name="driver" value="overlay">
+			</div>
+			<div>
+				<label>&nbsp;</label>
+				<label><input type="checkbox" name="attachable" checked> Attachable</label>
+			</div>
+			<div>
+				<label>&nbsp;</label>
+				<label><input type="checkbox" name="internal"> Internal</label>
+			</div>
+			<div>
+				<label>&nbsp;</label>
+				<button type="submit" class="btn">Create</button>
+			</div>
+		</div>
+	</form>
+</div>
+
+<table>
+	<thead><tr><th>Name</th><th>Driver</th><th>Scope</th><th>Attachable</th><th>Ingress</th><th></th></tr></thead>
+	<tbody>
+	{{range .Networks}}
+		<tr>
+			<td class="mono">{{.Name}}</td>
+			<td>{{.Driver}}</td>
+			<td>{{.Scope}}</td>
+			<td>{{.Attachable}}</td>
+			<td>{{.Ingress}}</td>
+			<td>
+				<form class="inline" method="post" action="/networks/{{.ID}}/delete" data-confirm="Delete network {{.Name}}?">
+					<button type="submit" class="btn danger small">Delete</button>
+				</form>
+			</td>
+		</tr>
+	{{else}}
+		<tr><td colspan="6" class="muted">No swarm-scoped networks.</td></tr>
+	{{end}}
+	</tbody>
+</table>
+{{end}}

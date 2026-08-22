@@ -1,0 +1,18 @@
+swarmdash
+Copyright 2026 Egor Matveev
+
+This product bundles the following third-party JavaScript/CSS, vendored
+under internal/web/static/vendor/ and served as static assets:
+
+- htmx (v2.0.4) - https://htmx.org
+  Copyright (c) 2020 Big Sky Software
+  Licensed under the BSD 2-Clause License.
+
+- xterm.js (xterm.js, xterm.css, xterm-addon-fit.js) - https://xtermjs.org
+  Copyright (c) 2017-2025, xterm.js contributors
+  Copyright (c) 2014-2017, SourceLair Private Company
+  Copyright (c) 2012-2013, Christopher Jeffrey
+  Licensed under the MIT License.
+
+These are unmodified builds of the upstream projects; see the respective
+project repositories for full license text and source.

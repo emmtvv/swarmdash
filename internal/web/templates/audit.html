@@ -1,0 +1,21 @@
+{{define "audit.html"}}
+<h1>Audit log</h1>
+<table>
+	<thead><tr><th>Time</th><th>User</th><th>Action</th><th>Target</th><th>Detail</th><th>Result</th></tr></thead>
+	<tbody>
+	{{range .Entries}}
+		<tr>
+			<td class="muted">{{ago .Time}}</td>
+			<td>{{.Username}}</td>
+			<td class="mono">{{.Action}}</td>
+			<td class="mono">{{.Target}}</td>
+			<td class="muted">{{.Detail}}</td>
+			<td>{{if .Success}}<span class="badge state-active">ok</span>{{else}}<span class="badge state-failed" title="{{.Error}}">failed</span>{{end}}</td>
+		</tr>
+	{{else}}
+		<tr><td colspan="6" class="muted">No audit entries yet.</td></tr>
+	{{end}}
+	</tbody>
+</table>
+{{template "pagination" .Pagination}}
+{{end}}

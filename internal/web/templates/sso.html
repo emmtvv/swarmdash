@@ -1,0 +1,89 @@
+{{define "sso.html"}}
+<h1>Single sign-on</h1>
+<p class="muted">Generic OIDC (OpenID Connect) - works with Okta, Authentik, Keycloak, Google Workspace, Azure AD, Auth0 and any other provider that exposes an issuer discovery document. Local username/password login stays available alongside SSO unless you turn on "Require SSO" below.</p>
+
+<div class="card">
+	<form method="post" action="/settings/sso">
+		<div class="card-row">
+			<div>
+				<label for="enabled">Enabled</label>
+				<select id="enabled" name="enabled">
+					<option value="off"{{if not .Config.Enabled}} selected{{end}}>Disabled</option>
+					<option value="on"{{if .Config.Enabled}} selected{{end}}>Enabled</option>
+				</select>
+			</div>
+			<div>
+				<label for="label">Button label</label>
+				<input type="text" id="label" name="label" value="{{.Config.Label}}" placeholder="Okta">
+			</div>
+		</div>
+
+		<label for="issuer">Issuer URL</label>
+		<input type="text" id="issuer" name="issuer" value="{{.Config.Issuer}}" placeholder="https://your-tenant.okta.com" style="width:100%;font-family:ui-monospace,monospace;">
+		<p class="muted" style="margin-top:4px;">swarmdash fetches <span class="mono">&lt;issuer&gt;/.well-known/openid-configuration</span> to find the provider's authorization/token/userinfo endpoints.</p>
+
+		<div class="card-row">
+			<div>
+				<label for="client_id">Client ID</label>
+				<input type="text" id="client_id" name="client_id" value="{{.Config.ClientID}}">
+			</div>
+			<div>
+				<label for="client_secret">Client secret{{if .HasSecret}} <span class="muted">(set - leave blank to keep it)</span>{{end}}</label>
+				<input type="password" id="client_secret" name="client_secret" placeholder="{{if .HasSecret}}unchanged{{else}}required{{end}}">
+			</div>
+		</div>
+
+		<label for="scopes">Scopes</label>
+		<input type="text" id="scopes" name="scopes" value="{{.Config.Scopes}}" placeholder="openid profile email">
+
+		<div class="card-row">
+			<div>
+				<label for="auto_create_users">Auto-create users on first login</label>
+				<select id="auto_create_users" name="auto_create_users">
+					<option value="off"{{if not .Config.AutoCreateUsers}} selected{{end}}>No - accounts must be pre-created (Settings &rarr; Users)</option>
+					<option value="on"{{if .Config.AutoCreateUsers}} selected{{end}}>Yes</option>
+				</select>
+			</div>
+			<div>
+				<label for="default_role">Role for auto-created users</label>
+				<select id="default_role" name="default_role">
+					<option value="viewer"{{if ne .Config.DefaultRole "admin"}} selected{{end}}>viewer</option>
+					<option value="admin"{{if eq .Config.DefaultRole "admin"}} selected{{end}}>admin</option>
+				</select>
+			</div>
+		</div>
+
+		<label for="allowed_domains">Allowed email domains <span class="muted">(optional, comma-separated - leave blank to allow any)</span></label>
+		<input type="text" id="allowed_domains" name="allowed_domains" value="{{.Config.AllowedDomains}}" placeholder="example.com, example.org">
+
+		<label for="redirect_base_url">Public base URL <span class="muted">(optional - set this if admin sits behind a proxy/load balancer; otherwise derived from the request)</span></label>
+		<input type="text" id="redirect_base_url" name="redirect_base_url" value="{{.Config.RedirectBaseURL}}" placeholder="https://swarmdash.example.com">
+		<p class="muted" style="margin-top:4px;">Redirect URI to register with your identity provider: <span class="mono">{{.RedirectURI}}</span></p>
+
+		<div class="section-label">Access control</div>
+		<label style="display:flex;align-items:center;gap:8px;font-weight:400;">
+			<input type="checkbox" name="enforce_sso" style="width:auto;"{{if .Config.EnforceSSO}} checked{{end}}>
+			Require SSO - disable local username/password login
+		</label>
+		{{if .Config.EnforceSSO}}
+		<div class="error-box" style="margin-top:8px;">
+			Local password login is currently <strong>disabled</strong> - only "Sign in with {{.Config.Label}}" works on the login page, and <span class="mono">POST /login</span> rejects password attempts server-side too. If the identity provider becomes unreachable or misconfigured, every account is locked out until this is switched back off directly in the <span class="mono">sso_config</span> MongoDB collection.
+		</div>
+		{{else}}
+		<p class="muted" style="margin-top:4px;">Off by default. Confirm SSO sign-in actually works end-to-end before turning this on - once enabled, the only way back in without direct database access is the identity provider itself.</p>
+		{{end}}
+
+		<button type="submit" class="btn" style="margin-top:16px;">Save</button>
+	</form>
+</div>
+
+{{if .Config.Issuer}}
+<div class="card">
+	<h2 style="margin-top:0;">Disable SSO</h2>
+	<p class="muted">Turns sign-in off without discarding the saved configuration (issuer, client ID/secret) so it can be re-enabled later.</p>
+	<form method="post" action="/settings/sso/disable" data-confirm="Disable SSO login?">
+		<button type="submit" class="btn danger small">Disable</button>
+	</form>
+</div>
+{{end}}
+{{end}}

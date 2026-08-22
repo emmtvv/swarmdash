@@ -1,0 +1,43 @@
+{{define "volumes.html"}}
+<h1>Volumes</h1>
+
+<div class="card-row" style="justify-content:space-between;">
+	<form class="inline" method="get" action="/volumes">
+		<label for="node" style="margin:0;">Node</label>
+		<select name="node" id="node" onchange="this.form.submit()">
+			{{$sel := .SelectedID}}
+			{{range .Nodes}}
+			<option value="{{.ID}}" {{if eq .ID $sel}}selected{{end}}>{{.Description.Hostname}}</option>
+			{{end}}
+		</select>
+	</form>
+	<form class="inline" method="post" action="/volumes">
+		<input type="hidden" name="node" value="{{.SelectedID}}">
+		<input type="text" name="name" placeholder="volume name" required>
+		<input type="text" name="driver" placeholder="local" style="width:100px;">
+		<button type="submit" class="btn">Create</button>
+	</form>
+</div>
+
+<table>
+	<thead><tr><th>Name</th><th>Driver</th><th>Mountpoint</th><th>Created</th><th></th></tr></thead>
+	<tbody>
+	{{range .Volumes}}
+		<tr>
+			<td class="mono">{{.Name}}</td>
+			<td>{{.Driver}}</td>
+			<td class="muted mono">{{.Mountpoint}}</td>
+			<td class="muted">{{.CreatedAt}}</td>
+			<td>
+				<form class="inline" method="post" action="/volumes/{{.Name}}/delete?node={{$.SelectedID}}" data-confirm="Delete volume {{.Name}}? Data will be lost.">
+					<button type="submit" class="btn danger small">Delete</button>
+				</form>
+			</td>
+		</tr>
+	{{else}}
+		<tr><td colspan="5" class="muted">No volumes on this node.</td></tr>
+	{{end}}
+	</tbody>
+</table>
+{{template "pagination" .Pagination}}
+{{end}}

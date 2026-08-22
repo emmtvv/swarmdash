@@ -1,0 +1,14 @@
+{{define "templates_gallery.html"}}
+<h1>Templates</h1>
+<p class="muted">Built-in compose templates for common self-hosted services. "Use template" pre-fills the deploy form - review and edit (especially placeholder passwords) before deploying.</p>
+
+<div class="grid">
+	{{range .Templates}}
+	<div class="stat-card" style="text-align:left;">
+		<div class="l" style="font-weight:600;font-size:1.05em;">{{.Name}}</div>
+		<p class="muted" style="margin:8px 0 12px;">{{.Description}}</p>
+		<a href="/stacks/deploy?template={{.ID}}" class="btn secondary small">Use template</a>
+	</div>
+	{{end}}
+</div>
+{{end}}

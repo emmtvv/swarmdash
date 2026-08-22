@@ -1,0 +1,38 @@
+{{define "images.html"}}
+<h1>Images</h1>
+
+<div class="card-row" style="justify-content:space-between;">
+	<form class="inline" method="get" action="/images">
+		<label for="node" style="margin:0;">Node</label>
+		<select name="node" id="node" onchange="this.form.submit()">
+			{{$sel := .SelectedID}}
+			{{range .Nodes}}
+			<option value="{{.ID}}" {{if eq .ID $sel}}selected{{end}}>{{.Description.Hostname}}</option>
+			{{end}}
+		</select>
+	</form>
+	<form class="inline" method="post" action="/images/prune" data-confirm="Prune images on this node?">
+		<input type="hidden" name="node" value="{{.SelectedID}}">
+		<label><input type="checkbox" name="all"> Remove all unused (not just dangling)</label>
+		<button type="submit" class="btn secondary">Prune</button>
+	</form>
+</div>
+
+<table>
+	<thead><tr><th>Repository:Tag</th><th>ID</th><th>Size</th><th>Containers</th><th>Created</th></tr></thead>
+	<tbody>
+	{{range .Images}}
+		<tr>
+			<td class="mono">{{if .RepoTags}}{{range .RepoTags}}{{.}}<br>{{end}}{{else}}<span class="muted">&lt;none&gt;</span>{{end}}</td>
+			<td class="mono muted">{{shortID .ID}}</td>
+			<td>{{bytesHuman .Size}}</td>
+			<td>{{if ge .Containers 0}}{{.Containers}}{{else}}-{{end}}</td>
+			<td class="muted">{{unixAgo .Created}}</td>
+		</tr>
+	{{else}}
+		<tr><td colspan="5" class="muted">No images on this node.</td></tr>
+	{{end}}
+	</tbody>
+</table>
+{{template "pagination" .Pagination}}
+{{end}}

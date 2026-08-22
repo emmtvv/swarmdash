@@ -1,0 +1,298 @@
+{{define "service_detail.html"}}
+{{$stack := index .Service.Spec.Labels "com.docker.stack.namespace"}}
+<div class="breadcrumb">
+	<a href="/services">Services</a>{{if $stack}} / <a href="/stacks/{{$stack}}">{{$stack}}</a>{{end}} / {{.Service.Spec.Name}}
+</div>
+
+<div class="page-header">
+	<h1>{{.Service.Spec.Name}}</h1>
+	<div class="actions">
+		<a href="/services/{{.Service.Spec.Name}}/export.yml" class="btn secondary">Export compose</a>
+		<a href="/services/{{.Service.Spec.Name}}/logs" class="btn secondary">Logs</a>
+		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/restart" data-confirm="Force-restart all tasks?">
+			<button type="submit" class="btn secondary">Restart</button>
+		</form>
+		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/update-latest" data-confirm="Re-pull the latest image for this tag and redeploy?">
+			<button type="submit" class="btn secondary">Update to latest</button>
+		</form>
+		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/rollback" data-confirm="Roll back to the previous version?">
+			<button type="submit" class="btn secondary" {{if not .Service.PreviousSpec}}disabled{{end}}>Rollback</button>
+		</form>
+		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/delete" data-confirm="Delete service {{.Service.Spec.Name}}?">
+			<button type="submit" class="btn danger">Delete</button>
+		</form>
+	</div>
+</div>
+
+<div id="rollout-banner"></div>
+
+<div class="card">
+	<div class="card-row" style="justify-content:space-between;">
+		<div class="field">
+			<div class="muted">Image</div>
+			<div class="mono">{{imageName .Service.Spec.TaskTemplate.ContainerSpec.Image}}</div>
+		</div>
+		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/image">
+			<input type="text" name="image" placeholder="new-image:tag" value="{{.Service.Spec.TaskTemplate.ContainerSpec.Image}}" style="width:320px;">
+			<button type="submit" class="btn">Update image</button>
+		</form>
+	</div>
+
+	{{if not .IsGlobal}}
+	<div class="card-row" style="margin-top:16px;">
+		<div class="muted">Replicas: {{.Replicas}}</div>
+		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/scale">
+			<input type="number" name="replicas" value="{{.Replicas}}" min="0" style="width:80px;">
+			<button type="submit" class="btn secondary">Scale</button>
+		</form>
+	</div>
+	{{end}}
+</div>
+
+<details class="card">
+	<summary style="cursor:pointer;font-weight:600;">Advanced settings</summary>
+	<form method="post" action="/services/{{.Service.Spec.Name}}/spec" style="margin-top:16px;">
+		<div class="section-label">Container</div>
+		<div class="form-grid">
+			<div>
+				<label for="entrypoint">Entrypoint (overrides image ENTRYPOINT)</label>
+				<textarea id="entrypoint" name="entrypoint" hidden data-list-editor="line" data-placeholders="/bin/sh">{{.Editor.Entrypoint}}</textarea>
+			</div>
+			<div>
+				<label for="command">Command (overrides image CMD)</label>
+				<textarea id="command" name="command" hidden data-list-editor="line" data-placeholders="-c">{{.Editor.Command}}</textarea>
+			</div>
+			<div>
+				<label for="env">Environment variables</label>
+				<textarea id="env" name="env" hidden data-list-editor="kv">{{.Editor.Env}}</textarea>
+			</div>
+			<div>
+				<label for="labels">Labels</label>
+				<textarea id="labels" name="labels" hidden data-list-editor="kv">{{.Editor.Labels}}</textarea>
+			</div>
+			<div>
+				<label for="mounts">Mounts</label>
+				<textarea id="mounts" name="mounts" hidden data-list-editor="mount">{{.Editor.Mounts}}</textarea>
+			</div>
+		</div>
+
+		<div class="section-label">Networking</div>
+		<div class="form-grid">
+			<div>
+				<label for="ports">Published ports</label>
+				<textarea id="ports" name="ports" hidden data-list-editor="port">{{.Editor.Ports}}</textarea>
+			</div>
+			<div>
+				<label for="networks">Attached networks (must already exist)</label>
+				<textarea id="networks" name="networks" hidden data-list-editor="line" data-placeholders="network-name">{{.Editor.Networks}}</textarea>
+			</div>
+		</div>
+
+		<div class="section-label">Secrets &amp; configs</div>
+		<div class="form-grid">
+			<div>
+				<label for="secrets">Secrets</label>
+				<textarea id="secrets" name="secrets" hidden data-list-editor="ref">{{.Editor.Secrets}}</textarea>
+			</div>
+			<div>
+				<label for="configs">Configs</label>
+				<textarea id="configs" name="configs" hidden data-list-editor="ref">{{.Editor.Configs}}</textarea>
+			</div>
+		</div>
+
+		<div class="section-label">Placement</div>
+		<div class="form-grid">
+			<div>
+				<label for="constraints">Placement constraints</label>
+				<textarea id="constraints" name="constraints" hidden data-list-editor="line" data-placeholders="node.role==worker">{{.Editor.Constraints}}</textarea>
+			</div>
+			<div>
+				<label for="preferences">Spread preferences</label>
+				<textarea id="preferences" name="preferences" hidden data-list-editor="line" data-placeholders="node.labels.zone">{{.Editor.Preferences}}</textarea>
+			</div>
+		</div>
+
+		<div class="section-label">Healthcheck</div>
+		<div class="card-row">
+			<div style="flex:1 1 260px;">
+				<label for="health_test">Test command (run via /bin/sh -c)</label>
+				<input type="text" id="health_test" name="health_test" value="{{.Editor.HealthTest}}" placeholder="curl -f http://localhost/health || exit 1" style="width:100%;font-family:ui-monospace,monospace;">
+			</div>
+			<div>
+				<label for="health_interval">Interval</label>
+				<input type="text" id="health_interval" name="health_interval" value="{{.Editor.HealthInterval}}" placeholder="30s" style="width:90px;">
+			</div>
+			<div>
+				<label for="health_timeout">Timeout</label>
+				<input type="text" id="health_timeout" name="health_timeout" value="{{.Editor.HealthTimeout}}" placeholder="10s" style="width:90px;">
+			</div>
+			<div>
+				<label for="health_start_period">Start period</label>
+				<input type="text" id="health_start_period" name="health_start_period" value="{{.Editor.HealthStartPeriod}}" placeholder="0s" style="width:90px;">
+			</div>
+			<div>
+				<label for="health_retries">Retries</label>
+				<input type="number" id="health_retries" name="health_retries" value="{{.Editor.HealthRetries}}" min="0" style="width:80px;">
+			</div>
+			<div>
+				<label>&nbsp;</label>
+				<label><input type="checkbox" name="health_disabled" {{if .Editor.HealthDisabled}}checked{{end}}> Disable healthcheck</label>
+			</div>
+		</div>
+
+		<div class="section-label">Resources &amp; restart</div>
+		<div class="card-row">
+			<div>
+				<label for="cpu_limit">CPU limit</label>
+				<input type="text" id="cpu_limit" name="cpu_limit" value="{{.Editor.CPULimit}}" placeholder="0.5" style="width:100px;">
+			</div>
+			<div>
+				<label for="mem_limit">Memory limit</label>
+				<input type="text" id="mem_limit" name="mem_limit" value="{{.Editor.MemLimit}}" placeholder="256M" style="width:100px;">
+			</div>
+			<div>
+				<label for="cpu_reservation">CPU reservation</label>
+				<input type="text" id="cpu_reservation" name="cpu_reservation" value="{{.Editor.CPUReservation}}" placeholder="0.1" style="width:100px;">
+			</div>
+			<div>
+				<label for="mem_reservation">Memory reservation</label>
+				<input type="text" id="mem_reservation" name="mem_reservation" value="{{.Editor.MemReservation}}" placeholder="64M" style="width:100px;">
+			</div>
+			<div>
+				<label for="restart_condition">Restart policy</label>
+				<select id="restart_condition" name="restart_condition" style="width:120px;">
+					<option value="any" {{if eq .Editor.RestartCondition "any"}}selected{{end}}>any</option>
+					<option value="on-failure" {{if eq .Editor.RestartCondition "on-failure"}}selected{{end}}>on-failure</option>
+					<option value="none" {{if eq .Editor.RestartCondition "none"}}selected{{end}}>none</option>
+				</select>
+			</div>
+		</div>
+
+		<div class="section-label">Rolling update</div>
+		<div class="card-row">
+			<div>
+				<label for="update_parallelism">Update parallelism</label>
+				<input type="number" id="update_parallelism" name="update_parallelism" value="{{.Editor.UpdateParallelism}}" min="0" style="width:100px;">
+			</div>
+			<div>
+				<label for="update_delay">Update delay</label>
+				<input type="text" id="update_delay" name="update_delay" value="{{.Editor.UpdateDelay}}" placeholder="10s" style="width:100px;">
+			</div>
+			<div>
+				<label for="update_order">Update order</label>
+				<select id="update_order" name="update_order" style="width:130px;">
+					<option value="stop-first" {{if eq .Editor.UpdateOrder "stop-first"}}selected{{end}}>stop-first</option>
+					<option value="start-first" {{if eq .Editor.UpdateOrder "start-first"}}selected{{end}}>start-first</option>
+				</select>
+			</div>
+			<div>
+				<label for="update_failure_action">On update failure</label>
+				<select id="update_failure_action" name="update_failure_action" style="width:130px;">
+					<option value="pause" {{if eq .Editor.UpdateFailure "pause"}}selected{{end}}>pause</option>
+					<option value="continue" {{if eq .Editor.UpdateFailure "continue"}}selected{{end}}>continue</option>
+					<option value="rollback" {{if eq .Editor.UpdateFailure "rollback"}}selected{{end}}>rollback</option>
+				</select>
+			</div>
+			<div>
+				<label>&nbsp;</label>
+				<button type="submit" class="btn">Save advanced settings</button>
+			</div>
+		</div>
+	</form>
+</details>
+
+<div class="card">
+	<h2 style="margin-top:0;">CI/CD deploy webhook</h2>
+	<p class="muted">POST to this URL (optionally with a JSON body <span class="mono">{"image":"repo/name:tag"}</span>) to trigger a redeploy from CI - no session or API token needed, the URL itself is the credential.</p>
+
+	{{if .NewDeployHookURL}}
+	<div class="card" style="border-color:var(--green);">
+		<strong>Webhook created - copy it now, it won't be shown again:</strong>
+		<div class="mono" style="margin-top:8px;padding:8px;background:var(--bg);border-radius:6px;word-break:break-all;">{{.NewDeployHookURL}}</div>
+	</div>
+	{{end}}
+
+	<table>
+		<thead><tr><th>Created</th><th>Last triggered</th><th></th></tr></thead>
+		<tbody>
+		{{range .DeployHooks}}
+			<tr>
+				<td class="muted">{{ago .CreatedAt}}</td>
+				<td class="muted">{{ago .LastUsedAt}}</td>
+				<td>
+					<form class="inline" method="post" action="/services/{{$.Service.Spec.Name}}/deploy-hooks/{{.ID}}/delete" data-confirm="Delete this deploy webhook?">
+						<button type="submit" class="btn danger small">Delete</button>
+					</form>
+				</td>
+			</tr>
+		{{else}}
+			<tr><td colspan="3" class="muted">No deploy webhooks yet.</td></tr>
+		{{end}}
+		</tbody>
+	</table>
+
+	<form method="post" action="/services/{{.Service.Spec.Name}}/deploy-hooks" style="margin-top:12px;">
+		<button type="submit" class="btn secondary">Create deploy webhook</button>
+	</form>
+</div>
+
+<h2>Tasks</h2>
+<div class="table-wrap">
+<input type="text" class="table-search" data-table-search placeholder="Filter tasks...">
+<table data-enhance>
+	<thead><tr><th>Slot</th><th>Node</th><th>State</th><th>Desired</th><th>Container</th><th>Updated</th><th>Message</th><th data-no-sort></th></tr></thead>
+	<tbody id="tasks-body">
+	{{range .Tasks}}
+		<tr>
+			<td>{{.Slot}}</td>
+			<td>{{index $.Hostnames .NodeID}}</td>
+			<td><span class="badge state-{{.Status.State}}">{{.Status.State}}</span></td>
+			<td class="muted">{{.DesiredState}}</td>
+			<td class="mono muted">{{if .Status.ContainerStatus}}{{shortID .Status.ContainerStatus.ContainerID}}{{end}}</td>
+			<td class="muted">{{ago .Status.Timestamp}}</td>
+			<td class="muted">{{.Status.Err}}{{.Status.Message}}</td>
+			<td>{{if eq .Status.State "running"}}<a href="/exec/{{.ID}}" class="btn small secondary">Console</a> <a href="/logs/{{.ID}}" class="btn small secondary">Logs</a>{{end}}</td>
+		</tr>
+	{{end}}
+	</tbody>
+</table>
+</div>
+
+<script nonce="{{cspNonce}}">
+(function() {
+	const src = new EventSource("/services/{{.Service.Spec.Name}}/events");
+	const banner = document.getElementById("rollout-banner");
+	const body = document.getElementById("tasks-body");
+
+	function stateBadge(s) { return '<span class="badge state-' + s + '">' + s + '</span>'; }
+	function esc(s) { return (s || "").replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
+
+	src.onmessage = function(ev) {
+		const d = JSON.parse(ev.data);
+
+		if (d.updateState && d.updateState !== "" && d.updateState !== "completed") {
+			banner.innerHTML = '<div class="card" style="border-color:var(--accent);">Rollout: ' +
+				stateBadge(d.updateState) + ' <span class="muted">' + esc(d.updateMessage) + '</span></div>';
+		} else {
+			banner.innerHTML = "";
+		}
+
+		let rows = "";
+		for (const t of (d.tasks || [])) {
+			rows += "<tr>" +
+				"<td>" + t.slot + "</td>" +
+				"<td>" + esc(t.node) + "</td>" +
+				"<td>" + stateBadge(t.state) + "</td>" +
+				"<td class=\"muted\">" + esc(t.desiredState) + "</td>" +
+				"<td class=\"mono muted\">" + esc((t.containerId || "").slice(0, 12)) + "</td>" +
+				"<td class=\"muted\">" + esc(t.updatedAt) + "</td>" +
+				"<td class=\"muted\">" + esc(t.err || t.message) + "</td>" +
+				"<td>" + (t.state === "running" ? '<a href="/exec/' + t.id + '" class="btn small secondary">Console</a> <a href="/logs/' + t.id + '" class="btn small secondary">Logs</a>' : "") + "</td>" +
+				"</tr>";
+		}
+		body.innerHTML = rows;
+	};
+	window.addEventListener("beforeunload", () => src.close());
+})();
+</script>
+{{end}}

@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.25"
+          check-latest: true
+          cache: true
+
+      - name: gofmt
+        run: |
+          fmt="$(gofmt -l .)"
+          if [ -n "$fmt" ]; then
+            echo "gofmt needs to be run on:"
+            echo "$fmt"
+            exit 1
+          fi
+
+      - name: vet
+        run: go vet ./...
+
+      - name: test
+        run: go test ./... -cover
+
+      - name: build
+        run: go build -trimpath -o bin/swarmdash ./cmd/swarmdash
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.25"
+          check-latest: true
+          cache: true
+
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.5.0
+
+  # Informational only (see the job comment below) - a red run here should
+  # prompt a look, not block merges, since as of this writing both flagged
+  # advisories are dockerd-daemon-side issues with no fixed version to
+  # upgrade to yet (see the job for details).
+  vulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.25"
+          check-latest: true
+          cache: true
+
+      # Non-blocking: govulncheck currently flags GO-2026-4887 and
+      # GO-2026-4883 in github.com/docker/docker - both are dockerd daemon
+      # bugs (AuthZ plugin bypass / plugin privilege validation), not
+      # client-SDK issues, reachable only through this module's own
+      # package-init graph rather than through any code path swarmdash
+      # (which only uses docker/docker as an API client) actually calls.
+      # Neither has a fixed version yet, so failing the build on them would
+      # just be permanently red. Revisit continue-on-error once upstream
+      # ships a fix or the advisories are refined.
+      - name: govulncheck
+        continue-on-error: true
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...

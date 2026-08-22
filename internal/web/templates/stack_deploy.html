@@ -1,0 +1,51 @@
+{{define "stack_deploy.html"}}
+<h1>Deploy stack from compose</h1>
+<p class="muted">Supports a pragmatic subset of the compose format: image, command, environment, labels, ports, volumes (short syntax), networks, deploy.replicas/mode/placement/resources/update_config/restart_policy. Secrets and configs must already exist (create them under Secrets/Configs first) and are referenced with <span class="mono">external: true</span>. No build:, no bind-mount host paths resolved against your local machine.</p>
+
+{{if .Error}}<div class="error-box">{{.Error}}</div>{{end}}
+
+{{if .Diffs}}
+<div class="card">
+	<h2 style="margin-top:0;">Preview</h2>
+	<table>
+		<thead><tr><th>Service</th><th>Action</th><th>Changes</th></tr></thead>
+		<tbody>
+		{{range .Diffs}}
+			<tr>
+				<td class="mono">{{.Name}}</td>
+				<td>
+					{{if eq .Action "create"}}<span class="badge state-active">create</span>
+					{{else if eq .Action "update"}}<span class="badge state-pending">update</span>
+					{{else}}<span class="badge">unchanged</span>{{end}}
+				</td>
+				<td class="muted">{{range .Changes}}{{.}}<br>{{end}}</td>
+			</tr>
+		{{end}}
+		</tbody>
+	</table>
+</div>
+{{end}}
+
+<form method="post" action="/stacks/deploy">
+	<label for="name">Stack name</label>
+	<input type="text" id="name" name="name" value="{{.Name}}" required style="width:320px;" pattern="[a-zA-Z0-9][a-zA-Z0-9_.\-]*">
+
+	<label for="compose">Compose YAML</label>
+	<textarea id="compose" name="compose" rows="22" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;" required placeholder="services:
+  web:
+    image: nginx:alpine
+    ports:
+      - &quot;8080:80&quot;
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: &quot;0.5&quot;
+          memory: 256M">{{.Compose}}</textarea>
+
+	<div class="card-row" style="margin-top:12px;">
+		<button type="submit" formaction="/stacks/deploy/preview" class="btn secondary">Preview</button>
+		<button type="submit" class="btn">Deploy</button>
+	</div>
+</form>
+{{end}}

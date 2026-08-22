@@ -1,0 +1,44 @@
+{{define "nodes.html"}}
+<h1>Nodes</h1>
+<div class="table-wrap">
+<input type="text" class="table-search" data-table-search placeholder="Filter nodes...">
+<table data-enhance>
+	<thead><tr><th>Hostname</th><th>Role</th><th>Status</th><th>Availability</th><th>Address</th><th>CPUs</th><th>CPU used</th><th>Memory</th><th>Mem used</th><th>Disk used</th><th>Engine</th><th data-no-sort></th></tr></thead>
+	<tbody>
+	{{range .Nodes}}
+		<tr>
+			<td><a href="/nodes/{{.ID}}">{{.Description.Hostname}}</a>{{if eq .Spec.Role "manager"}}{{if .ManagerStatus}}{{if .ManagerStatus.Leader}} <span class="badge state-active">leader</span>{{end}}{{end}}{{end}}</td>
+			<td>{{.Spec.Role}}</td>
+			<td><span class="badge state-{{.Status.State}}">{{.Status.State}}</span></td>
+			<td><span class="badge state-{{.Spec.Availability}}">{{.Spec.Availability}}</span></td>
+			<td class="muted mono">{{.Status.Addr}}</td>
+			<td>{{cpus .Description.Resources.NanoCPUs}}</td>
+			<td id="cpu-used-{{.ID}}" class="muted node-stat-loading">&hellip;</td>
+			<td>{{bytesHuman .Description.Resources.MemoryBytes}}</td>
+			<td id="mem-used-{{.ID}}" class="muted node-stat-loading">&hellip;</td>
+			<td id="disk-used-{{.ID}}" class="muted node-stat-loading">&hellip;</td>
+			<td class="muted">{{.Description.Engine.EngineVersion}}</td>
+			<td>
+				<div class="card-row" style="gap:4px;">
+					{{if ne (print .Spec.Availability) "active"}}
+					<form class="inline" method="post" action="/nodes/{{.ID}}/availability"><input type="hidden" name="availability" value="active"><button type="submit" class="btn small secondary">Activate</button></form>
+					{{end}}
+					{{if ne (print .Spec.Availability) "pause"}}
+					<form class="inline" method="post" action="/nodes/{{.ID}}/availability"><input type="hidden" name="availability" value="pause"><button type="submit" class="btn small secondary">Pause</button></form>
+					{{end}}
+					{{if ne (print .Spec.Availability) "drain"}}
+					<form class="inline" method="post" action="/nodes/{{.ID}}/availability" data-confirm="Drain {{.Description.Hostname}}? Its tasks will be rescheduled elsewhere."><input type="hidden" name="availability" value="drain"><button type="submit" class="btn small secondary">Drain</button></form>
+					{{end}}
+					{{if eq (print .Spec.Role) "worker"}}
+					<form class="inline" method="post" action="/nodes/{{.ID}}/promote" data-confirm="Promote {{.Description.Hostname}} to manager?"><button type="submit" class="btn small secondary">Promote</button></form>
+					{{else}}
+					<form class="inline" method="post" action="/nodes/{{.ID}}/demote" data-confirm="Demote {{.Description.Hostname}} to worker?"><button type="submit" class="btn small secondary">Demote</button></form>
+					{{end}}
+				</div>
+			</td>
+		</tr>
+	{{end}}
+	</tbody>
+</table>
+</div>
+{{end}}

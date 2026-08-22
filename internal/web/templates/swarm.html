@@ -1,0 +1,196 @@
+{{define "swarm.html"}}
+<h1>Swarm</h1>
+
+{{if .Flash}}
+{{if eq .Flash.Kind "tasks"}}
+<div class="alert {{if gt .Flash.Failed 0}}alert-warn{{else}}alert-success{{end}}">
+	<span>Removed {{.Flash.Removed}} failed task container{{if ne .Flash.Removed 1}}s{{end}}.{{if gt .Flash.Failed 0}} {{.Flash.Failed}} could not be removed - check the audit log.{{end}}</span>
+</div>
+{{else if eq .Flash.Kind "resources"}}
+<div class="alert {{if gt .Flash.Errors 0}}alert-warn{{else}}alert-success{{end}}">
+	<span>Cleaned up {{.Flash.Containers}} container{{if ne .Flash.Containers 1}}s{{end}}, {{.Flash.Images}} image{{if ne .Flash.Images 1}}s{{end}}, {{.Flash.Networks}} network{{if ne .Flash.Networks 1}}s{{end}}{{if gt .Flash.Volumes 0}}, {{.Flash.Volumes}} volume{{if ne .Flash.Volumes 1}}s{{end}}{{end}} - {{bytesHuman .Flash.Reclaimed}} reclaimed.{{if gt .Flash.Errors 0}} {{.Flash.Errors}} node{{if ne .Flash.Errors 1}}s{{end}} could not be reached.{{end}}</span>
+</div>
+{{end}}
+{{end}}
+
+<div class="card">
+	<div class="field-row">
+		<div class="field"><div class="muted">Cluster ID</div><div class="mono">{{.Swarm.ID}}</div></div>
+		<div class="field"><div class="muted">Created</div><div>{{ago .Swarm.CreatedAt}}</div></div>
+		<div class="field"><div class="muted">Updated</div><div>{{ago .Swarm.UpdatedAt}}</div></div>
+		<div class="field"><div class="muted">Root rotation in progress</div><div>{{.Swarm.RootRotationInProgress}}</div></div>
+	</div>
+</div>
+
+{{if .Flash}}{{if eq .Flash.Kind "settings"}}
+<div class="alert alert-success">
+	<span>Cluster settings saved.{{if .Flash.UnlockKey}} Manager autolock is now on - save this unlock key, it won't be shown again: <span class="mono" style="user-select:all;">{{.Flash.UnlockKey}}</span>{{end}}</span>
+</div>
+{{else if eq .Flash.Kind "certrotate"}}
+<div class="alert alert-success"><span>Root CA rotation started. New node certificates will roll out as they're renewed.</span></div>
+{{end}}{{end}}
+
+<h2>Cluster settings</h2>
+<p class="muted">Configuration that applies cluster-wide, as set in the swarm spec. Raft and dispatcher timing are set at init and rarely need changing - wrong values here can affect cluster stability.</p>
+
+<div class="card">
+	<div class="field-row">
+		<div class="field"><div class="muted">Default address pool</div><div class="mono">{{if .Swarm.DefaultAddrPool}}{{range $i, $p := .Swarm.DefaultAddrPool}}{{if $i}}, {{end}}{{$p}}{{end}}{{else}}-{{end}}</div></div>
+		<div class="field"><div class="muted">Subnet size</div><div>{{if .Swarm.SubnetSize}}/{{.Swarm.SubnetSize}}{{else}}-{{end}}</div></div>
+		<div class="field"><div class="muted">Data path port</div><div>{{if .Swarm.DataPathPort}}{{.Swarm.DataPathPort}}{{else}}default (4789){{end}}</div></div>
+	</div>
+	<p class="muted" style="margin-top:10px;">These three are fixed at <span class="mono">docker swarm init</span> time and can't be changed afterward.</p>
+
+	<form method="post" action="/settings/swarm/spec" data-confirm="Apply these cluster-wide settings?" style="margin-top:20px;">
+		<div class="form-grid">
+			<div>
+				<label for="name">Cluster name</label>
+				<input type="text" id="name" name="name" value="{{.Editor.Name}}">
+			</div>
+			<div>
+				<label><input type="checkbox" name="autolock" {{if .Editor.AutoLock}}checked{{end}}> Autolock managers (encrypt TLS keys/raft data at rest)</label>
+			</div>
+			<div>
+				<label for="labels">Labels</label>
+				<textarea id="labels" name="labels" hidden data-list-editor="kv">{{.Editor.Labels}}</textarea>
+			</div>
+		</div>
+
+		<div class="section-label">Certificate authority</div>
+		<div class="form-grid">
+			<div>
+				<label for="cert_expiry">Node cert expiry</label>
+				<input type="text" id="cert_expiry" name="cert_expiry" value="{{.Editor.CertExpiry}}" placeholder="2160h">
+			</div>
+		</div>
+
+		<div class="section-label">Orchestration</div>
+		<div class="form-grid">
+			<div>
+				<label for="task_history_retention">Task history retention limit (blank = engine default, negative = keep forever)</label>
+				<input type="number" id="task_history_retention" name="task_history_retention" value="{{.Editor.TaskHistoryRetentionLimit}}">
+			</div>
+			<div>
+				<label for="log_driver_name">Default task log driver (blank = engine default)</label>
+				<input type="text" id="log_driver_name" name="log_driver_name" value="{{.Editor.LogDriverName}}" placeholder="json-file">
+			</div>
+			<div>
+				<label for="log_driver_options">Log driver options</label>
+				<textarea id="log_driver_options" name="log_driver_options" hidden data-list-editor="kv">{{.Editor.LogDriverOptions}}</textarea>
+			</div>
+		</div>
+
+		<div class="section-label">Raft</div>
+		<div class="field-row">
+			<div class="field">
+				<label for="raft_snapshot_interval" style="margin:0;">Snapshot interval (log entries)</label>
+				<input type="number" id="raft_snapshot_interval" name="raft_snapshot_interval" value="{{.Editor.RaftSnapshotInterval}}" style="width:150px;">
+			</div>
+			<div class="field">
+				<label for="raft_keep_old_snapshots" style="margin:0;">Keep old snapshots</label>
+				<input type="number" id="raft_keep_old_snapshots" name="raft_keep_old_snapshots" value="{{.Editor.RaftKeepOldSnapshots}}" style="width:150px;">
+			</div>
+			<div class="field">
+				<label for="raft_log_entries_slow_followers" style="margin:0;">Log entries for slow followers</label>
+				<input type="number" id="raft_log_entries_slow_followers" name="raft_log_entries_slow_followers" value="{{.Editor.RaftLogEntriesSlowFollowers}}" style="width:150px;">
+			</div>
+			<div class="field">
+				<label for="raft_election_tick" style="margin:0;">Election tick</label>
+				<input type="number" id="raft_election_tick" name="raft_election_tick" value="{{.Editor.RaftElectionTick}}" style="width:100px;">
+			</div>
+			<div class="field">
+				<label for="raft_heartbeat_tick" style="margin:0;">Heartbeat tick</label>
+				<input type="number" id="raft_heartbeat_tick" name="raft_heartbeat_tick" value="{{.Editor.RaftHeartbeatTick}}" style="width:100px;">
+			</div>
+		</div>
+
+		<div class="section-label">Dispatcher</div>
+		<div class="form-grid">
+			<div>
+				<label for="dispatcher_heartbeat">Heartbeat period</label>
+				<input type="text" id="dispatcher_heartbeat" name="dispatcher_heartbeat" value="{{.Editor.DispatcherHeartbeatPeriod}}" placeholder="5s">
+			</div>
+		</div>
+
+		<button type="submit" class="btn" style="margin-top:18px;">Save cluster settings</button>
+	</form>
+</div>
+
+<div class="card">
+	<div class="card-row" style="justify-content:space-between;align-items:center;">
+		<div>
+			<div>Force root CA rotation</div>
+			<div class="muted">Generates a new cluster root certificate; all node certificates are reissued as they're renewed. External CAs configured: {{if .Swarm.Spec.CAConfig.ExternalCAs}}{{len .Swarm.Spec.CAConfig.ExternalCAs}}{{else}}none{{end}}.</div>
+		</div>
+		<form method="post" action="/settings/swarm/rotate-ca" data-confirm="Force the swarm to generate a new root CA certificate? All node certificates will be reissued as they renew.">
+			<button type="submit" class="btn secondary">Rotate CA cert</button>
+		</form>
+	</div>
+</div>
+
+<h2>Join tokens</h2>
+<p class="muted">Run on the node you want to add: <span class="mono">docker swarm join --token &lt;token&gt; {{.ManagerAddr}}:2377</span></p>
+
+<div class="card">
+	<div class="card-row" style="justify-content:space-between;align-items:flex-start;">
+		<div class="field">
+			<div class="muted">Worker token</div>
+			<div class="mono" style="word-break:break-all;max-width:600px;">{{.Swarm.JoinTokens.Worker}}</div>
+		</div>
+		<form method="post" action="/settings/swarm/rotate-token/worker" data-confirm="Rotate the worker join token? Existing tokens will stop working.">
+			<button type="submit" class="btn secondary small">Rotate</button>
+		</form>
+	</div>
+	<div class="card-row" style="justify-content:space-between;align-items:flex-start;margin-top:18px;">
+		<div class="field">
+			<div class="muted">Manager token</div>
+			<div class="mono" style="word-break:break-all;max-width:600px;">{{.Swarm.JoinTokens.Manager}}</div>
+		</div>
+		<form method="post" action="/settings/swarm/rotate-token/manager" data-confirm="Rotate the manager join token? Existing tokens will stop working.">
+			<button type="submit" class="btn secondary small">Rotate</button>
+		</form>
+	</div>
+</div>
+
+<h2>Rebalance</h2>
+<p class="muted">Swarm only weighs current node load when placing <em>new</em> tasks - it never moves an already-running task onto a node that joined later. After adding or removing nodes, force-restart every replicated service so the scheduler re-places all their tasks across the {{.NodeCount}} node{{if ne .NodeCount 1}}s{{end}} currently in the cluster. Each service still rolls per its own update policy (parallelism/delay/order), so this doesn't take everything down at once. Global-mode services aren't included - they already run one task per eligible node automatically.</p>
+<div class="card">
+	<div class="card-row" style="justify-content:space-between;align-items:center;">
+		<div class="muted">{{.ReplicatedServiceCount}} replicated service{{if ne .ReplicatedServiceCount 1}}s{{end}} will be force-restarted</div>
+		<form method="post" action="/settings/swarm/rebalance" data-confirm="Force-restart all {{.ReplicatedServiceCount}} replicated services so Swarm re-places their tasks across every current node?">
+			<button type="submit" class="btn secondary" {{if not .ReplicatedServiceCount}}disabled{{end}}>Rebalance services</button>
+		</form>
+	</div>
+</div>
+
+<h2>Cluster cleanup</h2>
+<p class="muted">Reduce load left over from normal cluster operation: dead task containers that outlived their usefulness, and images/networks/volumes/containers nothing references anymore.</p>
+
+<div class="card">
+	<div class="card-row" style="justify-content:space-between;align-items:center;">
+		<div>
+			<div>Remove failed tasks</div>
+			<div class="muted">Deletes the leftover container behind every task in <span class="mono">failed</span> or <span class="mono">rejected</span> state, across all nodes. Running tasks and their history for successful deploys are untouched.</div>
+		</div>
+		<form method="post" action="/settings/swarm/prune-failed-tasks" data-confirm="Remove the container behind every failed/rejected task across the cluster?">
+			<button type="submit" class="btn secondary" {{if not .FailedTaskCount}}disabled{{end}}>Remove {{.FailedTaskCount}} failed task{{if ne .FailedTaskCount 1}}s{{end}}</button>
+		</form>
+	</div>
+</div>
+
+<div class="card">
+	<div class="card-row" style="justify-content:space-between;align-items:flex-start;">
+		<div>
+			<div>Clean unused resources</div>
+			<div class="muted">Runs a <span class="mono">docker system prune</span> equivalent on every node: stopped containers, unused networks, and dangling images. Nothing that's running or in use is touched.</div>
+			<form method="post" action="/settings/swarm/prune-resources" data-confirm="Clean up unused containers, images and networks on every node in the cluster?" style="margin-top:12px;">
+				<div class="card-row" style="gap:18px;">
+					<label><input type="checkbox" name="all"> Remove all unused images, not just dangling ones</label>
+					<label><input type="checkbox" name="volumes"> Also remove unused volumes (data loss risk)</label>
+				</div>
+				<button type="submit" class="btn secondary" style="margin-top:10px;">Clean up cluster</button>
+			</form>
+		</div>
+	</div>
+</div>
+{{end}}

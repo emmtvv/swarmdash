@@ -1,0 +1,19 @@
+{{define "status.html"}}
+<div class="login-page">
+	<div class="login-card" style="width:420px;">
+		<h1>swarmdash</h1>
+		<div class="card-row" style="margin-bottom:16px;">
+			{{if .Healthy}}
+				<span class="badge state-active" style="font-size:14px;padding:6px 14px;">All systems operational</span>
+			{{else}}
+				<span class="badge state-pending" style="font-size:14px;padding:6px 14px;">Degraded</span>
+			{{end}}
+		</div>
+		<div class="grid" style="grid-template-columns:1fr 1fr;">
+			<div class="stat-card"><div class="n">{{.ReadyNodes}}/{{.NodeCount}}</div><div class="l">Nodes ready</div></div>
+			<div class="stat-card"><div class="n">{{.ServiceCount}}</div><div class="l">Services</div></div>
+			{{if .Degraded}}<div class="stat-card"><div class="n" style="color:var(--yellow);">{{.Degraded}}</div><div class="l">Degraded services</div></div>{{end}}
+		</div>
+	</div>
+</div>
+{{end}}

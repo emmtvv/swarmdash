@@ -1,0 +1,33 @@
+{{define "configs.html"}}
+<h1>Configs</h1>
+
+<div class="card">
+	<h2 style="margin-top:0;">Create config</h2>
+	<form method="post" action="/configs">
+		<label for="name">Name</label>
+		<input type="text" id="name" name="name" required style="width:320px;">
+		<label for="data">Content</label>
+		<textarea id="data" name="data" rows="8" style="width:100%;font-family:ui-monospace,monospace;" required></textarea>
+		<button type="submit" class="btn" style="margin-top:12px;">Create</button>
+	</form>
+</div>
+
+<table>
+	<thead><tr><th>Name</th><th>Created</th><th></th></tr></thead>
+	<tbody>
+	{{range .Configs}}
+		<tr>
+			<td class="mono">{{.Spec.Name}}</td>
+			<td class="muted">{{ago .CreatedAt}}</td>
+			<td>
+				<form class="inline" method="post" action="/configs/{{.ID}}/delete" data-confirm="Delete config {{.Spec.Name}}?">
+					<button type="submit" class="btn danger small">Delete</button>
+				</form>
+			</td>
+		</tr>
+	{{else}}
+		<tr><td colspan="3" class="muted">No configs.</td></tr>
+	{{end}}
+	</tbody>
+</table>
+{{end}}

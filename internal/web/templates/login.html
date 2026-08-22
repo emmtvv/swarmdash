@@ -1,0 +1,25 @@
+{{define "login.html"}}
+<div class="login-page">
+	<div class="login-card">
+		<div class="login-brand">
+			<span class="brand-mark">{{template "brand-svg"}}</span>
+			<h1>swarmdash</h1>
+			<p>Sign in to manage your cluster</p>
+		</div>
+		{{if .Error}}<div class="error-box">{{.Error}}</div>{{end}}
+		{{if not .LocalLoginDisabled}}
+		<form method="post" action="/login">
+			<label for="username">Username</label>
+			<input type="text" id="username" name="username" autofocus required>
+			<label for="password">Password</label>
+			<input type="password" id="password" name="password" required>
+			<button type="submit" class="btn" style="width:100%;margin-top:22px;">Log in</button>
+		</form>
+		{{end}}
+		{{if .SSOActive}}
+		{{if not .LocalLoginDisabled}}<div class="login-divider"><span>or</span></div>{{end}}
+		<a href="/sso/login" class="btn secondary" style="width:100%;display:block;text-align:center;box-sizing:border-box;{{if .LocalLoginDisabled}}margin-top:22px;{{end}}">Sign in with {{.SSOLabel}}</a>
+		{{end}}
+	</div>
+</div>
+{{end}}

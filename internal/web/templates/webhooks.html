@@ -1,0 +1,33 @@
+{{define "webhooks.html"}}
+<h1>Alert webhooks</h1>
+<p class="muted">POSTed a JSON body <span class="mono">{event, target, message, time}</span> when a service stays below its desired replica count for more than 2 minutes (and when it recovers), or when a node goes down/comes back.</p>
+
+<div class="card">
+	<h2 style="margin-top:0;">Add webhook</h2>
+	<form class="inline" method="post" action="/settings/webhooks">
+		<input type="text" name="name" placeholder="name" required>
+		<input type="text" name="url" placeholder="https://example.com/hook" style="width:340px;" required>
+		<button type="submit" class="btn">Add</button>
+	</form>
+</div>
+
+<table>
+	<thead><tr><th>Name</th><th>URL</th><th>Added</th><th></th></tr></thead>
+	<tbody>
+	{{range .Webhooks}}
+		<tr>
+			<td>{{.Name}}</td>
+			<td class="mono muted">{{.URL}}</td>
+			<td class="muted">{{ago .CreatedAt}}</td>
+			<td>
+				<form class="inline" method="post" action="/settings/webhooks/{{.ID}}/delete">
+					<button type="submit" class="btn danger small">Delete</button>
+				</form>
+			</td>
+		</tr>
+	{{else}}
+		<tr><td colspan="4" class="muted">No webhooks configured.</td></tr>
+	{{end}}
+	</tbody>
+</table>
+{{end}}
