@@ -1,13 +1,19 @@
 name: Release
 
 # Publishes to Docker Hub (mathwave/swarmdash - see README's Docker Hub
-# link) whenever a version tag is pushed. Requires the repo secrets
-# DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (an access token, not the account
-# password - create one under Docker Hub > Account Settings > Security).
+# link) and creates a GitHub Release whenever a version tag is pushed.
+# Requires the repo secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (an
+# access token, not the account password - create one under Docker Hub >
+# Account Settings > Security). The GitHub Release body is pulled from the
+# matching version section in CHANGELOG.md, so that section must exist
+# (renamed from "Unreleased") before the tag is pushed.
 on:
   push:
     tags:
       - "v*.*.*"
+
+permissions:
+  contents: write
 
 jobs:
   test:
@@ -85,3 +91,24 @@ jobs:
           build-args: |
             VERSION=${{ github.ref_name }}
             COMMIT=${{ github.sha }}
+
+  gh-release:
+    needs: [test, lint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - id: changelog
+        uses: mindsers/changelog-reader-action@v2
+        with:
+          version: ${{ steps.version.outputs.version }}
+          path: ./CHANGELOG.md
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body: ${{ steps.changelog.outputs.changes }}

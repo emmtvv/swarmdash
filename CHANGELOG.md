@@ -7,4 +7,6 @@ README's "Known gaps" section for what's still evolving.
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-22
+
 - First public release.
