@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/emmtvv/swarmdash/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/emmtv/swarmdash/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/emmtvv/swarmdash/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/emmtvv/swarmdash/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://hub.docker.com/r/mathwave/swarmdash"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/mathwave/swarmdash"></a>
   <a href="go.mod"><img alt="Go version" src="https://img.shields.io/badge/go-1.25-00ADD8?logo=go&logoColor=white"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/emmtvv/swarmdash"></a>
