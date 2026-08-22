@@ -21,6 +21,28 @@
 	});
 })();
 
+// Node picker: auto-submits its <form> on change (volumes/images pages'
+// node <select>), replacing an inline onchange= that CSP's script-src
+// blocks (nonces only cover <script> elements, not event-handler attrs).
+(function () {
+	document.querySelectorAll("select[data-auto-submit]").forEach((select) => {
+		select.addEventListener("change", () => select.form.submit());
+	});
+})();
+
+// Reset-password forms (users.html): prompts for a new password client-side
+// via data-prompt-password="<username>" instead of an inline onsubmit=,
+// then fills the hidden password field before the form submits.
+(function () {
+	document.querySelectorAll("form[data-prompt-password]").forEach((form) => {
+		form.addEventListener("submit", (e) => {
+			const p = prompt("New password for " + form.dataset.promptPassword + ":");
+			if (!p) { e.preventDefault(); return; }
+			form.password.value = p;
+		});
+	});
+})();
+
 // Custom file picker (see .file-picker in app.css): keeps the visible
 // filename text in sync with the visually-hidden native <input type=file>.
 (function () {

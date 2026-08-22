@@ -4,7 +4,7 @@
 <div class="card-row" style="justify-content:space-between;">
 	<form class="inline" method="get" action="/images">
 		<label for="node" style="margin:0;">Node</label>
-		<select name="node" id="node" onchange="this.form.submit()">
+		<select name="node" id="node" data-auto-submit>
 			{{$sel := .SelectedID}}
 			{{range .Nodes}}
 			<option value="{{.ID}}" {{if eq .ID $sel}}selected{{end}}>{{.Description.Hostname}}</option>
