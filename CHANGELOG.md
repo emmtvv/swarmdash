@@ -5,6 +5,42 @@ Notable changes to swarmdash are tracked here, following
 does not yet follow strict semantic versioning across releases — see the
 README's "Known gaps" section for what's still evolving.
 
+## [1.2.2] - 2026-08-23
+
+### Security
+
+- Deploy webhooks (`POST /hooks/deploy/{token}`) no longer accept an
+  arbitrary `image` override in the request body. By design the token is
+  the only credential and the endpoint stays unauthenticated, but an
+  unvalidated `{"image": "..."}` field meant anyone who obtained the URL
+  could redeploy the service running any image of their choosing -
+  effective remote code execution in the target service's context. A hook
+  now only accepts a same-repository tag/digest swap unless it was
+  explicitly created with a new "allow full image override" option; a
+  rejected override is recorded in the audit log.
+- SSO login now re-authenticates by the OIDC `sub` claim instead of
+  `preferred_username`/`email`, neither of which OIDC guarantees to be
+  unique or immutable and which some identity providers let end users edit
+  themselves. Previously, an attacker who could get their IdP to report a
+  `preferred_username`/`email` matching an existing SSO-provisioned local
+  account could sign into that account, including an admin's. Existing
+  SSO accounts are transparently bound to their `sub` on next login; a
+  later login attempt from a different `sub` claiming the same username is
+  now rejected instead of silently succeeding. The allowed-domains check
+  also now requires `email_verified` before trusting the email claim.
+- The audit log previously covered every mutating admin action but not
+  interactive container access: opening/closing a `/ws/exec` console
+  session, browsing or downloading files out of a container, and local
+  login/logout were all invisible in it. All five are now recorded
+  (exec entries include the command run; file entries include the path),
+  and every audit entry now records the client IP it was attributed to.
+- Fixed a nil-pointer panic on every successful SSO login/auto-provision:
+  the audit call for `user.sso_login`/`user.sso_provision` read the
+  session user from request context, but the SSO callback runs before a
+  session exists. Split the internal `audit` helper so pre-session flows
+  (SSO callback, local login, logout) can attribute an audit entry to an
+  explicit username instead.
+
 ## [1.2.1] - 2026-08-23
 
 ### Security
