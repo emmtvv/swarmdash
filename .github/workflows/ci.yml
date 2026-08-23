@@ -78,3 +78,84 @@ jobs:
       - name: govulncheck
         continue-on-error: true
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+
+  # Every job above runs against whatever Docker Engine the runner image
+  # ships with and never actually initializes swarm mode, so a real engine
+  # upgrade breaking Swarm (Docker 29 did, for a lot of people - DNS
+  # resolution and volume-plugin regressions specific to Swarm; see
+  # https://docs.docker.com/engine/release-notes/29/ and
+  # docs/known-gaps.md) would pass CI cleanly right up until it broke
+  # someone's cluster. This job pins the runner to specific real engine
+  # versions instead and does the minimum needed to catch that class of
+  # break: swarm init, swarmdash's own agent+admin actually starting and
+  # answering their health endpoints against that engine, and a real
+  # service reaching Running through the swarm scheduler.
+  #
+  # Bump the versions below by hand as new engine releases ship -
+  # Dependabot only tracks go.mod/Actions/Dockerfile pins, not matrix
+  # values buried in workflow YAML.
+  swarm-engine-compat:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Last 28.x release (matches the docker/docker client version
+        # go.mod is pinned to - see the vulncheck job comment above) and
+        # the latest 29.x release, the line that introduced the Swarm
+        # regressions this job exists to catch.
+        docker-version: ["28.5.2", "29.7.2"]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.25"
+          check-latest: true
+          cache: true
+
+      - name: install pinned docker engine
+        uses: docker/setup-docker-action@v5
+        with:
+          version: ${{ matrix.docker-version }}
+
+      - name: init swarm mode
+        run: docker swarm init
+
+      - name: build
+        run: go build -trimpath -o bin/swarmdash ./cmd/swarmdash
+
+      - name: start agent + admin against the pinned engine
+        run: |
+          export SWARMDASH_CLUSTER_SECRET=ci-smoke-test-secret
+          ./bin/swarmdash agent --listen :8871 &
+          ./bin/swarmdash admin --listen :8870 --storage-driver local --data-dir "${RUNNER_TEMP}/swarmdash-data" &
+
+      - name: wait for health endpoints
+        run: |
+          for i in $(seq 1 30); do curl -fsS http://localhost:8871/healthz && break; sleep 1; done
+          curl -fsS http://localhost:8871/healthz
+          for i in $(seq 1 30); do curl -fsS http://localhost:8870/health && break; sleep 1; done
+          curl -fsS http://localhost:8870/health
+
+      - name: agent reports docker info for this engine version
+        run: |
+          curl -fsS -H "Authorization: Bearer ci-smoke-test-secret" http://localhost:8871/v1/info | tee /dev/stderr | grep -q server_version
+
+      - name: swarm still schedules a service on this engine version
+        run: |
+          docker service create --name ci-smoke --detach nginx:alpine
+          for i in $(seq 1 60); do
+            state="$(docker service ps ci-smoke --format '{{.CurrentState}}' --no-trunc | head -1)"
+            echo "state: $state"
+            case "$state" in Running*) exit 0 ;; esac
+            sleep 2
+          done
+          echo "service never reached Running on Docker ${{ matrix.docker-version }} - swarm scheduling appears broken" >&2
+          docker service ps ci-smoke --no-trunc
+          exit 1
+
+      - name: cleanup
+        if: always()
+        run: |
+          docker service rm ci-smoke || true
+          docker swarm leave --force || true

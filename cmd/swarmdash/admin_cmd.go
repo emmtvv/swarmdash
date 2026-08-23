@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net"
-	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -13,7 +11,6 @@ import (
 	"swarmdash/internal/admin"
 	"swarmdash/internal/dockerutil"
 	"swarmdash/internal/secretenv"
-	"swarmdash/internal/store"
 )
 
 func newAdminCmd() *cobra.Command {
@@ -31,23 +28,7 @@ func newAdminCmd() *cobra.Command {
 		uiTLSCert    string
 		uiTLSKey     string
 
-		// mongoURI, when set, is used verbatim and every other mongo-*
-		// flag/env var below is ignored - it's the escape hatch for
-		// connection strings the discrete parts can't express (mongodb+srv,
-		// multiple hosts, exotic query params). Otherwise a URI is built up
-		// from the discrete parts, which is what deploy/stack.yml uses so
-		// the username/password can each come from their own Docker secret.
-		mongoURI        string
-		mongoHost       string
-		mongoPort       string
-		mongoUsername   string
-		mongoPassword   string
-		mongoDB         string
-		mongoAuthSource string
-		mongoParams     string
-
-		storageDriver string
-		dataDir       string
+		sf storeFlags
 	)
 
 	cmd := &cobra.Command{
@@ -96,89 +77,9 @@ func newAdminCmd() *cobra.Command {
 				return fmt.Errorf("this node is not a swarm manager (or swarm mode is not active): admin must run on a manager node")
 			}
 
-			if storageDriver == "" {
-				storageDriver = os.Getenv("SWARMDASH_STORAGE_DRIVER")
-			}
-			if storageDriver == "" {
-				storageDriver = "local"
-			}
-
-			var st store.Interface
-			switch storageDriver {
-			case "mongo":
-				if mongoURI == "" {
-					resolved, err := secretenv.Resolve("SWARMDASH_MONGO_URI")
-					if err != nil {
-						return fmt.Errorf("read mongo uri: %w", err)
-					}
-					mongoURI = resolved
-				}
-				if mongoDB == "" {
-					mongoDB = os.Getenv("SWARMDASH_MONGO_DATABASE")
-				}
-				if mongoDB == "" {
-					mongoDB = "swarmdash"
-				}
-				if mongoURI == "" {
-					if mongoHost == "" {
-						mongoHost = os.Getenv("SWARMDASH_MONGO_HOST")
-					}
-					if mongoHost == "" {
-						mongoHost = "localhost"
-					}
-					if mongoPort == "" {
-						mongoPort = os.Getenv("SWARMDASH_MONGO_PORT")
-					}
-					if mongoPort == "" {
-						mongoPort = "27017"
-					}
-					if mongoUsername == "" {
-						resolved, err := secretenv.Resolve("SWARMDASH_MONGO_USERNAME")
-						if err != nil {
-							return fmt.Errorf("read mongo username: %w", err)
-						}
-						mongoUsername = resolved
-					}
-					if mongoPassword == "" {
-						resolved, err := secretenv.Resolve("SWARMDASH_MONGO_PASSWORD")
-						if err != nil {
-							return fmt.Errorf("read mongo password: %w", err)
-						}
-						mongoPassword = resolved
-					}
-					if mongoAuthSource == "" {
-						mongoAuthSource = os.Getenv("SWARMDASH_MONGO_AUTH_SOURCE")
-					}
-					if mongoAuthSource == "" && mongoUsername != "" {
-						// MONGO_INITDB_ROOT_USERNAME/PASSWORD (see deploy/stack.yml)
-						// always creates the root user in the admin database.
-						mongoAuthSource = "admin"
-					}
-					if mongoParams == "" {
-						mongoParams = os.Getenv("SWARMDASH_MONGO_PARAMS")
-					}
-					mongoURI = buildMongoURI(mongoHost, mongoPort, mongoUsername, mongoPassword, mongoAuthSource, mongoParams)
-				}
-
-				mdb, err := store.OpenMongo(cmd.Context(), mongoURI, mongoDB)
-				if err != nil {
-					return fmt.Errorf("open mongo store: %w", err)
-				}
-				st = mdb
-			case "local":
-				if dataDir == "" {
-					dataDir = os.Getenv("SWARMDASH_DATA_DIR")
-				}
-				if dataDir == "" {
-					dataDir = "./data"
-				}
-				sdb, err := store.OpenSQLite(dataDir)
-				if err != nil {
-					return fmt.Errorf("open local store: %w", err)
-				}
-				st = sdb
-			default:
-				return fmt.Errorf("invalid --storage-driver %q: must be \"mongo\" or \"local\"", storageDriver)
+			st, err := sf.open(cmd.Context())
+			if err != nil {
+				return fmt.Errorf("open store: %w", err)
 			}
 			defer st.Close()
 
@@ -217,43 +118,7 @@ func newAdminCmd() *cobra.Command {
 	cmd.Flags().StringVar(&agentTLSCA, "agent-tls-ca", "", "CA certificate used to verify agents' server certificate")
 	cmd.Flags().StringVar(&uiTLSCert, "ui-tls-cert", "", "TLS certificate for the admin web UI/API (enables HTTPS when set with --ui-tls-key)")
 	cmd.Flags().StringVar(&uiTLSKey, "ui-tls-key", "", "TLS private key for the admin web UI/API")
-	cmd.Flags().StringVar(&storageDriver, "storage-driver", "", "where admin state (users, sessions, audit log, tokens, ...) is persisted: \"local\" (default, a SQLite database - see --data-dir) or \"mongo\" (see --mongo-* below; required for more than one admin replica) (env SWARMDASH_STORAGE_DRIVER)")
-	cmd.Flags().StringVar(&dataDir, "data-dir", "", "directory holding the SQLite database when --storage-driver=local (env SWARMDASH_DATA_DIR; defaults to \"./data\"); ignored otherwise. Only one admin replica may point at a given data dir at a time")
-	cmd.Flags().StringVar(&mongoURI, "mongo-uri", "", "full MongoDB connection string, overrides every other --mongo-* flag below (env SWARMDASH_MONGO_URI, _FILE suffix also works); only used when --storage-driver=mongo. Every admin replica should point at the same MongoDB deployment")
-	cmd.Flags().StringVar(&mongoHost, "mongo-host", "", "MongoDB host (env SWARMDASH_MONGO_HOST; defaults to \"localhost\"), ignored if --mongo-uri is set")
-	cmd.Flags().StringVar(&mongoPort, "mongo-port", "", "MongoDB port (env SWARMDASH_MONGO_PORT; defaults to \"27017\"), ignored if --mongo-uri is set")
-	cmd.Flags().StringVar(&mongoUsername, "mongo-username", "", "MongoDB username (env SWARMDASH_MONGO_USERNAME, _FILE suffix also works), ignored if --mongo-uri is set")
-	cmd.Flags().StringVar(&mongoPassword, "mongo-password", "", "MongoDB password (env SWARMDASH_MONGO_PASSWORD, _FILE suffix also works), ignored if --mongo-uri is set")
-	cmd.Flags().StringVar(&mongoDB, "mongo-database", "", "MongoDB database name (env SWARMDASH_MONGO_DATABASE; defaults to \"swarmdash\")")
-	cmd.Flags().StringVar(&mongoAuthSource, "mongo-auth-source", "", "MongoDB authSource (env SWARMDASH_MONGO_AUTH_SOURCE; defaults to \"admin\" when a username is set), ignored if --mongo-uri is set")
-	cmd.Flags().StringVar(&mongoParams, "mongo-params", "", "extra MongoDB connection string query params, e.g. \"replicaSet=rs0&tls=true\" (env SWARMDASH_MONGO_PARAMS), ignored if --mongo-uri is set")
+	sf.register(cmd)
 
 	return cmd
-}
-
-// buildMongoURI assembles a mongodb:// connection string from discrete
-// parts. It's the deploy/stack.yml-friendly counterpart to --mongo-uri:
-// username and password can each come from their own Docker secret instead
-// of being baked together into one connection-string secret.
-func buildMongoURI(host, port, username, password, authSource, params string) string {
-	// Mongo's URI parser requires a "/" between the host and a query
-	// string even with no database path segment (mongodb://host:port/?...),
-	// unlike net/url's default rendering when Path is left empty.
-	u := url.URL{Scheme: "mongodb", Host: net.JoinHostPort(host, port), Path: "/"}
-	if username != "" {
-		if password != "" {
-			u.User = url.UserPassword(username, password)
-		} else {
-			u.User = url.User(username)
-		}
-	}
-	q, _ := url.ParseQuery(params)
-	if q == nil {
-		q = url.Values{}
-	}
-	if authSource != "" {
-		q.Set("authSource", authSource)
-	}
-	u.RawQuery = q.Encode()
-	return u.String()
 }

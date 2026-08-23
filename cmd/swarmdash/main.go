@@ -26,6 +26,7 @@ func main() {
 	root.AddCommand(newAgentCmd())
 	root.AddCommand(newAdminCmd())
 	root.AddCommand(newTLSCmd())
+	root.AddCommand(newRotateClusterSecretCmd())
 	root.AddCommand(&cobra.Command{
 		Use:   "version",
 		Short: "Print version information",

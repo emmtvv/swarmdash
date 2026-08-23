@@ -1,8 +1,38 @@
 # Quickstart
 
-On any Linux machine (installs Docker if it's missing, initializes swarm
-mode if this node isn't in it yet, builds the image, deploys the stack, and
-prints the panel's URL plus the generated bootstrap admin credentials):
+## Fastest path: the published image, one node
+
+No clone, no build — just the published image against any single node
+that's in swarm mode (or will be after `docker swarm init`):
+
+```
+docker swarm init   # skip if this node is already in swarm mode
+
+export SWARMDASH_CLUSTER_SECRET=$(openssl rand -hex 32)
+
+docker run -d --name swarmdash-agent --network host \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e SWARMDASH_CLUSTER_SECRET \
+  mathwave/swarmdash agent
+
+docker run -d --name swarmdash-admin -p 8870:8870 \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e SWARMDASH_CLUSTER_SECRET \
+  mathwave/swarmdash admin
+
+docker logs swarmdash-admin   # grab the generated bootstrap admin password
+```
+
+Open http://localhost:8870. `admin`'s state (users, sessions, tokens, ...)
+lands in a SQLite database inside the container by default, so it's gone if
+you `docker rm` it — fine for a first look, not for anything you want to
+keep. For that, or for more than one node, use one of the paths below.
+
+## From a bare machine (installs Docker, builds the image, multi-node ready)
+
+Installs Docker if it's missing, initializes swarm mode if this node isn't
+in it yet, builds the image, deploys the stack, and prints the panel's URL
+plus the generated bootstrap admin credentials:
 
 ```
 git clone https://github.com/emmtvv/swarmdash.git
@@ -18,8 +48,8 @@ Want to pin the bootstrap admin password yourself instead of reading a
 generated one out of the logs? Set `SWARMDASH_ADMIN_PASSWORD` in `.env`
 before running `make up`/`make deploy` — see `.env.example`.
 
-Prefer the published image over building locally? `docker pull
-mathwave/swarmdash` — edit the `image:` lines in
+Prefer the published image over building locally for the real-cluster
+deploy too? `docker pull mathwave/swarmdash` — edit the `image:` lines in
 [../deploy/stack.yml](../deploy/stack.yml) to `mathwave/swarmdash:latest` before
 running `make deploy` (skips the local `docker build` step, useful on
 multi-node clusters where you'd otherwise have to build on every node).

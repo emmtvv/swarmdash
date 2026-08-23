@@ -4,8 +4,22 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/gorilla/websocket"
+)
+
+// maxConcurrentExecSessions caps how many interactive /ws/exec sessions can
+// be open at once (see Server.execSlots). Unlike logs/stats, an exec
+// session runs arbitrary commands for as long as a browser tab stays open,
+// so with no cap a handful of abandoned or malicious sessions can pin an
+// unbounded number of agent-side shells and admin-side goroutines.
+const maxConcurrentExecSessions = 50
+
+const (
+	wsPingInterval  = 30 * time.Second
+	wsPongWait      = 60 * time.Second
+	wsPingWriteWait = 10 * time.Second
 )
 
 // browserUpgrader upgrades the browser-facing side of a proxied websocket.
@@ -45,6 +59,14 @@ func (s *Server) handleTaskLogsPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleExecProxy(w http.ResponseWriter, r *http.Request) {
+	select {
+	case s.execSlots <- struct{}{}:
+		defer func() { <-s.execSlots }()
+	default:
+		http.Error(w, "too many concurrent exec sessions - close an existing console and try again", http.StatusServiceUnavailable)
+		return
+	}
+
 	taskID := r.PathValue("taskID")
 	nodeID, containerID, err := s.taskContainer(r.Context(), taskID)
 	if err != nil {
@@ -108,10 +130,47 @@ func (s *Server) proxyWS(w http.ResponseWriter, r *http.Request, nodeID, agentPa
 	}
 	defer client.Close()
 
+	// Without this, a session that goes idle (a shell sitting at a prompt,
+	// a log tail with nothing new to print) never has its ReadMessage
+	// calls return, so a dead peer or an intermediate proxy/load balancer
+	// that silently drops idle connections leaves both relay goroutines
+	// blocked forever instead of the session getting torn down.
+	done := make(chan struct{})
+	defer close(done)
+	go keepAlive(client, done)
+	go keepAlive(upstream, done)
+
 	errc := make(chan error, 2)
 	go relayWS(client, upstream, errc)
 	go relayWS(upstream, client, errc)
 	<-errc
+}
+
+// keepAlive installs a read deadline on conn that's pushed out by every
+// pong (refreshed in-line inside ReadMessage on whichever goroutine is
+// already reading conn, so this touches no shared state from a second
+// goroutine) and periodically sends a ping to elicit one. Pings are sent
+// via WriteControl, which - unlike WriteMessage - gorilla/websocket
+// documents as safe to call concurrently with the relay goroutine's own
+// WriteMessage calls on the same conn.
+func keepAlive(conn *websocket.Conn, done <-chan struct{}) {
+	_ = conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	})
+
+	ticker := time.NewTicker(wsPingInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(wsPingWriteWait)); err != nil {
+				return
+			}
+		}
+	}
 }
 
 // wsTextWriter adapts an io.Writer to forward each Write as a text

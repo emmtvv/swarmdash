@@ -24,8 +24,8 @@ type Interface interface {
 	DeleteSession(token string) error
 
 	PutLoginAttempt(a LoginAttempt) error
-	GetLoginAttempt(username string) (LoginAttempt, error)
-	DeleteLoginAttempt(username string) error
+	GetLoginAttempt(key string) (LoginAttempt, error)
+	DeleteLoginAttempt(key string) error
 
 	AppendAudit(e AuditEntry) error
 	ListAudit(skip, limit int) ([]AuditEntry, error)
@@ -68,6 +68,9 @@ type Interface interface {
 
 	GetSSOConfig() (SSOConfig, error)
 	PutSSOConfig(c SSOConfig) error
+
+	GetAppSettings() (AppSettings, error)
+	PutAppSettings(a AppSettings) error
 
 	Ping() error
 }

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"swarmdash/internal/httpx"
 	"swarmdash/internal/store"
 )
 
@@ -97,7 +98,7 @@ func (s *Server) handleBackupExport(w http.ResponseWriter, r *http.Request) {
 	}
 	filename := fmt.Sprintf("swarmdash-backup-%s.json", time.Now().UTC().Format("20060102-150405"))
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	httpx.SetAttachment(w, filename)
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	if err := enc.Encode(doc); err != nil {

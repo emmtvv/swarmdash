@@ -27,7 +27,7 @@ func (s *Server) handleDeployHookCreate(w http.ResponseWriter, r *http.Request) 
 	token := "sdh_" + randomToken(24)
 	hook := store.DeployHook{
 		ID:          randomToken(8),
-		Hash:        hashAPIToken(token),
+		Hash:        hashToken(token),
 		ServiceName: svc.Spec.Name,
 		CreatedBy:   userFromContext(r).Username,
 		CreatedAt:   time.Now(),
@@ -78,7 +78,7 @@ func (s *Server) handleDeployHookTrigger(w http.ResponseWriter, r *http.Request)
 	token := r.PathValue("token")
 	ctx := r.Context()
 
-	hook, err := s.store.FindDeployHookByHash(hashAPIToken(token))
+	hook, err := s.store.FindDeployHookByHash(hashToken(token))
 	if err != nil {
 		http.Error(w, "invalid or revoked deploy hook", http.StatusNotFound)
 		return

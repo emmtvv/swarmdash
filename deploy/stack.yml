@@ -41,6 +41,32 @@
 # via the swarm ingress mesh, so it's reachable regardless of which node
 # the admin task actually landed on).
 #
+# --- Optional: cluster secret as a Docker secret instead of an env var ----
+# The tradeoff above is deliberate for a cluster you already trust, but if
+# you'd rather have the cluster secret only ever live in a tmpfs-mounted
+# file (never in `docker service inspect`/`docker inspect` output, and
+# immutable once created) run `make cluster-secret` to create the
+# `swarmdash_cluster_secret` Docker secret from your `.env` value (or a
+# freshly generated one if `.env` doesn't have one yet), then:
+#   1. Uncomment the top-level `secrets:` block below and the
+#      `swarmdash_cluster_secret` entry in it.
+#   2. Uncomment the `secrets:` list under both `agent` and `admin` below.
+#   3. Replace each service's
+#        SWARMDASH_CLUSTER_SECRET: ${SWARMDASH_CLUSTER_SECRET:?...}
+#      line with:
+#        SWARMDASH_CLUSTER_SECRET_FILE: /run/secrets/cluster_secret
+#      (every SWARMDASH_* var swarmdash reads supports this "_FILE"
+#      convention - see internal/secretenv - so no code/flag changes are
+#      needed, only where the value comes from.)
+#   4. Redeploy.
+# Docker secrets are immutable: rotating the value means creating a new
+# secret (a new name, since `docker secret create` won't let you reuse
+# one), updating the reference above, and redeploying - see `make
+# cluster-secret`'s own comment for the exact steps. Whichever way the
+# secret is delivered, use `swarmdash rotate-cluster-secret` first so
+# registry passwords/GitOps tokens/the SSO client secret (encrypted with a
+# key derived from it) don't become undecryptable - see docs/hardening.md.
+#
 # --- Optional: mTLS between admin and agent -------------------------------
 # The cluster secret above is enough auth for a trusted cluster network.
 # For defense in depth (or an untrusted network between nodes), run `make
@@ -70,12 +96,17 @@
 version: "3.8"
 
 # No top-level `secrets:` block by default - the cluster secret moved to a
-# plain environment variable (see the top-of-file comment). Only TLS
-# material still uses Docker secrets (certs/keys are files, not sensibly
-# passed as env vars); uncomment this block plus the matching `secrets:`
-# list under agent/admin below if you enable mTLS:
+# plain environment variable (see the top-of-file comment). Uncomment
+# `swarmdash_cluster_secret` below (plus the matching `secrets:` list under
+# agent/admin) if you'd rather deliver it as a Docker secret instead - see
+# "Optional: cluster secret as a Docker secret" above. TLS material always
+# uses Docker secrets regardless (certs/keys are files, not sensibly passed
+# as env vars); uncomment those entries plus the matching `secrets:` list
+# under agent/admin if you enable mTLS:
 #
 # secrets:
+#   swarmdash_cluster_secret:
+#     external: true
 #   swarmdash_tls_ca_crt:
 #     external: true
 #   swarmdash_tls_agent_crt:
@@ -93,7 +124,14 @@ services:
     command: ["agent"]
     environment:
       SWARMDASH_CLUSTER_SECRET: ${SWARMDASH_CLUSTER_SECRET:?set SWARMDASH_CLUSTER_SECRET in .env}
+      # Delivering the cluster secret as a Docker secret instead: comment
+      # out the SWARMDASH_CLUSTER_SECRET line above, uncomment this one and
+      # the "swarmdash_cluster_secret" entry in the secrets: list below -
+      # see "Optional: cluster secret as a Docker secret" up top.
+      # SWARMDASH_CLUSTER_SECRET_FILE: /run/secrets/cluster_secret
     # secrets:
+    #   - source: swarmdash_cluster_secret
+    #     target: cluster_secret
     #   - source: swarmdash_tls_ca_crt
     #     target: tls_ca_crt
     #   - source: swarmdash_tls_agent_crt
@@ -136,7 +174,14 @@ services:
       # letting swarmdash generate + log one. Either way, this account must
       # set its own password on first login (see auth.go MustChangePassword).
       SWARMDASH_ADMIN_PASSWORD: ${SWARMDASH_ADMIN_PASSWORD:-}
+      # Delivering the cluster secret as a Docker secret instead: comment
+      # out the SWARMDASH_CLUSTER_SECRET line above, uncomment this one and
+      # the "swarmdash_cluster_secret" entry in the secrets: list below -
+      # see "Optional: cluster secret as a Docker secret" up top.
+      # SWARMDASH_CLUSTER_SECRET_FILE: /run/secrets/cluster_secret
     # secrets:
+    #   - source: swarmdash_cluster_secret
+    #     target: cluster_secret
     #   - source: swarmdash_tls_ca_crt
     #     target: tls_ca_crt
     #   - source: swarmdash_tls_admin_crt

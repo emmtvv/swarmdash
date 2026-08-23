@@ -5,6 +5,8 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
+
+	"swarmdash/internal/httpx"
 )
 
 // handleServiceLogsPage renders the aggregated log viewer for a service -
@@ -85,7 +87,7 @@ func (s *Server) handleServiceLogsDownload(w http.ResponseWriter, r *http.Reques
 	}
 	defer rc.Close()
 
-	w.Header().Set("Content-Disposition", `attachment; filename="`+svc.Spec.Name+`.log"`)
+	httpx.SetAttachment(w, svc.Spec.Name+".log")
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = stdcopy.StdCopy(w, w, rc)
 }

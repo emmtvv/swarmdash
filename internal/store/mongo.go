@@ -202,22 +202,22 @@ func (m *MongoStore) DeleteSession(token string) error {
 func (m *MongoStore) PutLoginAttempt(a LoginAttempt) error {
 	ctx, cancel := ctxTimeout()
 	defer cancel()
-	_, err := m.col("login_attempts").ReplaceOne(ctx, bson.M{"_id": a.Username}, a, options.Replace().SetUpsert(true))
+	_, err := m.col("login_attempts").ReplaceOne(ctx, bson.M{"_id": a.Key}, a, options.Replace().SetUpsert(true))
 	return err
 }
 
-func (m *MongoStore) GetLoginAttempt(username string) (LoginAttempt, error) {
+func (m *MongoStore) GetLoginAttempt(key string) (LoginAttempt, error) {
 	ctx, cancel := ctxTimeout()
 	defer cancel()
 	var a LoginAttempt
-	err := m.col("login_attempts").FindOne(ctx, bson.M{"_id": username}).Decode(&a)
+	err := m.col("login_attempts").FindOne(ctx, bson.M{"_id": key}).Decode(&a)
 	return a, notFound(err)
 }
 
-func (m *MongoStore) DeleteLoginAttempt(username string) error {
+func (m *MongoStore) DeleteLoginAttempt(key string) error {
 	ctx, cancel := ctxTimeout()
 	defer cancel()
-	_, err := m.col("login_attempts").DeleteOne(ctx, bson.M{"_id": username})
+	_, err := m.col("login_attempts").DeleteOne(ctx, bson.M{"_id": key})
 	return err
 }
 
@@ -538,6 +538,22 @@ func (m *MongoStore) PutSSOConfig(c SSOConfig) error {
 	defer cancel()
 	c.ID = SSOConfigID
 	_, err := m.col("sso_config").ReplaceOne(ctx, bson.M{"_id": SSOConfigID}, c, options.Replace().SetUpsert(true))
+	return err
+}
+
+func (m *MongoStore) GetAppSettings() (AppSettings, error) {
+	ctx, cancel := ctxTimeout()
+	defer cancel()
+	var a AppSettings
+	err := m.col("app_settings").FindOne(ctx, bson.M{"_id": AppSettingsID}).Decode(&a)
+	return a, notFound(err)
+}
+
+func (m *MongoStore) PutAppSettings(a AppSettings) error {
+	ctx, cancel := ctxTimeout()
+	defer cancel()
+	a.ID = AppSettingsID
+	_, err := m.col("app_settings").ReplaceOne(ctx, bson.M{"_id": AppSettingsID}, a, options.Replace().SetUpsert(true))
 	return err
 }
 

@@ -109,7 +109,7 @@ func TestHandleDeployHookTrigger(t *testing.T) {
 	docker := newFakeDocker(t, mux)
 	s := newTestServer(t, docker)
 
-	if err := s.store.PutDeployHook(store.DeployHook{ID: "h1", Hash: hashAPIToken("plaintoken"), ServiceName: "web_app"}); err != nil {
+	if err := s.store.PutDeployHook(store.DeployHook{ID: "h1", Hash: hashToken("plaintoken"), ServiceName: "web_app"}); err != nil {
 		t.Fatalf("seed deploy hook: %v", err)
 	}
 
@@ -155,7 +155,7 @@ func TestHandleDeployHookTrigger_ServiceGone(t *testing.T) {
 	docker := newFakeDocker(t, mux)
 	s := newTestServer(t, docker)
 
-	if err := s.store.PutDeployHook(store.DeployHook{ID: "h1", Hash: hashAPIToken("plaintoken"), ServiceName: "gone_app"}); err != nil {
+	if err := s.store.PutDeployHook(store.DeployHook{ID: "h1", Hash: hashToken("plaintoken"), ServiceName: "gone_app"}); err != nil {
 		t.Fatalf("seed deploy hook: %v", err)
 	}
 
@@ -185,7 +185,7 @@ func TestHandleDeployHookTrigger_ImageOverride(t *testing.T) {
 	docker := newFakeDocker(t, mux)
 	s := newTestServer(t, docker)
 
-	if err := s.store.PutDeployHook(store.DeployHook{ID: "h1", Hash: hashAPIToken("plaintoken"), ServiceName: "web_app"}); err != nil {
+	if err := s.store.PutDeployHook(store.DeployHook{ID: "h1", Hash: hashToken("plaintoken"), ServiceName: "web_app"}); err != nil {
 		t.Fatalf("seed deploy hook: %v", err)
 	}
 

@@ -1,6 +1,11 @@
 package admin
 
-import "testing"
+import (
+	"testing"
+	"time"
+
+	"swarmdash/internal/store"
+)
 
 func TestEncryptDecryptSecret_RoundTrip(t *testing.T) {
 	s := &Server{cfg: Config{ClusterSecret: "test-secret"}}
@@ -97,5 +102,103 @@ func TestDecryptSecret_GarbageCiphertext(t *testing.T) {
 	}
 	if _, err := s.decryptSecret(garbage); err == nil {
 		t.Fatal("expected error for garbage ciphertext")
+	}
+}
+
+// TestRotateClusterSecret_ReencryptsEveryCredentialType is the regression
+// test for the "no key rotation path" gap: registry passwords, GitOps auth
+// tokens, and the SSO client secret are all encrypted with a key derived
+// from the cluster secret, so rotating the secret without this would leave
+// every one of them permanently undecryptable.
+func TestRotateClusterSecret_ReencryptsEveryCredentialType(t *testing.T) {
+	const oldSecret, newSecret = "old-cluster-secret", "new-cluster-secret"
+	old := &Server{cfg: Config{ClusterSecret: oldSecret}}
+	st := newTestStore(t)
+
+	regPassword, err := old.encryptSecret("registry-password")
+	if err != nil {
+		t.Fatalf("encrypt registry password: %v", err)
+	}
+	if err := st.PutRegistryCredential(store.RegistryCredential{
+		Server: "registry.example.com", Username: "u", PasswordEnc: regPassword, CreatedAt: time.Now(),
+	}); err != nil {
+		t.Fatalf("put registry credential: %v", err)
+	}
+
+	gitToken, err := old.encryptSecret("gitops-token")
+	if err != nil {
+		t.Fatalf("encrypt gitops token: %v", err)
+	}
+	if err := st.PutGitStack(store.GitStack{
+		ID: "g1", StackName: "app", RepoURL: "https://example.com/repo.git", AuthTokenEnc: gitToken, CreatedAt: time.Now(),
+	}); err != nil {
+		t.Fatalf("put gitops stack: %v", err)
+	}
+
+	ssoSecret, err := old.encryptSecret("sso-client-secret")
+	if err != nil {
+		t.Fatalf("encrypt sso client secret: %v", err)
+	}
+	if err := st.PutSSOConfig(store.SSOConfig{
+		ID: store.SSOConfigID, Enabled: true, ClientSecretEnc: ssoSecret, UpdatedAt: time.Now(),
+	}); err != nil {
+		t.Fatalf("put sso config: %v", err)
+	}
+
+	if err := RotateClusterSecret(st, oldSecret, newSecret); err != nil {
+		t.Fatalf("RotateClusterSecret: %v", err)
+	}
+
+	next := &Server{cfg: Config{ClusterSecret: newSecret}}
+
+	cred, err := st.GetRegistryCredential("registry.example.com")
+	if err != nil {
+		t.Fatalf("get registry credential: %v", err)
+	}
+	if got, err := next.decryptSecret(cred.PasswordEnc); err != nil || got != "registry-password" {
+		t.Errorf("registry password after rotation: got %q, err %v", got, err)
+	}
+
+	gs, err := st.GetGitStack("g1")
+	if err != nil {
+		t.Fatalf("get gitops stack: %v", err)
+	}
+	if got, err := next.decryptSecret(gs.AuthTokenEnc); err != nil || got != "gitops-token" {
+		t.Errorf("gitops token after rotation: got %q, err %v", got, err)
+	}
+
+	cfg, err := st.GetSSOConfig()
+	if err != nil {
+		t.Fatalf("get sso config: %v", err)
+	}
+	if got, err := next.decryptSecret(cfg.ClientSecretEnc); err != nil || got != "sso-client-secret" {
+		t.Errorf("sso client secret after rotation: got %q, err %v", got, err)
+	}
+
+	// The old key must no longer work - rotation actually re-encrypted,
+	// not just left a stale copy readable under the old key too.
+	if _, err := old.decryptSecret(cred.PasswordEnc); err == nil {
+		t.Error("registry password still decrypts under the old cluster secret after rotation")
+	}
+}
+
+func TestRotateClusterSecret_EmptyCredentialsLeftAlone(t *testing.T) {
+	st := newTestStore(t)
+	if err := st.PutRegistryCredential(store.RegistryCredential{
+		Server: "registry.example.com", Username: "u", CreatedAt: time.Now(), // no PasswordEnc
+	}); err != nil {
+		t.Fatalf("put registry credential: %v", err)
+	}
+
+	if err := RotateClusterSecret(st, "old-secret", "new-secret"); err != nil {
+		t.Fatalf("RotateClusterSecret: %v", err)
+	}
+
+	cred, err := st.GetRegistryCredential("registry.example.com")
+	if err != nil {
+		t.Fatalf("get registry credential: %v", err)
+	}
+	if len(cred.PasswordEnc) != 0 {
+		t.Errorf("PasswordEnc = %v, want empty (rotation should leave unset credentials alone)", cred.PasswordEnc)
 	}
 }

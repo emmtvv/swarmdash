@@ -97,7 +97,7 @@ func (s *Server) handleDownloadFile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "path is a directory", http.StatusBadRequest)
 		return
 	}
-	w.Header().Set("Content-Disposition", `attachment; filename="`+path.Base(hdr.Name)+`"`)
+	httpx.SetAttachment(w, path.Base(hdr.Name))
 	w.Header().Set("Content-Type", "application/octet-stream")
 	_, _ = io.Copy(w, tr)
 }

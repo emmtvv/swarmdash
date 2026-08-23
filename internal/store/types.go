@@ -25,14 +25,22 @@ type User struct {
 	MustChangePassword bool `bson:"must_change_password,omitempty" json:"must_change_password,omitempty"`
 }
 
-// LoginAttempt tracks recent failed local-password logins for one username,
-// backing the lockout in handleLoginSubmit (internal/admin/auth.go). Keyed
-// by username (not client IP) so the lockout holds regardless of which
-// admin replica or address a guess came from - every replica shares the
-// same MongoDB deployment, so this stays correct under HA. A TTL index on
-// LastFailure prunes rows a day after the account's last failed attempt.
+// LoginAttempt tracks recent failed local-password logins for one (username,
+// client IP) pair, backing the lockout in handleLoginSubmit
+// (internal/admin/auth.go). Key is that pair joined by loginAttemptKey, not
+// username alone: a username-only key means one attacker anywhere can lock
+// a known account (e.g. "admin") out from under its real owner with a
+// handful of bad requests, which is worse than the credential-stuffing
+// resistance a lockout buys - keying on the pair instead means a bad
+// actor can only lock out their own (username, IP) combination, not
+// everyone else guessing that username from a different address. This
+// stays correct under Mongo HA the same way username-only did, since every
+// replica still shares the same deployment. A TTL index on LastFailure
+// prunes rows a day after the last failed attempt.
 type LoginAttempt struct {
-	Username    string    `bson:"_id" json:"username"`
+	Key         string    `bson:"_id" json:"key"`
+	Username    string    `bson:"username" json:"username"`
+	IP          string    `bson:"ip" json:"ip"`
 	FailCount   int       `bson:"fail_count" json:"fail_count"`
 	LastFailure time.Time `bson:"last_failure" json:"last_failure"`
 	LockedUntil time.Time `bson:"locked_until,omitempty" json:"locked_until,omitempty"`
@@ -168,6 +176,24 @@ type SSOConfig struct {
 
 // SSOConfigID is the fixed document ID for the singleton SSOConfig.
 const SSOConfigID = "sso"
+
+// AppSettings is a singleton (_id/id AppSettingsID) document holding
+// instance-wide settings that aren't tied to any one feature area.
+type AppSettings struct {
+	ID string `bson:"_id" json:"id"`
+	// UpdateCheckDisabled turns off the dashboard's update-available
+	// banner (see internal/web/static/app.js), which otherwise has the
+	// browser fetch api.github.com directly on every dashboard load - off
+	// by default so that request only ever happens for operators who
+	// haven't opted out, not because the panel is closed-network by
+	// default. Read once and cached (see Server.isUpdateCheckDisabled in
+	// internal/admin/handlers_settings_general.go) rather than looked up
+	// on every request.
+	UpdateCheckDisabled bool `bson:"update_check_disabled" json:"update_check_disabled"`
+}
+
+// AppSettingsID is the fixed document ID for the singleton AppSettings.
+const AppSettingsID = "app"
 
 // ClusterSample is a periodic snapshot of cluster-wide health numbers,
 // recorded by admin's background poller (internal/admin/poller.go) so the

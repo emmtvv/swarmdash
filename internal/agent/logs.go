@@ -6,6 +6,8 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/gorilla/websocket"
+
+	"swarmdash/internal/httpx"
 )
 
 // handleLogs streams a container's stdout/stderr to the caller over a
@@ -67,7 +69,7 @@ func (s *Server) handleLogsDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rc.Close()
 
-	w.Header().Set("Content-Disposition", `attachment; filename="`+id+`.log"`)
+	httpx.SetAttachment(w, id+".log")
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = stdcopy.StdCopy(w, w, rc)
 }

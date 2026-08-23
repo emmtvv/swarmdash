@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/docker/docker/client"
+	"golang.org/x/time/rate"
 
 	"swarmdash/internal/store"
 	"swarmdash/internal/web"
@@ -111,11 +112,14 @@ func newTestStore(t *testing.T) store.Interface {
 func newTestServer(t *testing.T, docker *client.Client) *Server {
 	t.Helper()
 	return &Server{
-		cfg:      Config{AgentPort: "0"},
-		docker:   docker,
-		store:    newTestStore(t),
-		log:      slog.New(slog.NewTextHandler(io.Discard, nil)),
-		renderer: web.NewRenderer(),
+		cfg:           Config{AgentPort: "0"},
+		docker:        docker,
+		store:         newTestStore(t),
+		log:           slog.New(slog.NewTextHandler(io.Discard, nil)),
+		renderer:      web.NewRenderer(),
+		loginLimiter:  newIPRateLimiter(rate.Inf, 0),
+		globalLimiter: newIPRateLimiter(rate.Inf, 0),
+		execSlots:     make(chan struct{}, maxConcurrentExecSessions),
 	}
 }
 

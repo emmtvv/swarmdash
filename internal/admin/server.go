@@ -13,9 +13,11 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/docker/docker/client"
+	"golang.org/x/time/rate"
 
 	"swarmdash/internal/store"
 	"swarmdash/internal/web"
@@ -58,6 +60,34 @@ type Server struct {
 	// load.
 	memUsageMu    sync.RWMutex
 	memUsageBytes int64
+
+	// rbacCache/rbacOnce memoize the route -> role-requirement lookup built
+	// from protectedRoutes (see routes.go and rbacTable in auth.go).
+	rbacOnce  sync.Once
+	rbacCache *rbac
+
+	// loginLimiter/globalLimiter throttle by client IP (see ratelimit.go).
+	// loginLimiter is deliberately tight - it backstops the (username, IP)
+	// account lockout in auth.go against an attacker spraying many
+	// different usernames from one address, which the per-account lockout
+	// alone wouldn't catch. globalLimiter is a loose backstop against
+	// naive flooding across the rest of the app.
+	loginLimiter  *ipRateLimiter
+	globalLimiter *ipRateLimiter
+
+	// execSlots caps concurrent interactive /ws/exec sessions (see
+	// handleExecProxy in wsproxy.go): a buffered channel used purely as a
+	// counting semaphore, sized maxConcurrentExecSessions.
+	execSlots chan struct{}
+
+	// updateCheckDisabled caches store.AppSettings.UpdateCheckDisabled -
+	// see isUpdateCheckDisabled/setUpdateCheckDisabled in
+	// handlers_settings_general.go - so the security() middleware (which
+	// wraps every request) and the dashboard don't each hit the store on
+	// every request for a value that only changes when an admin flips it
+	// in Settings -> General.
+	updateCheckLoaded   sync.Once
+	updateCheckDisabled atomic.Bool
 }
 
 func New(cfg Config, docker *client.Client, st store.Interface) (*Server, error) {
@@ -72,6 +102,14 @@ func New(cfg Config, docker *client.Client, st store.Interface) (*Server, error)
 		log:      slog.New(slog.NewTextHandler(os.Stdout, nil)).With("component", "admin"),
 		renderer: web.NewRenderer(),
 		agentTLS: agentTLS,
+		// 5 attempts/minute/IP, burst 5: generous enough for a real user
+		// mistyping a password, tight enough to make spraying many
+		// usernames from one address slow going.
+		loginLimiter: newIPRateLimiter(rate.Every(12*time.Second), 5),
+		// 20 req/s/IP, burst 40: a loose backstop against naive flooding,
+		// not meant to shape legitimate dashboard/SSE traffic.
+		globalLimiter: newIPRateLimiter(rate.Limit(20), 40),
+		execSlots:     make(chan struct{}, maxConcurrentExecSessions),
 	}, nil
 }
 
@@ -116,129 +154,19 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /hooks/deploy/{token}", s.handleDeployHookTrigger)
 
 	mux.HandleFunc("GET /login", s.handleLoginPage)
-	mux.HandleFunc("POST /login", s.handleLoginSubmit)
+	mux.Handle("POST /login", s.loginLimiter.middleware(http.HandlerFunc(s.handleLoginSubmit)))
 	mux.HandleFunc("POST /logout", s.handleLogout)
 	mux.HandleFunc("GET /sso/login", s.handleSSOLogin)
 	mux.HandleFunc("GET /sso/callback", s.handleSSOCallback)
 
 	protected := http.NewServeMux()
-	protected.HandleFunc("GET /{$}", s.handleDashboard)
-
-	protected.HandleFunc("GET /account/password", s.handleAccountPasswordPage)
-	protected.HandleFunc("POST /account/password", s.handleAccountPasswordChange)
-
-	protected.HandleFunc("GET /nodes", s.handleNodesPage)
-	protected.HandleFunc("GET /nodes/stats", s.handleNodesStatsJSON)
-	protected.HandleFunc("GET /nodes/{id}", s.handleNodeDetail)
-	protected.HandleFunc("GET /nodes/{id}/stats", s.handleNodeStatsJSON)
-	protected.HandleFunc("POST /nodes/{id}/availability", s.handleNodeAvailability)
-	protected.HandleFunc("POST /nodes/{id}/promote", s.handleNodePromote)
-	protected.HandleFunc("POST /nodes/{id}/demote", s.handleNodeDemote)
-	protected.HandleFunc("POST /nodes/{id}/labels", s.handleNodeLabelAdd)
-	protected.HandleFunc("POST /nodes/{id}/labels/{key}/delete", s.handleNodeLabelDelete)
-
-	protected.HandleFunc("GET /stacks", s.handleStacksPage)
-	protected.HandleFunc("GET /stacks/templates", s.handleTemplatesPage)
-	protected.HandleFunc("GET /stacks/deploy", s.handleStackDeployPage)
-	protected.HandleFunc("POST /stacks/deploy/preview", s.handleStackDeployPreview)
-	protected.HandleFunc("POST /stacks/deploy", s.handleStackDeploySubmit)
-	protected.HandleFunc("GET /stacks/gitops", s.handleGitOpsPage)
-	protected.HandleFunc("POST /stacks/gitops", s.handleGitOpsCreate)
-	protected.HandleFunc("POST /stacks/gitops/{id}/sync", s.handleGitOpsSync)
-	protected.HandleFunc("POST /stacks/gitops/{id}/delete", s.handleGitOpsDelete)
-	protected.HandleFunc("GET /stacks/{name}", s.handleStackDetail)
-	protected.HandleFunc("GET /stacks/{name}/export.yml", s.handleStackExport)
-	protected.HandleFunc("POST /stacks/{name}/restart", s.handleStackRestart)
-	protected.HandleFunc("POST /stacks/{name}/delete", s.handleStackDelete)
-
-	protected.HandleFunc("GET /services", s.handleServicesPage)
-	protected.HandleFunc("GET /services/{name}", s.handleServiceDetail)
-	protected.HandleFunc("GET /services/{name}/events", s.handleServiceEvents)
-	protected.HandleFunc("GET /services/{name}/export.yml", s.handleServiceExport)
-	protected.HandleFunc("POST /services/{name}/scale", s.handleServiceScale)
-	protected.HandleFunc("POST /services/{name}/image", s.handleServiceUpdateImage)
-	protected.HandleFunc("POST /services/{name}/spec", s.handleServiceUpdateSpec)
-	protected.HandleFunc("POST /services/{name}/rollback", s.handleServiceRollback)
-	protected.HandleFunc("POST /services/{name}/restart", s.handleServiceRestart)
-	protected.HandleFunc("POST /services/{name}/update-latest", s.handleServiceUpdateLatest)
-	protected.HandleFunc("POST /services/{name}/delete", s.handleServiceDelete)
-	protected.HandleFunc("POST /services/bulk", s.handleServicesBulk)
-	protected.HandleFunc("POST /services/{name}/deploy-hooks", s.handleDeployHookCreate)
-	protected.HandleFunc("POST /services/{name}/deploy-hooks/{id}/delete", s.handleDeployHookDelete)
-
-	protected.HandleFunc("GET /topology", s.handleTopologyPage)
-
-	protected.HandleFunc("GET /networks", s.handleNetworksPage)
-	protected.HandleFunc("POST /networks", s.handleNetworkCreate)
-	protected.HandleFunc("POST /networks/{id}/delete", s.handleNetworkDelete)
-
-	protected.HandleFunc("GET /secrets", s.handleSecretsPage)
-	protected.HandleFunc("POST /secrets", s.handleSecretCreate)
-	protected.HandleFunc("POST /secrets/{id}/delete", s.handleSecretDelete)
-
-	protected.HandleFunc("GET /configs", s.handleConfigsPage)
-	protected.HandleFunc("POST /configs", s.handleConfigCreate)
-	protected.HandleFunc("POST /configs/{id}/delete", s.handleConfigDelete)
-
-	protected.HandleFunc("GET /images", s.handleImagesPage)
-	protected.HandleFunc("POST /images/prune", s.handleImagesPrune)
-
-	protected.HandleFunc("GET /volumes", s.handleVolumesPage)
-	protected.HandleFunc("POST /volumes", s.handleVolumeCreate)
-	protected.HandleFunc("POST /volumes/{name}/delete", s.handleVolumeDelete)
-
-	protected.HandleFunc("GET /audit", s.handleAuditPage)
-	protected.HandleFunc("GET /events", s.handleEventsPage)
-
-	protected.HandleFunc("GET /settings/webhooks", s.handleWebhooksPage)
-	protected.HandleFunc("POST /settings/webhooks", s.handleWebhookCreate)
-	protected.HandleFunc("POST /settings/webhooks/{id}/delete", s.handleWebhookDelete)
-
-	protected.HandleFunc("GET /settings/tokens", s.handleTokensPage)
-	protected.HandleFunc("POST /settings/tokens", s.handleTokenCreate)
-	protected.HandleFunc("POST /settings/tokens/{id}/delete", s.handleTokenDelete)
-
-	protected.HandleFunc("GET /settings/users", s.handleUsersPage)
-	protected.HandleFunc("POST /settings/users", s.handleUserCreate)
-	protected.HandleFunc("POST /settings/users/{username}/delete", s.handleUserDelete)
-	protected.HandleFunc("POST /settings/users/{username}/password", s.handleUserResetPassword)
-
-	protected.HandleFunc("GET /settings/swarm", s.handleSwarmPage)
-	protected.HandleFunc("POST /settings/swarm/spec", s.handleSwarmUpdateSpec)
-	protected.HandleFunc("POST /settings/swarm/rotate-token/{role}", s.handleSwarmRotateToken)
-	protected.HandleFunc("POST /settings/swarm/rotate-ca", s.handleSwarmForceCertRotate)
-	protected.HandleFunc("POST /settings/swarm/rebalance", s.handleSwarmRebalance)
-	protected.HandleFunc("POST /settings/swarm/prune-failed-tasks", s.handleSwarmPruneFailedTasks)
-	protected.HandleFunc("POST /settings/swarm/prune-resources", s.handleSwarmPruneResources)
-
-	protected.HandleFunc("GET /settings/registries", s.handleRegistriesPage)
-	protected.HandleFunc("POST /settings/registries", s.handleRegistryCreate)
-	protected.HandleFunc("POST /settings/registries/{server}/delete", s.handleRegistryDelete)
-
-	protected.HandleFunc("GET /settings/sso", s.handleSSOSettingsPage)
-	protected.HandleFunc("POST /settings/sso", s.handleSSOSettingsSave)
-	protected.HandleFunc("POST /settings/sso/disable", s.handleSSOSettingsDisable)
-
-	protected.HandleFunc("GET /settings/backup", s.handleBackupPage)
-	protected.HandleFunc("GET /settings/backup/export", s.handleBackupExport)
-	protected.HandleFunc("POST /settings/backup/restore", s.handleBackupRestore)
-
-	protected.HandleFunc("GET /exec/{taskID}", s.handleExecPage)
-	protected.HandleFunc("GET /ws/exec/{taskID}", s.handleExecProxy)
-	protected.HandleFunc("GET /logs/{taskID}", s.handleTaskLogsPage)
-	protected.HandleFunc("GET /ws/logs/{taskID}", s.handleLogsProxy)
-	protected.HandleFunc("GET /ws/stats/{taskID}", s.handleStatsProxy)
-	protected.HandleFunc("GET /logs/{taskID}/download", s.handleLogsDownload)
-	protected.HandleFunc("GET /files/{taskID}", s.handleFilesList)
-	protected.HandleFunc("GET /files/{taskID}/download", s.handleFileDownload)
-
-	protected.HandleFunc("GET /services/{name}/logs", s.handleServiceLogsPage)
-	protected.HandleFunc("GET /ws/services/{name}/logs", s.handleServiceLogsProxy)
-	protected.HandleFunc("GET /services/{name}/logs/download", s.handleServiceLogsDownload)
+	for _, rt := range protectedRoutes(s) {
+		protected.HandleFunc(rt.Pattern, rt.Handler)
+	}
 
 	mux.Handle("/", s.requireAuth(s.requireRole(protected)))
 
-	return s.logging(s.security(mux))
+	return s.logging(s.globalLimiter.middleware(s.security(mux)))
 }
 
 func (s *Server) ListenAndServe(ctx context.Context) error {

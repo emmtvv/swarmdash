@@ -12,6 +12,27 @@
   cluster — it mints a brand new CA and invalidates every certificate
   issued from the old one.
 - HTTPS for the admin UI itself: `--ui-tls-cert`/`--ui-tls-key`.
+- Cluster secret as a Docker secret: [deploy/stack.yml](../deploy/stack.yml)
+  passes it as a plain environment variable by default (see that file's
+  top comment for the tradeoff). Every `SWARMDASH_*` value admin/agent
+  read also has a `_FILE`-suffixed variant that reads from a mounted file
+  (see [../internal/secretenv](../internal/secretenv)), so
+  `SWARMDASH_CLUSTER_SECRET_FILE=/run/secrets/cluster_secret` works with no
+  code changes - `make cluster-secret` creates the Docker secret, then
+  uncomment the matching sections in `deploy/stack.yml` ("Optional:
+  cluster secret as a Docker secret").
+- Rotating the cluster secret: registry passwords, GitOps auth tokens, and
+  the SSO client secret are all encrypted at rest with a key derived from
+  `SWARMDASH_CLUSTER_SECRET` (see [../internal/admin/crypto.go](../internal/admin/crypto.go)).
+  Changing that value and redeploying, on its own, makes every one of those
+  permanently undecryptable — there's nothing to rotate the *encryption*
+  key independently of the shared bearer secret. Run
+  `swarmdash rotate-cluster-secret --old-secret=<current> --new-secret=<next>`
+  (pointed at the same `--storage-driver`/`--data-dir` or `--mongo-*` admin
+  uses) to re-encrypt them under the new secret *before* rolling
+  `SWARMDASH_CLUSTER_SECRET` out to admin/agent — see the command's
+  `--help` for the full sequence. Safe to re-run if it's interrupted
+  partway through.
 - Storage: all admin state (users, sessions, audit log, tokens, registry
   credentials, gitops stacks, ...) persists through one of two backends,
   chosen with `--storage-driver`/`SWARMDASH_STORAGE_DRIVER`:

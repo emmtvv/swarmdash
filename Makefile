@@ -7,7 +7,7 @@ LDFLAGS := -s -w -X swarmdash/internal/version.Version=$(VERSION) -X swarmdash/i
 # scripts/up.sh.
 DOCKER ?= docker
 
-.PHONY: build build-linux docker test test-cover vet env tls tls-renew deploy down up
+.PHONY: build build-linux docker test test-cover vet env cluster-secret tls tls-renew deploy down up
 
 build:
 	go build -trimpath -ldflags "$(LDFLAGS)" -o bin/swarmdash ./cmd/swarmdash
@@ -52,6 +52,32 @@ env:
 		} > .env; \
 		echo "generated .env"; \
 	fi
+
+# Loads the cluster secret as a Docker secret instead of the plain env var
+# `make env`/deploy/stack.yml use by default (see the top-of-file comment
+# in deploy/stack.yml for that default's tradeoff). Reuses the value
+# already in .env if `make env` has been run, so switching delivery
+# mechanisms doesn't also rotate the secret and break already-deployed
+# agents; generates a fresh one otherwise. A no-op if the Docker secret
+# already exists - Docker secrets are immutable, so to rotate, create a new
+# secret under a new name, update deploy/stack.yml's reference, redeploy,
+# then remove the old secret (run `swarmdash rotate-cluster-secret` first -
+# see docs/hardening.md - so encrypted registry/GitOps/SSO credentials
+# aren't left undecryptable).
+cluster-secret:
+	@if [ -f .env ] && grep -q '^SWARMDASH_CLUSTER_SECRET=' .env; then \
+		value="$$(grep '^SWARMDASH_CLUSTER_SECRET=' .env | cut -d= -f2-)"; \
+	else \
+		value="$$(openssl rand -hex 32)"; \
+	fi; \
+	if $(DOCKER) secret inspect swarmdash_cluster_secret >/dev/null 2>&1; then \
+		echo "swarmdash_cluster_secret already exists, skipping"; \
+	else \
+		printf '%s' "$$value" | $(DOCKER) secret create swarmdash_cluster_secret - >/dev/null; \
+		echo "created docker secret: swarmdash_cluster_secret"; \
+	fi
+	@echo ""
+	@echo "enable it by uncommenting the cluster-secret sections in deploy/stack.yml, then redeploy"
 
 # Generates the mTLS CA + agent/admin certificates (optional hardening on
 # top of the cluster secret, see README) and loads them as Docker secrets -

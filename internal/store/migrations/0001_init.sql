@@ -11,6 +11,10 @@ CREATE TABLE users (
     must_change_password  INTEGER NOT NULL DEFAULT 0
 );
 
+-- token is the session cookie's SHA-256 hash (see hashToken in
+-- internal/admin/auth.go), not the plaintext bearer value - same
+-- treatment as api_tokens.hash below, so a copy of this file doesn't hand
+-- out live sessions.
 CREATE TABLE sessions (
     token       TEXT PRIMARY KEY,
     username    TEXT NOT NULL,

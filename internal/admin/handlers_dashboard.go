@@ -60,6 +60,11 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		s.log.Warn("list cluster samples", "err", err)
 	}
 
+	currentVersion := updatecheck.CurrentVersion
+	if s.isUpdateCheckDisabled() {
+		currentVersion = ""
+	}
+
 	s.render(w, r, "dashboard.html", map[string]any{
 		"User":           userFromContext(r),
 		"Nodes":          nodes,
@@ -78,7 +83,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"MemUsed":        memUsed,
 		"MemPct":         pct(memUsed, memCapacity),
 		"HistoryJSON":    clusterHistoryJSON(history),
-		"CurrentVersion": updatecheck.CurrentVersion,
+		"CurrentVersion": currentVersion,
 	})
 }
 

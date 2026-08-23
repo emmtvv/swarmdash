@@ -1,0 +1,15 @@
+{{define "settings_general.html"}}
+<h1>General settings</h1>
+
+<div class="card">
+	<h2 style="margin-top:0;">Update check</h2>
+	<p class="muted">The dashboard shows a banner when a newer swarmdash release is available. Checking it has your browser ask <span class="mono">api.github.com</span> for the latest release directly - the admin server itself never talks to GitHub. Turning this off stops that request entirely, not just the banner.</p>
+	<form method="post" action="/settings/general">
+		<label style="display:flex; align-items:center; gap:0.5em;">
+			<input type="checkbox" name="update_check_disabled" value="1" {{if .UpdateCheckDisabled}}checked{{end}}>
+			Disable the update-available check
+		</label>
+		<button type="submit" class="btn" style="margin-top:0.75em;">Save</button>
+	</form>
+</div>
+{{end}}

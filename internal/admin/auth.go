@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -25,10 +26,10 @@ const sessionTTL = 7 * 24 * time.Hour
 
 // Local-login lockout: bootstrap/generated passwords are long random
 // tokens, but operators can still set short ones by hand, so failed
-// attempts are throttled per-username regardless. maxLoginAttempts failures
-// within loginAttemptWindow of each other locks that username out for
-// loginLockDuration; a failure outside the window starts the count over
-// rather than compounding indefinitely.
+// attempts are throttled per (username, client IP) pair regardless - see
+// loginAttemptKey. maxLoginAttempts failures within loginAttemptWindow of
+// each other locks that pair out for loginLockDuration; a failure outside
+// the window starts the count over rather than compounding indefinitely.
 const (
 	maxLoginAttempts   = 5
 	loginAttemptWindow = 15 * time.Minute
@@ -128,11 +129,12 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 
 	username := r.FormValue("username")
 	password := r.FormValue("password")
+	ip := clientIP(r)
 
 	// Checked before touching the user record so an unknown username locks
 	// out the same way a known one does - it doesn't create a timing/
 	// enumeration gap between the two.
-	if wait, err := s.loginLockedFor(username); err != nil {
+	if wait, err := s.loginLockedFor(username, ip); err != nil {
 		s.log.Error("check login lockout", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
@@ -146,7 +148,11 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		if !errors.Is(err, store.ErrNotFound) {
 			s.log.Error("get user", "err", err)
 		}
-		s.recordLoginFailure(username)
+		// Burn roughly the same time a real bcrypt comparison below would
+		// take, so an unknown username doesn't answer measurably faster
+		// than a known one with a wrong password - see dummyPasswordHash.
+		_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(password))
+		s.recordLoginFailure(username, ip)
 		http.Redirect(w, r, "/login?error=invalid+credentials", http.StatusSeeOther)
 		return
 	}
@@ -155,26 +161,60 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
-		s.recordLoginFailure(username)
+		s.recordLoginFailure(username, ip)
 		http.Redirect(w, r, "/login?error=invalid+credentials", http.StatusSeeOther)
 		return
 	}
 
-	if err := s.store.DeleteLoginAttempt(username); err != nil {
+	if err := s.store.DeleteLoginAttempt(loginAttemptKey(username, ip)); err != nil {
 		s.log.Error("clear login attempts", "err", err)
 	}
 
-	if err := s.startSession(w, username); err != nil {
+	if err := s.startSession(w, r, username); err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// loginLockedFor reports how much longer username is locked out of local
-// login, or 0 if it isn't locked.
-func (s *Server) loginLockedFor(username string) (time.Duration, error) {
-	a, err := s.store.GetLoginAttempt(username)
+// dummyPasswordHash is compared against on an unknown-username login so
+// that path takes roughly the same bcrypt-shaped time as a known username
+// with a wrong password - otherwise the endpoint answers fast enough on an
+// unknown username to let an attacker enumerate accounts by timing alone,
+// even though the redirect the client sees is identical either way.
+var dummyPasswordHash = func() []byte {
+	h, err := bcrypt.GenerateFromPassword([]byte("swarmdash-timing-placeholder"), bcrypt.DefaultCost)
+	if err != nil {
+		panic(err)
+	}
+	return h
+}()
+
+// loginAttemptKey derives the lockout key for a (username, client IP)
+// pair; see LoginAttempt's doc comment in internal/store/types.go for why
+// it's the pair and not username alone.
+func loginAttemptKey(username, ip string) string {
+	return username + "\x00" + ip
+}
+
+// clientIP extracts the request's remote address, stripping the port
+// net/http always includes in RemoteAddr. Best-effort: an admin behind a
+// reverse proxy that doesn't forward the original client address sees
+// every request as coming from the proxy, which just means the lockout
+// keys off the proxy's address - no worse than treating every request as
+// one shared bucket, which is what a username-only key already did.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+// loginLockedFor reports how much longer the (username, ip) pair is locked
+// out of local login, or 0 if it isn't locked.
+func (s *Server) loginLockedFor(username, ip string) (time.Duration, error) {
+	a, err := s.store.GetLoginAttempt(loginAttemptKey(username, ip))
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
 			return 0, nil
@@ -187,14 +227,15 @@ func (s *Server) loginLockedFor(username string) (time.Duration, error) {
 	return 0, nil
 }
 
-// recordLoginFailure increments username's failed-attempt count, resetting
-// it first if the last failure fell outside loginAttemptWindow, and sets a
-// lockout once maxLoginAttempts is reached. Best-effort: a store error here
-// only means this one failure wasn't counted, so it's logged rather than
-// surfaced to the client - a login that already failed on bad credentials
-// shouldn't turn into a 500.
-func (s *Server) recordLoginFailure(username string) {
-	a, err := s.store.GetLoginAttempt(username)
+// recordLoginFailure increments the (username, ip) pair's failed-attempt
+// count, resetting it first if the last failure fell outside
+// loginAttemptWindow, and sets a lockout once maxLoginAttempts is reached.
+// Best-effort: a store error here only means this one failure wasn't
+// counted, so it's logged rather than surfaced to the client - a login
+// that already failed on bad credentials shouldn't turn into a 500.
+func (s *Server) recordLoginFailure(username, ip string) {
+	key := loginAttemptKey(username, ip)
+	a, err := s.store.GetLoginAttempt(key)
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		s.log.Error("get login attempt", "err", err)
 		return
@@ -203,12 +244,14 @@ func (s *Server) recordLoginFailure(username string) {
 	if now.Sub(a.LastFailure) > loginAttemptWindow {
 		a.FailCount = 0
 	}
+	a.Key = key
 	a.Username = username
+	a.IP = ip
 	a.FailCount++
 	a.LastFailure = now
 	if a.FailCount >= maxLoginAttempts {
 		a.LockedUntil = now.Add(loginLockDuration)
-		s.log.Warn("account locked out after repeated failed logins", "username", username, "attempts", a.FailCount)
+		s.log.Warn("account locked out after repeated failed logins", "username", username, "ip", ip, "attempts", a.FailCount)
 	}
 	if err := s.store.PutLoginAttempt(a); err != nil {
 		s.log.Error("put login attempt", "err", err)
@@ -217,12 +260,17 @@ func (s *Server) recordLoginFailure(username string) {
 
 // startSession mints a new session token for username and sets the session
 // cookie on w. Shared by local password login (handleLoginSubmit) and the
-// OIDC callback (handleSSOCallback).
-func (s *Server) startSession(w http.ResponseWriter, username string) error {
+// OIDC callback (handleSSOCallback). Only the token's hash is persisted
+// (see hashToken) - like an API token, the plaintext is a bearer
+// credential, and with --storage-driver=local that credential now lives in
+// a SQLite file on disk (trivial to copy out via a backup or `docker cp`),
+// so it shouldn't be recoverable from a stolen database the way a raw
+// primary key would be.
+func (s *Server) startSession(w http.ResponseWriter, r *http.Request, username string) error {
 	token := randomToken(32)
 	now := time.Now()
 	if err := s.store.PutSession(store.Session{
-		Token:     token,
+		Token:     hashToken(token),
 		Username:  username,
 		CreatedAt: now,
 		ExpiresAt: now.Add(sessionTTL),
@@ -234,6 +282,7 @@ func (s *Server) startSession(w http.ResponseWriter, username string) error {
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   isSecureRequest(r),
 		SameSite: http.SameSiteLaxMode,
 		Expires:  now.Add(sessionTTL),
 	})
@@ -242,9 +291,9 @@ func (s *Server) startSession(w http.ResponseWriter, username string) error {
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookieName); err == nil {
-		_ = s.store.DeleteSession(c.Value)
+		_ = s.store.DeleteSession(hashToken(c.Value))
 	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: "", Path: "/", MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: "", Path: "/", Secure: isSecureRequest(r), MaxAge: -1})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
@@ -253,7 +302,7 @@ func (s *Server) currentUser(r *http.Request) *store.User {
 	if err != nil {
 		return nil
 	}
-	sess, err := s.store.GetSession(c.Value)
+	sess, err := s.store.GetSession(hashToken(c.Value))
 	if err != nil || time.Now().After(sess.ExpiresAt) {
 		return nil
 	}
@@ -298,9 +347,13 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 // authentication: "viewer" accounts get read-only access. Enforced in one
 // place, wrapped around the whole protected mux (see server.go), so no
 // individual route registration can be missed.
+// requireRole enforces the two-role model on top of requireAuth's
+// authentication: "viewer" accounts get read-only access. Enforced in one
+// place, wrapped around the whole protected mux (see server.go), so no
+// individual route registration can be missed.
 func (s *Server) requireRole(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if user := userFromContext(r); user.Role != "admin" && needsAdmin(r) {
+		if user := userFromContext(r); user.Role != "admin" && s.rbacTable().needsAdmin(r) {
 			http.Error(w, "forbidden: this account has read-only access", http.StatusForbidden)
 			return
 		}
@@ -308,23 +361,15 @@ func (s *Server) requireRole(next http.Handler) http.Handler {
 	})
 }
 
-// needsAdmin reports whether a request requires the admin role: any
-// mutating request, plus three read-only-by-method areas that are
-// privileged in practice - settings (registries, tokens, webhooks, swarm
-// join tokens, users), and the interactive console (page + websocket),
-// which lets you run arbitrary commands in a container despite being a
-// GET.
-func needsAdmin(r *http.Request) bool {
-	// Changing your own password isn't a privileged action - every account
-	// needs it, including a viewer stuck behind MustChangePassword.
-	if r.URL.Path == "/account/password" {
-		return false
-	}
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		return true
-	}
-	p := r.URL.Path
-	return strings.HasPrefix(p, "/settings/") || strings.HasPrefix(p, "/exec/") || strings.HasPrefix(p, "/ws/exec/")
+// rbacTable lazily builds the route -> role-requirement lookup from
+// protectedRoutes (see routes.go). Lazy + cached on first use rather than
+// built in Handler(), since tests exercise requireRole directly without
+// necessarily calling Handler() first.
+func (s *Server) rbacTable() *rbac {
+	s.rbacOnce.Do(func() {
+		s.rbacCache = newRBAC(protectedRoutes(s))
+	})
+	return s.rbacCache
 }
 
 func bearerToken(r *http.Request) string {
@@ -336,7 +381,7 @@ func bearerToken(r *http.Request) string {
 	return ""
 }
 
-func hashAPIToken(token string) string {
+func hashToken(token string) string {
 	sum := sha256.Sum256([]byte(token))
 	return hex.EncodeToString(sum[:])
 }
@@ -347,7 +392,7 @@ func hashAPIToken(token string) string {
 // existed have no stored Role - grandfathered in as "admin" so existing
 // CI credentials don't silently lose access.
 func (s *Server) userFromAPIToken(token string) (*store.User, error) {
-	t, err := s.store.FindAPITokenByHash(hashAPIToken(token))
+	t, err := s.store.FindAPITokenByHash(hashToken(token))
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +411,7 @@ func newAPIToken(name, role, createdBy string) (plaintext string, rec store.APIT
 	rec = store.APIToken{
 		ID:        randomToken(8),
 		Name:      name,
-		Hash:      hashAPIToken(plaintext),
+		Hash:      hashToken(plaintext),
 		Role:      role,
 		CreatedBy: createdBy,
 		CreatedAt: time.Now(),

@@ -9,6 +9,22 @@ import (
 
 const csrfCookieName = "swarmdash_csrf"
 
+// isSecureRequest reports whether the request arrived over an encrypted
+// connection, either directly (UITLSCertFile/-KeyFile terminate TLS in
+// this process, so r.TLS is set) or via a reverse proxy that terminates
+// TLS and sets X-Forwarded-Proto - the same signal ssoRedirectURI already
+// trusts for building the OAuth redirect URI. Used to gate the Secure
+// attribute on cookies: set it whenever the connection is HTTPS so
+// browsers never send them in cleartext, but don't hard-code it, since an
+// admin reachable only over plain HTTP (a trusted, internal cluster
+// network) would otherwise never be able to log in at all.
+func isSecureRequest(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return r.Header.Get("X-Forwarded-Proto") == "https"
+}
+
 func csrfTokenFromContext(r *http.Request) string {
 	v, _ := r.Context().Value(ctxKeyCSRF).(string)
 	return v
@@ -47,6 +63,17 @@ func (s *Server) security(next http.Handler) http.Handler {
 		if r.TLS != nil {
 			h.Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}
+		// api.github.com: the dashboard's update-check banner fetches the
+		// latest release directly from the browser (see
+		// internal/web/static/app.js) rather than through the admin
+		// server. Only loosen the policy for it while the check is
+		// actually enabled (Settings -> General) - turning the banner off
+		// should mean the browser never talks to GitHub at all, not just
+		// that the result goes unused.
+		connectSrc := "connect-src 'self'"
+		if !s.isUpdateCheckDisabled() {
+			connectSrc += " https://api.github.com"
+		}
 		h.Set("Content-Security-Policy", strings.Join([]string{
 			"default-src 'self'",
 			"script-src 'self' 'nonce-" + nonce + "'",
@@ -57,11 +84,7 @@ func (s *Server) security(next http.Handler) http.Handler {
 			"style-src 'self' 'unsafe-inline'",
 			"img-src 'self' data:",
 			"font-src 'self'",
-			// api.github.com: the dashboard's update-check banner fetches
-			// the latest release directly from the browser (see
-			// internal/web/static/app.js) rather than through the admin
-			// server.
-			"connect-src 'self' https://api.github.com",
+			connectSrc,
 			"object-src 'none'",
 			"base-uri 'self'",
 			"form-action 'self'",
@@ -76,6 +99,7 @@ func (s *Server) security(next http.Handler) http.Handler {
 				Value:    token,
 				Path:     "/",
 				HttpOnly: true,
+				Secure:   isSecureRequest(r),
 				SameSite: http.SameSiteLaxMode,
 			})
 		}

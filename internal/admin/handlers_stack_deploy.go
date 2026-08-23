@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"swarmdash/internal/compose"
+	"swarmdash/internal/httpx"
 )
 
 var stackNamePattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_.-]*$`)
@@ -122,7 +123,7 @@ func (s *Server) handleStackExport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "render compose: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`.yml"`)
+	httpx.SetAttachment(w, name+".yml")
 	w.Header().Set("Content-Type", "application/x-yaml")
 	_, _ = w.Write(buf)
 }
@@ -143,7 +144,7 @@ func (s *Server) handleServiceExport(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "render compose: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Disposition", `attachment; filename="`+svc.Spec.Name+`.yml"`)
+	httpx.SetAttachment(w, svc.Spec.Name+".yml")
 	w.Header().Set("Content-Type", "application/x-yaml")
 	_, _ = w.Write(buf)
 }

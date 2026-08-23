@@ -194,25 +194,25 @@ func (s *SQLiteStore) DeleteSession(token string) error {
 
 func (s *SQLiteStore) PutLoginAttempt(a LoginAttempt) error {
 	_, err := s.db.Exec(`
-		INSERT INTO login_attempts (username, fail_count, last_failure, locked_until)
-		VALUES (?, ?, ?, ?)
-		ON CONFLICT(username) DO UPDATE SET
+		INSERT INTO login_attempts (key, username, ip, fail_count, last_failure, locked_until)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(key) DO UPDATE SET
 			fail_count = excluded.fail_count,
 			last_failure = excluded.last_failure,
 			locked_until = excluded.locked_until`,
-		a.Username, a.FailCount, a.LastFailure, a.LockedUntil)
+		a.Key, a.Username, a.IP, a.FailCount, a.LastFailure, a.LockedUntil)
 	return err
 }
 
-func (s *SQLiteStore) GetLoginAttempt(username string) (LoginAttempt, error) {
+func (s *SQLiteStore) GetLoginAttempt(key string) (LoginAttempt, error) {
 	var a LoginAttempt
-	err := s.db.QueryRow(`SELECT username, fail_count, last_failure, locked_until FROM login_attempts WHERE username = ?`, username).
-		Scan(&a.Username, &a.FailCount, &a.LastFailure, &a.LockedUntil)
+	err := s.db.QueryRow(`SELECT key, username, ip, fail_count, last_failure, locked_until FROM login_attempts WHERE key = ?`, key).
+		Scan(&a.Key, &a.Username, &a.IP, &a.FailCount, &a.LastFailure, &a.LockedUntil)
 	return a, notFoundSQL(err)
 }
 
-func (s *SQLiteStore) DeleteLoginAttempt(username string) error {
-	_, err := s.db.Exec(`DELETE FROM login_attempts WHERE username = ?`, username)
+func (s *SQLiteStore) DeleteLoginAttempt(key string) error {
+	_, err := s.db.Exec(`DELETE FROM login_attempts WHERE key = ?`, key)
 	return err
 }
 
@@ -583,5 +583,22 @@ func (s *SQLiteStore) PutSSOConfig(c SSOConfig) error {
 			redirect_base_url = excluded.redirect_base_url,
 			updated_at = excluded.updated_at`,
 		c.ID, c.Enabled, c.Label, c.Issuer, c.ClientID, c.ClientSecretEnc, c.Scopes, c.AutoCreateUsers, c.EnforceSSO, c.DefaultRole, c.AllowedDomains, c.RedirectBaseURL, c.UpdatedAt)
+	return err
+}
+
+func (s *SQLiteStore) GetAppSettings() (AppSettings, error) {
+	var a AppSettings
+	err := s.db.QueryRow(`SELECT id, update_check_disabled FROM app_settings WHERE id = ?`, AppSettingsID).
+		Scan(&a.ID, &a.UpdateCheckDisabled)
+	return a, notFoundSQL(err)
+}
+
+func (s *SQLiteStore) PutAppSettings(a AppSettings) error {
+	a.ID = AppSettingsID
+	_, err := s.db.Exec(`
+		INSERT INTO app_settings (id, update_check_disabled)
+		VALUES (?, ?)
+		ON CONFLICT(id) DO UPDATE SET update_check_disabled = excluded.update_check_disabled`,
+		a.ID, a.UpdateCheckDisabled)
 	return err
 }

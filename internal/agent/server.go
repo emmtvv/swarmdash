@@ -6,6 +6,8 @@ package agent
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -116,12 +118,23 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 func (s *Server) auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token := bearerToken(r)
-		if s.cfg.ClusterSecret == "" || token != s.cfg.ClusterSecret {
+		if s.cfg.ClusterSecret == "" || !secretsEqual(token, s.cfg.ClusterSecret) {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// secretsEqual compares two secrets in constant time, regardless of
+// length: subtle.ConstantTimeCompare alone still branches on len(a) !=
+// len(b) before comparing, letting a byte-at-a-time attacker infer the
+// cluster secret's length from response timing (as with the plain `!=` this
+// replaces) - hashing both to a fixed size first removes that leak too.
+func secretsEqual(a, b string) bool {
+	ah := sha256.Sum256([]byte(a))
+	bh := sha256.Sum256([]byte(b))
+	return subtle.ConstantTimeCompare(ah[:], bh[:]) == 1
 }
 
 func (s *Server) logging(next http.Handler) http.Handler {

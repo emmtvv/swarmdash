@@ -12,4 +12,4 @@ package updatecheck
 // by hand with a manually assembled image/config - so rather than depend on
 // that, this is the single source of truth for the update check. Bump it
 // by hand alongside the latest released entry in CHANGELOG.md.
-const CurrentVersion = "1.1.1"
+const CurrentVersion = "1.2.0"
