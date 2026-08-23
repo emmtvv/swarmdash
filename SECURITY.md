@@ -8,7 +8,7 @@ take vulnerability reports seriously here.
 Please do **not** open a public GitHub issue for a security vulnerability.
 
 Instead, use GitHub's private reporting flow:
-[Security → Report a vulnerability](https://github.com/MathWave/swarmdash/security/advisories/new)
+[Security → Report a vulnerability](https://github.com/emmtvv/swarmdash/security/advisories/new)
 on this repository. This opens a private advisory visible only to the
 maintainer until a fix is ready.
 

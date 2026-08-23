@@ -82,7 +82,14 @@ func (s *Server) handleExecProxy(w http.ResponseWriter, r *http.Request) {
 	path := fmt.Sprintf("/v1/containers/%s/exec?cmd=%s&cols=%s&rows=%s",
 		containerID, url.QueryEscape(shell), q.Get("cols"), q.Get("rows"))
 
+	// Audited on open and close (not just the mutating actions that already
+	// go through s.audit elsewhere), with the command that was run - an
+	// interactive root-equivalent shell into a container is exactly the
+	// kind of access a compliance/incident-response audit trail exists to
+	// cover, and it was previously invisible in the log entirely.
+	s.audit(r, "container.exec.open", taskID, shell, nil)
 	s.proxyWS(w, r, nodeID, path)
+	s.audit(r, "container.exec.close", taskID, shell, nil)
 }
 
 func (s *Server) handleLogsProxy(w http.ResponseWriter, r *http.Request) {

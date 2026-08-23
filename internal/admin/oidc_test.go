@@ -63,38 +63,65 @@ func TestOIDCAuthURL_AppendsWhenEndpointAlreadyHasQuery(t *testing.T) {
 
 func TestSSOIdentityFromClaims(t *testing.T) {
 	tests := []struct {
-		name         string
-		claims       map[string]any
-		wantUsername string
-		wantEmail    string
+		name              string
+		claims            map[string]any
+		wantSubject       string
+		wantUsername      string
+		wantEmail         string
+		wantEmailVerified bool
 	}{
 		{
-			name:         "prefers preferred_username",
-			claims:       map[string]any{"preferred_username": "alice", "email": "alice@example.com", "sub": "abc123"},
-			wantUsername: "alice",
-			wantEmail:    "alice@example.com",
+			name:              "subject always comes from sub, display prefers preferred_username",
+			claims:            map[string]any{"preferred_username": "alice", "email": "alice@example.com", "sub": "abc123", "email_verified": true},
+			wantSubject:       "abc123",
+			wantUsername:      "alice",
+			wantEmail:         "alice@example.com",
+			wantEmailVerified: true,
 		},
 		{
-			name:         "falls back to email",
+			name:         "display falls back to email when no preferred_username",
 			claims:       map[string]any{"email": "bob@example.com", "sub": "def456"},
+			wantSubject:  "def456",
 			wantUsername: "bob@example.com",
 			wantEmail:    "bob@example.com",
 		},
 		{
-			name:         "falls back to sub",
+			name:         "no username claims at all - subject is still returned, display is empty",
 			claims:       map[string]any{"sub": "sub-only"},
-			wantUsername: "sub-only",
+			wantSubject:  "sub-only",
+			wantUsername: "",
 			wantEmail:    "",
+		},
+		{
+			name:         "no sub claim at all - subject is empty even if a display name is present",
+			claims:       map[string]any{"preferred_username": "alice"},
+			wantSubject:  "",
+			wantUsername: "alice",
+			wantEmail:    "",
+		},
+		{
+			name:              "email_verified false is preserved, not silently treated as true",
+			claims:            map[string]any{"sub": "abc123", "email": "alice@example.com", "email_verified": false},
+			wantSubject:       "abc123",
+			wantUsername:      "alice@example.com",
+			wantEmail:         "alice@example.com",
+			wantEmailVerified: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			username, email := ssoIdentityFromClaims(tt.claims)
+			subject, username, email, emailVerified := ssoIdentityFromClaims(tt.claims)
+			if subject != tt.wantSubject {
+				t.Errorf("subject = %q, want %q", subject, tt.wantSubject)
+			}
 			if username != tt.wantUsername {
 				t.Errorf("username = %q, want %q", username, tt.wantUsername)
 			}
 			if email != tt.wantEmail {
 				t.Errorf("email = %q, want %q", email, tt.wantEmail)
+			}
+			if emailVerified != tt.wantEmailVerified {
+				t.Errorf("emailVerified = %v, want %v", emailVerified, tt.wantEmailVerified)
 			}
 		})
 	}

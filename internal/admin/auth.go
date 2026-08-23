@@ -153,15 +153,18 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		// than a known one with a wrong password - see dummyPasswordHash.
 		_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(password))
 		s.recordLoginFailure(username, ip)
+		s.auditAs(r, username, "user.login", username, "", errUnknownUsername)
 		http.Redirect(w, r, "/login?error=invalid+credentials", http.StatusSeeOther)
 		return
 	}
 	if user.AuthSource == "sso" {
+		s.auditAs(r, username, "user.login", username, "", errSSOAccountUsedLocalLogin)
 		http.Redirect(w, r, "/login?error=this+account+signs+in+via+SSO", http.StatusSeeOther)
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
 		s.recordLoginFailure(username, ip)
+		s.auditAs(r, username, "user.login", username, "", errWrongPassword)
 		http.Redirect(w, r, "/login?error=invalid+credentials", http.StatusSeeOther)
 		return
 	}
@@ -174,8 +177,21 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	s.auditAs(r, username, "user.login", username, "", nil)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
+
+// Sentinel errors recorded (via their Error() text, in AuditEntry.Error) on
+// a failed local login - see the auditAs calls in handleLoginSubmit. Not
+// shown to the client, which always sees the same generic "invalid
+// credentials" either way, so these don't hand an attacker anything the
+// response itself doesn't already withhold; they exist purely so the audit
+// log records *why* an attempt failed rather than just that it did.
+var (
+	errUnknownUsername          = errors.New("unknown username")
+	errWrongPassword            = errors.New("wrong password")
+	errSSOAccountUsedLocalLogin = errors.New("sso account attempted local password login")
+)
 
 // dummyPasswordHash is compared against on an unknown-username login so
 // that path takes roughly the same bcrypt-shaped time as a known username
@@ -371,6 +387,9 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request, username s
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
+	if user := s.currentUser(r); user != nil {
+		s.auditAs(r, user.Username, "user.logout", user.Username, "", nil)
+	}
 	if c, err := r.Cookie(sessionCookieName); err == nil {
 		_ = s.store.DeleteSession(hashToken(c.Value))
 	}

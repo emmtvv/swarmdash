@@ -24,6 +24,10 @@ func (s *Server) handleFilesList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := r.URL.Query().Get("path")
+	// Audited same as file download below - the /files listing already
+	// reveals filenames (and so plenty about what's mounted into the
+	// container) even without downloading anything.
+	s.audit(r, "container.files.list", taskID, path, nil)
 	resp, err := s.agentGet(r.Context(), nodeID, "/v1/containers/"+containerID+"/files?path="+url.QueryEscape(path))
 	if err != nil {
 		http.Error(w, "agent request: "+err.Error(), http.StatusBadGateway)
@@ -47,6 +51,11 @@ func (s *Server) handleFileDownload(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "path is required", http.StatusBadRequest)
 		return
 	}
+	// Same secrets-exfiltration concern as the RBAC comment on this route
+	// in routes.go: containers routinely bind-mount Docker secrets, so
+	// every file actually pulled out of one is worth a durable record of
+	// who did it and which path they took.
+	s.audit(r, "container.files.download", taskID, path, nil)
 	s.proxyDownload(w, r, nodeID, "/v1/containers/"+containerID+"/files/download?path="+url.QueryEscape(path))
 }
 

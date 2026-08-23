@@ -74,6 +74,14 @@ func TestHandleLoginSubmit_Success(t *testing.T) {
 	if sess.Username != "bob" {
 		t.Errorf("session username = %q, want bob", sess.Username)
 	}
+
+	entries, err := s.store.ListAudit(0, 10)
+	if err != nil {
+		t.Fatalf("ListAudit: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Action != "user.login" || entries[0].Username != "bob" || !entries[0].Success {
+		t.Fatalf("unexpected audit entries: %+v", entries)
+	}
 }
 
 func TestHandleLoginSubmit_UnknownVsWrongPassword_SameRedirect(t *testing.T) {
@@ -101,6 +109,19 @@ func TestHandleLoginSubmit_UnknownVsWrongPassword_SameRedirect(t *testing.T) {
 	}
 	if _, err := s.store.GetLoginAttempt(loginAttemptKey("carol", testIP)); err != nil {
 		t.Errorf("no login attempt recorded for wrong password: %v", err)
+	}
+
+	entries, err := s.store.ListAudit(0, 10)
+	if err != nil {
+		t.Fatalf("ListAudit: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 audit entries (one per failed attempt), got: %+v", entries)
+	}
+	for _, e := range entries {
+		if e.Action != "user.login" || e.Success {
+			t.Errorf("unexpected audit entry: %+v", e)
+		}
 	}
 }
 
@@ -132,6 +153,39 @@ func TestLoginLockout_AfterMaxAttempts(t *testing.T) {
 	}
 	if c := g4CookieByName(w, sessionCookieName); c != nil {
 		t.Error("session cookie set despite lockout")
+	}
+}
+
+func TestHandleLogout_Audits(t *testing.T) {
+	s := newTestServer(t, nil)
+	g4PutLocalUser(t, s, "erin", "rightpw", "admin")
+
+	loginW := httptest.NewRecorder()
+	s.handleLoginSubmit(loginW, g4LoginRequest("erin", "rightpw"))
+	sessionCookie := g4CookieByName(loginW, sessionCookieName)
+	if sessionCookie == nil {
+		t.Fatal("login did not set a session cookie")
+	}
+
+	r := httptest.NewRequest(http.MethodPost, "/logout", nil)
+	r.AddCookie(sessionCookie)
+	w := httptest.NewRecorder()
+	s.handleLogout(w, r)
+
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d; body: %s", w.Code, http.StatusSeeOther, w.Body.String())
+	}
+	if _, err := s.store.GetSession(hashToken(sessionCookie.Value)); err == nil {
+		t.Error("session still valid after logout")
+	}
+
+	entries, err := s.store.ListAudit(0, 10)
+	if err != nil {
+		t.Fatalf("ListAudit: %v", err)
+	}
+	// entries[0] is the newest (logout); entries[1] is the earlier login.
+	if len(entries) != 2 || entries[0].Action != "user.logout" || entries[0].Username != "erin" {
+		t.Fatalf("unexpected audit entries: %+v", entries)
 	}
 }
 

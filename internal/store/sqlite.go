@@ -121,22 +121,35 @@ func notFoundSQL(err error) error {
 
 func (s *SQLiteStore) PutUser(u User) error {
 	_, err := s.db.Exec(`
-		INSERT INTO users (username, password_hash, role, created_at, auth_source, must_change_password)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO users (username, password_hash, role, created_at, auth_source, must_change_password, sso_subject)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(username) DO UPDATE SET
 			password_hash = excluded.password_hash,
 			role = excluded.role,
 			created_at = excluded.created_at,
 			auth_source = excluded.auth_source,
-			must_change_password = excluded.must_change_password`,
-		u.Username, u.PasswordHash, u.Role, u.CreatedAt, u.AuthSource, u.MustChangePassword)
+			must_change_password = excluded.must_change_password,
+			sso_subject = excluded.sso_subject`,
+		u.Username, u.PasswordHash, u.Role, u.CreatedAt, u.AuthSource, u.MustChangePassword, u.SSOSubject)
 	return err
 }
 
 func (s *SQLiteStore) GetUser(username string) (User, error) {
 	var u User
-	err := s.db.QueryRow(`SELECT username, password_hash, role, created_at, auth_source, must_change_password FROM users WHERE username = ?`, username).
-		Scan(&u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.AuthSource, &u.MustChangePassword)
+	err := s.db.QueryRow(`SELECT username, password_hash, role, created_at, auth_source, must_change_password, sso_subject FROM users WHERE username = ?`, username).
+		Scan(&u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.AuthSource, &u.MustChangePassword, &u.SSOSubject)
+	return u, notFoundSQL(err)
+}
+
+// GetUserBySSOSubject looks up the user record pinned to an OIDC `sub`
+// claim (see User.SSOSubject's doc comment). ErrNotFound if no user has
+// bound that subject yet - either because they haven't logged in since
+// migration 0004 backfilled the column, or because this is their first
+// login ever.
+func (s *SQLiteStore) GetUserBySSOSubject(subject string) (User, error) {
+	var u User
+	err := s.db.QueryRow(`SELECT username, password_hash, role, created_at, auth_source, must_change_password, sso_subject FROM users WHERE sso_subject = ? AND sso_subject != ''`, subject).
+		Scan(&u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.AuthSource, &u.MustChangePassword, &u.SSOSubject)
 	return u, notFoundSQL(err)
 }
 
@@ -147,7 +160,7 @@ func (s *SQLiteStore) HasAnyUser() (bool, error) {
 }
 
 func (s *SQLiteStore) ListUsers() ([]User, error) {
-	rows, err := s.db.Query(`SELECT username, password_hash, role, created_at, auth_source, must_change_password FROM users ORDER BY username`)
+	rows, err := s.db.Query(`SELECT username, password_hash, role, created_at, auth_source, must_change_password, sso_subject FROM users ORDER BY username`)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +168,7 @@ func (s *SQLiteStore) ListUsers() ([]User, error) {
 	var out []User
 	for rows.Next() {
 		var u User
-		if err := rows.Scan(&u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.AuthSource, &u.MustChangePassword); err != nil {
+		if err := rows.Scan(&u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.AuthSource, &u.MustChangePassword, &u.SSOSubject); err != nil {
 			return nil, err
 		}
 		out = append(out, u)
@@ -217,13 +230,13 @@ func (s *SQLiteStore) DeleteLoginAttempt(key string) error {
 }
 
 func (s *SQLiteStore) AppendAudit(e AuditEntry) error {
-	_, err := s.db.Exec(`INSERT INTO audit_log (ts, username, action, target, detail, success, error) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		time.Now(), e.Username, e.Action, e.Target, e.Detail, e.Success, e.Error)
+	_, err := s.db.Exec(`INSERT INTO audit_log (ts, username, action, target, detail, success, error, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		time.Now(), e.Username, e.Action, e.Target, e.Detail, e.Success, e.Error, e.IP)
 	return err
 }
 
 func (s *SQLiteStore) ListAudit(skip, limit int) ([]AuditEntry, error) {
-	rows, err := s.db.Query(`SELECT seq, ts, username, action, target, detail, success, error FROM audit_log ORDER BY seq DESC LIMIT ? OFFSET ?`, limit, skip)
+	rows, err := s.db.Query(`SELECT seq, ts, username, action, target, detail, success, error, ip FROM audit_log ORDER BY seq DESC LIMIT ? OFFSET ?`, limit, skip)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +244,7 @@ func (s *SQLiteStore) ListAudit(skip, limit int) ([]AuditEntry, error) {
 	var out []AuditEntry
 	for rows.Next() {
 		var e AuditEntry
-		if err := rows.Scan(&e.ID, &e.Time, &e.Username, &e.Action, &e.Target, &e.Detail, &e.Success, &e.Error); err != nil {
+		if err := rows.Scan(&e.ID, &e.Time, &e.Username, &e.Action, &e.Target, &e.Detail, &e.Success, &e.Error, &e.IP); err != nil {
 			return nil, err
 		}
 		out = append(out, e)
@@ -460,20 +473,21 @@ func (s *SQLiteStore) DeleteGitStack(id string) error {
 
 func (s *SQLiteStore) PutDeployHook(h DeployHook) error {
 	_, err := s.db.Exec(`
-		INSERT INTO deploy_hooks (id, hash, service_name, created_by, created_at, last_used_at)
-		VALUES (?, ?, ?, ?, ?, ?)
+		INSERT INTO deploy_hooks (id, hash, service_name, created_by, created_at, last_used_at, allow_image_override)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET
 			hash = excluded.hash,
 			service_name = excluded.service_name,
 			created_by = excluded.created_by,
 			created_at = excluded.created_at,
-			last_used_at = excluded.last_used_at`,
-		h.ID, h.Hash, h.ServiceName, h.CreatedBy, h.CreatedAt, h.LastUsedAt)
+			last_used_at = excluded.last_used_at,
+			allow_image_override = excluded.allow_image_override`,
+		h.ID, h.Hash, h.ServiceName, h.CreatedBy, h.CreatedAt, h.LastUsedAt, h.AllowImageOverride)
 	return err
 }
 
 func (s *SQLiteStore) ListDeployHooks() ([]DeployHook, error) {
-	rows, err := s.db.Query(`SELECT id, hash, service_name, created_by, created_at, last_used_at FROM deploy_hooks ORDER BY created_at`)
+	rows, err := s.db.Query(`SELECT id, hash, service_name, created_by, created_at, last_used_at, allow_image_override FROM deploy_hooks ORDER BY created_at`)
 	if err != nil {
 		return nil, err
 	}
@@ -481,7 +495,7 @@ func (s *SQLiteStore) ListDeployHooks() ([]DeployHook, error) {
 	var out []DeployHook
 	for rows.Next() {
 		var h DeployHook
-		if err := rows.Scan(&h.ID, &h.Hash, &h.ServiceName, &h.CreatedBy, &h.CreatedAt, &h.LastUsedAt); err != nil {
+		if err := rows.Scan(&h.ID, &h.Hash, &h.ServiceName, &h.CreatedBy, &h.CreatedAt, &h.LastUsedAt, &h.AllowImageOverride); err != nil {
 			return nil, err
 		}
 		out = append(out, h)
@@ -490,7 +504,7 @@ func (s *SQLiteStore) ListDeployHooks() ([]DeployHook, error) {
 }
 
 func (s *SQLiteStore) ListDeployHooksForService(serviceName string) ([]DeployHook, error) {
-	rows, err := s.db.Query(`SELECT id, hash, service_name, created_by, created_at, last_used_at FROM deploy_hooks WHERE service_name = ? ORDER BY created_at`, serviceName)
+	rows, err := s.db.Query(`SELECT id, hash, service_name, created_by, created_at, last_used_at, allow_image_override FROM deploy_hooks WHERE service_name = ? ORDER BY created_at`, serviceName)
 	if err != nil {
 		return nil, err
 	}
@@ -498,7 +512,7 @@ func (s *SQLiteStore) ListDeployHooksForService(serviceName string) ([]DeployHoo
 	var out []DeployHook
 	for rows.Next() {
 		var h DeployHook
-		if err := rows.Scan(&h.ID, &h.Hash, &h.ServiceName, &h.CreatedBy, &h.CreatedAt, &h.LastUsedAt); err != nil {
+		if err := rows.Scan(&h.ID, &h.Hash, &h.ServiceName, &h.CreatedBy, &h.CreatedAt, &h.LastUsedAt, &h.AllowImageOverride); err != nil {
 			return nil, err
 		}
 		out = append(out, h)
@@ -508,8 +522,8 @@ func (s *SQLiteStore) ListDeployHooksForService(serviceName string) ([]DeployHoo
 
 func (s *SQLiteStore) FindDeployHookByHash(hash string) (DeployHook, error) {
 	var h DeployHook
-	err := s.db.QueryRow(`SELECT id, hash, service_name, created_by, created_at, last_used_at FROM deploy_hooks WHERE hash = ?`, hash).
-		Scan(&h.ID, &h.Hash, &h.ServiceName, &h.CreatedBy, &h.CreatedAt, &h.LastUsedAt)
+	err := s.db.QueryRow(`SELECT id, hash, service_name, created_by, created_at, last_used_at, allow_image_override FROM deploy_hooks WHERE hash = ?`, hash).
+		Scan(&h.ID, &h.Hash, &h.ServiceName, &h.CreatedBy, &h.CreatedAt, &h.LastUsedAt, &h.AllowImageOverride)
 	return h, notFoundSQL(err)
 }
 

@@ -23,6 +23,17 @@ type User struct {
 	// env var or a generated one printed to logs, either way not really
 	// "theirs") and on any account another admin resets the password of.
 	MustChangePassword bool `bson:"must_change_password,omitempty" json:"must_change_password,omitempty"`
+	// SSOSubject pins an SSO-provisioned account to its identity provider's
+	// `sub` claim - the one OIDC claim guaranteed both unique and immutable
+	// for a given identity, unlike preferred_username or email, which a
+	// user can often edit at the IdP. Login re-authenticates by this field
+	// once it's set (see handleSSOCallback in internal/admin/handlers_sso.go),
+	// not by username, so renaming/editing those claims at the IdP can
+	// never make one identity land in another identity's account. Empty
+	// for local accounts and for SSO accounts that haven't logged in since
+	// this field was introduced (backfilled - "claimed" - on their next
+	// successful login).
+	SSOSubject string `bson:"sso_subject,omitempty" json:"sso_subject,omitempty"`
 }
 
 // LoginAttempt tracks recent failed local-password logins for one (username,
@@ -62,6 +73,12 @@ type AuditEntry struct {
 	Detail   string    `bson:"detail,omitempty" json:"detail,omitempty"`
 	Success  bool      `bson:"success" json:"success"`
 	Error    string    `bson:"error,omitempty" json:"error,omitempty"`
+	// IP is the client address the action was attributed to - s.clientIP(r)
+	// at the time of the call (see audit/auditAs in internal/admin/audit.go),
+	// so an entry can be traced back to where it came from even though
+	// Username alone is self-reported (a session cookie, a claimed SSO
+	// identity) rather than itself an authentication factor.
+	IP string `bson:"ip,omitempty" json:"ip,omitempty"`
 }
 
 // APIToken lets CI/CD or scripts call the admin API without a browser
@@ -143,6 +160,14 @@ type DeployHook struct {
 	CreatedBy   string    `bson:"created_by" json:"created_by"`
 	CreatedAt   time.Time `bson:"created_at" json:"created_at"`
 	LastUsedAt  time.Time `bson:"last_used_at,omitempty" json:"last_used_at,omitempty"`
+	// AllowImageOverride opts this hook into accepting a `{"image": ...}`
+	// body that swaps to a completely different image repository, not just
+	// a different tag of the service's current one. Defaults to false (and
+	// false for every hook created before this field existed), because an
+	// unauthenticated caller who only knows the hook's URL should not be
+	// able to point the service at an arbitrary attacker-controlled image -
+	// see sameImageRepo in handlers_deploy_hooks.go.
+	AllowImageOverride bool `bson:"allow_image_override,omitempty" json:"allow_image_override,omitempty"`
 }
 
 // SSOConfig is the single (singleton, _id "sso") document holding this

@@ -90,6 +90,20 @@ func (m *MongoStore) ensureIndexes(ctx context.Context) error {
 			return err
 		}
 	}
+
+	// Mirrors SQLiteStore's partial unique index on users.sso_subject (see
+	// migration 0004): at most one user document may claim a given OIDC
+	// `sub`, but any number may share the "not set yet" state, so the
+	// uniqueness constraint only applies where the field is actually a
+	// non-empty string.
+	if _, err := m.col("users").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "sso_subject", Value: 1}},
+		Options: options.Index().SetUnique(true).SetPartialFilterExpression(bson.M{
+			"sso_subject": bson.M{"$gt": ""},
+		}),
+	}); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -141,6 +155,19 @@ func (m *MongoStore) GetUser(username string) (User, error) {
 	defer cancel()
 	var u User
 	err := m.col("users").FindOne(ctx, bson.M{"_id": username}).Decode(&u)
+	return u, notFound(err)
+}
+
+// GetUserBySSOSubject looks up the user record pinned to an OIDC `sub`
+// claim - see User.SSOSubject's doc comment (internal/store/types.go).
+func (m *MongoStore) GetUserBySSOSubject(subject string) (User, error) {
+	if subject == "" {
+		return User{}, ErrNotFound
+	}
+	ctx, cancel := ctxTimeout()
+	defer cancel()
+	var u User
+	err := m.col("users").FindOne(ctx, bson.M{"sso_subject": subject}).Decode(&u)
 	return u, notFound(err)
 }
 

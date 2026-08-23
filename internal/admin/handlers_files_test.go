@@ -115,6 +115,14 @@ func TestHandleFilesList(t *testing.T) {
 	if !strings.Contains(w.Body.String(), "a.txt") {
 		t.Errorf("body missing file entry, got: %s", w.Body.String())
 	}
+
+	entries, err := s.store.ListAudit(0, 10)
+	if err != nil {
+		t.Fatalf("ListAudit: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Action != "container.files.list" || entries[0].Target != "t1" || entries[0].Detail != "/data" {
+		t.Fatalf("unexpected audit entries: %+v", entries)
+	}
 }
 
 func TestHandleFilesList_TaskNotFound(t *testing.T) {
@@ -157,6 +165,14 @@ func TestHandleFileDownload(t *testing.T) {
 	}
 	if w.Body.String() != "file contents" {
 		t.Errorf("body = %q, want %q", w.Body.String(), "file contents")
+	}
+
+	entries, err := s.store.ListAudit(0, 10)
+	if err != nil {
+		t.Fatalf("ListAudit: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Action != "container.files.download" || entries[0].Target != "t1" || entries[0].Detail != "/data/a.txt" {
+		t.Fatalf("unexpected audit entries: %+v", entries)
 	}
 }
 

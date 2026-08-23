@@ -2,9 +2,11 @@ package admin
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
+	"github.com/distribution/reference"
 	"github.com/docker/docker/api/types/swarm"
 
 	"swarmdash/internal/store"
@@ -26,11 +28,12 @@ func (s *Server) handleDeployHookCreate(w http.ResponseWriter, r *http.Request) 
 
 	token := "sdh_" + randomToken(24)
 	hook := store.DeployHook{
-		ID:          randomToken(8),
-		Hash:        hashToken(token),
-		ServiceName: svc.Spec.Name,
-		CreatedBy:   userFromContext(r).Username,
-		CreatedAt:   time.Now(),
+		ID:                 randomToken(8),
+		Hash:               hashToken(token),
+		ServiceName:        svc.Spec.Name,
+		CreatedBy:          userFromContext(r).Username,
+		CreatedAt:          time.Now(),
+		AllowImageOverride: r.FormValue("allow_image_override") == "on",
 	}
 	if err := s.store.PutDeployHook(hook); err != nil {
 		http.Error(w, "create deploy hook: "+err.Error(), http.StatusInternalServerError)
@@ -57,6 +60,29 @@ func (s *Server) handleDeployHookDelete(w http.ResponseWriter, r *http.Request) 
 	}
 	s.audit(r, "deploy_hook.delete", name, id, nil)
 	redirect(w, r, "/services/"+name)
+}
+
+// sameImageRepo reports whether current and candidate name the same image
+// repository (ignoring tag/digest) once both are normalized the way Docker
+// itself normalizes references - e.g. "nginx" and "docker.io/library/nginx:1.27"
+// are the same repo. Used to keep an unauthenticated deploy-hook caller
+// (see handleDeployHookTrigger) from swapping a service to a completely
+// different, potentially attacker-controlled image via the optional
+// {"image": ...} body: without AllowImageOverride explicitly set on the
+// hook, only a same-repo tag/digest change is permitted. A candidate that
+// fails to parse as a reference at all is rejected (returns false) rather
+// than erroring the request differently, so malformed input hits the same
+// "forbidden" response as a deliberate cross-repo swap.
+func sameImageRepo(current, candidate string) bool {
+	a, err := reference.ParseNormalizedNamed(current)
+	if err != nil {
+		return false
+	}
+	b, err := reference.ParseNormalizedNamed(candidate)
+	if err != nil {
+		return false
+	}
+	return a.Name() == b.Name()
 }
 
 // deployHookURL builds the absolute URL a CI pipeline should POST to,
@@ -96,7 +122,14 @@ func (s *Server) handleDeployHookTrigger(w http.ResponseWriter, r *http.Request)
 	if r.ContentLength != 0 {
 		_ = json.NewDecoder(r.Body).Decode(&body) // best-effort; a missing/empty body just means "no image override"
 	}
-	if body.Image != "" {
+	if body.Image != "" && body.Image != svc.Spec.TaskTemplate.ContainerSpec.Image {
+		if !hook.AllowImageOverride && !sameImageRepo(svc.Spec.TaskTemplate.ContainerSpec.Image, body.Image) {
+			s.auditAs(r, "webhook:"+svc.Spec.Name, "deploy_hook.trigger", svc.Spec.Name, body.Image,
+				errors.New("rejected cross-repository image override"))
+			http.Error(w, "this hook is not allowed to switch to a different image repository - enable "+
+				"\"allow full image override\" on the hook if that's intended", http.StatusForbidden)
+			return
+		}
 		svc.Spec.TaskTemplate.ContainerSpec.Image = body.Image
 	}
 	svc.Spec.TaskTemplate.ForceUpdate++
@@ -115,15 +148,7 @@ func (s *Server) handleDeployHookTrigger(w http.ResponseWriter, r *http.Request)
 	}
 
 	go func() { _ = s.store.TouchDeployHook(hook.ID) }()
-	if err := s.store.AppendAudit(store.AuditEntry{
-		Username: "webhook:" + svc.Spec.Name,
-		Action:   "deploy_hook.trigger",
-		Target:   svc.Spec.Name,
-		Detail:   body.Image,
-		Success:  true,
-	}); err != nil {
-		s.log.Warn("append audit entry", "err", err)
-	}
+	s.auditAs(r, "webhook:"+svc.Spec.Name, "deploy_hook.trigger", svc.Spec.Name, body.Image, nil)
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok", "service": svc.Spec.Name})

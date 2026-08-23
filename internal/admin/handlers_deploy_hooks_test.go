@@ -202,3 +202,70 @@ func TestHandleDeployHookTrigger_ImageOverride(t *testing.T) {
 		t.Errorf("captured image = %q, want nginx:1.26", capturedImage)
 	}
 }
+
+func TestHandleDeployHookTrigger_CrossRepoImageRejectedByDefault(t *testing.T) {
+	svc := g2Service("s1", "web_app", "")
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /services/{id}", jsonHandler(svc))
+	mux.HandleFunc("POST /services/{id}/update", func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("service update should not be called when the cross-repo override is rejected")
+	})
+	docker := newFakeDocker(t, mux)
+	s := newTestServer(t, docker)
+
+	if err := s.store.PutDeployHook(store.DeployHook{ID: "h1", Hash: hashToken("plaintoken"), ServiceName: "web_app"}); err != nil {
+		t.Fatalf("seed deploy hook: %v", err)
+	}
+
+	r := httptest.NewRequest(http.MethodPost, "/hooks/deploy/plaintoken", strings.NewReader(`{"image":"evil.example.com/malicious:latest"}`))
+	r.SetPathValue("token", "plaintoken")
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	s.handleDeployHookTrigger(w, r)
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403; body: %s", w.Code, w.Body.String())
+	}
+
+	entries, err := s.store.ListAudit(0, 10)
+	if err != nil {
+		t.Fatalf("ListAudit: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Action != "deploy_hook.trigger" || entries[0].Success {
+		t.Fatalf("unexpected audit entries: %+v", entries)
+	}
+}
+
+func TestHandleDeployHookTrigger_CrossRepoImageAllowedWhenOptedIn(t *testing.T) {
+	svc := g2Service("s1", "web_app", "")
+	var capturedImage string
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /services/{id}", jsonHandler(svc))
+	mux.HandleFunc("POST /services/{id}/update", func(w http.ResponseWriter, r *http.Request) {
+		var body swarm.ServiceSpec
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body.TaskTemplate.ContainerSpec != nil {
+			capturedImage = body.TaskTemplate.ContainerSpec.Image
+		}
+		jsonHandler(swarm.ServiceUpdateResponse{})(w, r)
+	})
+	docker := newFakeDocker(t, mux)
+	s := newTestServer(t, docker)
+
+	if err := s.store.PutDeployHook(store.DeployHook{ID: "h1", Hash: hashToken("plaintoken"), ServiceName: "web_app", AllowImageOverride: true}); err != nil {
+		t.Fatalf("seed deploy hook: %v", err)
+	}
+
+	r := httptest.NewRequest(http.MethodPost, "/hooks/deploy/plaintoken", strings.NewReader(`{"image":"other/repo:latest"}`))
+	r.SetPathValue("token", "plaintoken")
+	r.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	s.handleDeployHookTrigger(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+	if capturedImage != "other/repo:latest" {
+		t.Errorf("captured image = %q, want other/repo:latest", capturedImage)
+	}
+}

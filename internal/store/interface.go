@@ -15,6 +15,7 @@ type Interface interface {
 
 	PutUser(u User) error
 	GetUser(username string) (User, error)
+	GetUserBySSOSubject(subject string) (User, error)
 	HasAnyUser() (bool, error)
 	ListUsers() ([]User, error)
 	DeleteUser(username string) error

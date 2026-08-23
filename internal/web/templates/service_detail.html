@@ -203,7 +203,7 @@
 
 <div class="card">
 	<h2 style="margin-top:0;">CI/CD deploy webhook</h2>
-	<p class="muted">POST to this URL (optionally with a JSON body <span class="mono">{"image":"repo/name:tag"}</span>) to trigger a redeploy from CI - no session or API token needed, the URL itself is the credential.</p>
+	<p class="muted">POST to this URL (optionally with a JSON body <span class="mono">{"image":"repo/name:tag"}</span>) to trigger a redeploy from CI - no session or API token needed, the URL itself is the credential. By default an <span class="mono">image</span> override may only change the tag/digest of the service's current repository; a hook created with "allow full image override" may switch to any repository.</p>
 
 	{{if .NewDeployHookURL}}
 	<div class="card" style="border-color:var(--green);">
@@ -213,12 +213,13 @@
 	{{end}}
 
 	<table>
-		<thead><tr><th>Created</th><th>Last triggered</th><th></th></tr></thead>
+		<thead><tr><th>Created</th><th>Last triggered</th><th>Image override</th><th></th></tr></thead>
 		<tbody>
 		{{range .DeployHooks}}
 			<tr>
 				<td class="muted">{{ago .CreatedAt}}</td>
 				<td class="muted">{{ago .LastUsedAt}}</td>
+				<td class="muted">{{if .AllowImageOverride}}any repository{{else}}same repository only{{end}}</td>
 				<td>
 					<form class="inline" method="post" action="/services/{{$.Service.Spec.Name}}/deploy-hooks/{{.ID}}/delete" data-confirm="Delete this deploy webhook?">
 						<button type="submit" class="btn danger small">Delete</button>
@@ -226,12 +227,16 @@
 				</td>
 			</tr>
 		{{else}}
-			<tr><td colspan="3" class="muted">No deploy webhooks yet.</td></tr>
+			<tr><td colspan="4" class="muted">No deploy webhooks yet.</td></tr>
 		{{end}}
 		</tbody>
 	</table>
 
 	<form method="post" action="/services/{{.Service.Spec.Name}}/deploy-hooks" style="margin-top:12px;">
+		<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px;">
+			<input type="checkbox" name="allow_image_override" style="width:auto;">
+			Allow this hook to switch to a different image repository, not just a different tag
+		</label>
 		<button type="submit" class="btn secondary">Create deploy webhook</button>
 	</form>
 </div>

@@ -201,43 +201,91 @@ func (s *Server) handleSSOCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username, email := ssoIdentityFromClaims(claims)
-	if username == "" {
-		fail("identity provider did not return a usable username or email")
+	subject, username, email, emailVerified := ssoIdentityFromClaims(claims)
+	if subject == "" {
+		fail("identity provider did not return a stable subject (sub) claim")
 		return
 	}
-	if cfg.AllowedDomains != "" && !emailDomainAllowed(email, cfg.AllowedDomains) {
-		fail("this account's email domain is not allowed to sign in")
-		return
+	if username == "" {
+		username = subject
+	}
+	if cfg.AllowedDomains != "" {
+		if !emailVerified {
+			fail("this identity's email is not verified, so its domain cannot be checked against the allowlist")
+			return
+		}
+		if !emailDomainAllowed(email, cfg.AllowedDomains) {
+			fail("this account's email domain is not allowed to sign in")
+			return
+		}
 	}
 
-	user, err := s.store.GetUser(username)
+	// Re-authentication is keyed off `sub` - the one OIDC claim guaranteed
+	// unique and immutable for a given identity - never off username or
+	// email, either of which can be edited at some IdPs and would otherwise
+	// let one identity take over another's local account by claiming its
+	// username. See User.SSOSubject's doc comment (internal/store/types.go).
+	user, err := s.store.GetUserBySSOSubject(subject)
 	switch {
 	case err == nil:
-		if user.AuthSource != "sso" {
-			fail("a local account with this username already exists")
-			return
-		}
+		// Already bound to this subject on a previous login: sign in under
+		// the account as it exists today. The display username is
+		// deliberately NOT refreshed from preferred_username/email here -
+		// once bound, an identity keeps the local username it was
+		// provisioned/claimed under, so a claim edit at the IdP can't rename
+		// (and can never collide with) an existing local account.
 	case errors.Is(err, store.ErrNotFound):
-		if !cfg.AutoCreateUsers {
-			fail("no local account exists for this identity; ask an admin to create one")
+		existing, lookupErr := s.store.GetUser(username)
+		switch {
+		case lookupErr == nil:
+			if existing.AuthSource != "sso" {
+				fail("a local account with this username already exists")
+				return
+			}
+			if existing.SSOSubject != "" {
+				// A different subject already owns this username - most
+				// likely someone changed their preferred_username/email at
+				// the IdP to collide with another account. Reject rather
+				// than silently signing into the existing user's session.
+				fail("this identity's username is already in use by a different account")
+				return
+			}
+			// Pre-migration SSO account with no subject bound yet: claim it
+			// for this subject now (one-time backfill), rather than
+			// requiring every existing SSO user to be recreated.
+			existing.SSOSubject = subject
+			if err := s.store.PutUser(existing); err != nil {
+				s.log.Error("sso backfill subject", "err", err)
+				fail("internal error")
+				return
+			}
+			user = existing
+		case errors.Is(lookupErr, store.ErrNotFound):
+			if !cfg.AutoCreateUsers {
+				fail("no local account exists for this identity; ask an admin to create one")
+				return
+			}
+			user = store.User{
+				Username:     username,
+				PasswordHash: ssoUnusablePasswordHash,
+				Role:         cfg.DefaultRole,
+				AuthSource:   "sso",
+				SSOSubject:   subject,
+				CreatedAt:    time.Now(),
+			}
+			if err := s.store.PutUser(user); err != nil {
+				s.log.Error("sso auto-create user", "err", err)
+				fail("could not create local account")
+				return
+			}
+			s.auditAs(r, user.Username, "user.sso_provision", user.Username, "role="+user.Role, nil)
+		default:
+			s.log.Error("sso lookup user", "err", lookupErr)
+			fail("internal error")
 			return
 		}
-		user = store.User{
-			Username:     username,
-			PasswordHash: ssoUnusablePasswordHash,
-			Role:         cfg.DefaultRole,
-			AuthSource:   "sso",
-			CreatedAt:    time.Now(),
-		}
-		if err := s.store.PutUser(user); err != nil {
-			s.log.Error("sso auto-create user", "err", err)
-			fail("could not create local account")
-			return
-		}
-		s.audit(r, "user.sso_provision", user.Username, "role="+user.Role, nil)
 	default:
-		s.log.Error("sso lookup user", "err", err)
+		s.log.Error("sso lookup user by subject", "err", err)
 		fail("internal error")
 		return
 	}
@@ -246,24 +294,30 @@ func (s *Server) handleSSOCallback(w http.ResponseWriter, r *http.Request) {
 		fail("internal error")
 		return
 	}
-	s.audit(r, "user.sso_login", user.Username, "", nil)
+	s.auditAs(r, user.Username, "user.sso_login", user.Username, "", nil)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-func ssoIdentityFromClaims(claims map[string]any) (username, email string) {
+// ssoIdentityFromClaims reads the identity provider's claims for the
+// account signing in. subject (`sub`) is the only claim used to
+// re-authenticate a returning identity - see the doc comment on its use in
+// handleSSOCallback above. username and email are display/allowlist
+// information only, sourced from claims that a user can often change at
+// the IdP itself and so must never be trusted to look up or distinguish
+// accounts.
+func ssoIdentityFromClaims(claims map[string]any) (subject, username, email string, emailVerified bool) {
 	str := func(k string) string {
 		v, _ := claims[k].(string)
 		return v
 	}
+	subject = strings.TrimSpace(str("sub"))
 	email = strings.TrimSpace(str("email"))
 	username = strings.TrimSpace(str("preferred_username"))
 	if username == "" {
 		username = email
 	}
-	if username == "" {
-		username = strings.TrimSpace(str("sub"))
-	}
-	return username, email
+	emailVerified, _ = claims["email_verified"].(bool)
+	return subject, username, email, emailVerified
 }
 
 func emailDomainAllowed(email, allowedCSV string) bool {
