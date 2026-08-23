@@ -24,7 +24,7 @@ get fixes.
 ## Scope
 
 In scope: the `admin` and `agent` binaries, the deploy tooling in
-`deploy/`/`Makefile`/`scripts/`, and the published `mathwave/swarmdash`
+`deploy/`/`Makefile`/`scripts/`, and the published `emmtvv/swarmdash`
 Docker image.
 
 Out of scope: vulnerabilities in third-party dependencies (report those

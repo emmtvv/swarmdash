@@ -1,6 +1,6 @@
 name: Release
 
-# Publishes to Docker Hub (mathwave/swarmdash - see README's Docker Hub
+# Publishes to Docker Hub (emmtvv/swarmdash - see README's Docker Hub
 # link) and creates a GitHub Release whenever a version tag is pushed.
 # Requires the repo secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN (an
 # access token, not the account password - create one under Docker Hub >
@@ -75,7 +75,7 @@ jobs:
       - id: meta
         uses: docker/metadata-action@v6
         with:
-          images: mathwave/swarmdash
+          images: emmtvv/swarmdash
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}

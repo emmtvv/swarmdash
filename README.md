@@ -4,14 +4,14 @@
 
 <p align="center">
   <a href="https://github.com/emmtvv/swarmdash/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/emmtvv/swarmdash/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="https://hub.docker.com/r/mathwave/swarmdash"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/mathwave/swarmdash"></a>
+  <a href="https://hub.docker.com/r/emmtvv/swarmdash"><img alt="Docker Pulls" src="https://img.shields.io/docker/pulls/emmtvv/swarmdash"></a>
   <a href="go.mod"><img alt="Go version" src="https://img.shields.io/badge/go-1.25-00ADD8?logo=go&logoColor=white"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/emmtvv/swarmdash"></a>
 </p>
 
 <p align="center">
   <b><a href="https://swarmdash.app">swarmdash.app</a></b> &nbsp;·&nbsp;
-  <b><a href="https://hub.docker.com/r/mathwave/swarmdash">Docker Hub</a></b> &nbsp;·&nbsp;
+  <b><a href="https://hub.docker.com/r/emmtvv/swarmdash">Docker Hub</a></b> &nbsp;·&nbsp;
   <b><a href="docs/quickstart.md">Quickstart</a></b> &nbsp;·&nbsp;
   <b><a href="docs/features.md">Features</a></b> &nbsp;·&nbsp;
   <b><a href="docs">Docs</a></b>
@@ -45,12 +45,12 @@ export SWARMDASH_CLUSTER_SECRET=$(openssl rand -hex 32)
 docker run -d --name swarmdash-agent --network host \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -e SWARMDASH_CLUSTER_SECRET \
-  mathwave/swarmdash agent
+  emmtvv/swarmdash agent
 
 docker run -d --name swarmdash-admin -p 8870:8870 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -e SWARMDASH_CLUSTER_SECRET \
-  mathwave/swarmdash admin
+  emmtvv/swarmdash admin
 
 docker logs swarmdash-admin   # grab the generated bootstrap admin password
 ```

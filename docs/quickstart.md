@@ -13,12 +13,12 @@ export SWARMDASH_CLUSTER_SECRET=$(openssl rand -hex 32)
 docker run -d --name swarmdash-agent --network host \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -e SWARMDASH_CLUSTER_SECRET \
-  mathwave/swarmdash agent
+  emmtvv/swarmdash agent
 
 docker run -d --name swarmdash-admin -p 8870:8870 \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -e SWARMDASH_CLUSTER_SECRET \
-  mathwave/swarmdash admin
+  emmtvv/swarmdash admin
 
 docker logs swarmdash-admin   # grab the generated bootstrap admin password
 ```
@@ -49,8 +49,8 @@ generated one out of the logs? Set `SWARMDASH_ADMIN_PASSWORD` in `.env`
 before running `make up`/`make deploy` — see `.env.example`.
 
 Prefer the published image over building locally for the real-cluster
-deploy too? `docker pull mathwave/swarmdash` — edit the `image:` lines in
-[../deploy/stack.yml](../deploy/stack.yml) to `mathwave/swarmdash:latest` before
+deploy too? `docker pull emmtvv/swarmdash` — edit the `image:` lines in
+[../deploy/stack.yml](../deploy/stack.yml) to `emmtvv/swarmdash:latest` before
 running `make deploy` (skips the local `docker build` step, useful on
 multi-node clusters where you'd otherwise have to build on every node).
 
