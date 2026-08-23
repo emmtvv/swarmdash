@@ -57,7 +57,11 @@ func (s *Server) security(next http.Handler) http.Handler {
 			"style-src 'self' 'unsafe-inline'",
 			"img-src 'self' data:",
 			"font-src 'self'",
-			"connect-src 'self'",
+			// api.github.com: the dashboard's update-check banner fetches
+			// the latest release directly from the browser (see
+			// internal/web/static/app.js) rather than through the admin
+			// server.
+			"connect-src 'self' https://api.github.com",
 			"object-src 'none'",
 			"base-uri 'self'",
 			"form-action 'self'",

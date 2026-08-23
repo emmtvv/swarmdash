@@ -18,7 +18,6 @@ import (
 	"github.com/docker/docker/client"
 
 	"swarmdash/internal/store"
-	"swarmdash/internal/updatecheck"
 	"swarmdash/internal/web"
 )
 
@@ -52,7 +51,6 @@ type Server struct {
 	log      *slog.Logger
 	renderer *web.Renderer
 	agentTLS *tls.Config
-	updates  *updatecheck.Checker
 
 	// memUsage caches the last cluster-wide real memory usage sampled by
 	// the poller (internal/admin/poller.go), so the dashboard can render
@@ -74,7 +72,6 @@ func New(cfg Config, docker *client.Client, st store.Interface) (*Server, error)
 		log:      slog.New(slog.NewTextHandler(os.Stdout, nil)).With("component", "admin"),
 		renderer: web.NewRenderer(),
 		agentTLS: agentTLS,
-		updates:  updatecheck.NewChecker(updatecheck.CurrentVersion),
 	}, nil
 }
 
@@ -106,11 +103,6 @@ func buildAgentTLSConfig(cfg Config) (*tls.Config, error) {
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data any) {
-	if m, ok := data.(map[string]any); ok {
-		if _, exists := m["UpdateStatus"]; !exists {
-			m["UpdateStatus"] = s.updates.Status()
-		}
-	}
 	s.renderer.Render(w, name, data, csrfTokenFromContext(r), cspNonceFromContext(r))
 }
 
@@ -256,7 +248,6 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 
 	go s.runPoller(ctx)
 	go s.runGitOpsPoller(ctx)
-	go s.updates.Run(ctx)
 
 	srv := &http.Server{
 		Addr:              s.cfg.ListenAddr,

@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types/swarm"
 
 	"swarmdash/internal/store"
+	"swarmdash/internal/updatecheck"
 )
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
@@ -60,23 +61,24 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, r, "dashboard.html", map[string]any{
-		"User":          userFromContext(r),
-		"Nodes":         nodes,
-		"Services":      services,
-		"NodeCount":     len(nodes),
-		"ServiceCount":  len(services),
-		"StackCount":    len(groupByStack(services)),
-		"DesiredTasks":  desired,
-		"RunningTasks":  running,
-		"FailedTasks":   failed,
-		"DegradedCount": degraded,
-		"CPUCapacity":   cpuCapacity,
-		"CPUReserved":   cpuReserved,
-		"CPUPct":        pct(cpuReserved, cpuCapacity),
-		"MemCapacity":   memCapacity,
-		"MemUsed":       memUsed,
-		"MemPct":        pct(memUsed, memCapacity),
-		"HistoryJSON":   clusterHistoryJSON(history),
+		"User":           userFromContext(r),
+		"Nodes":          nodes,
+		"Services":       services,
+		"NodeCount":      len(nodes),
+		"ServiceCount":   len(services),
+		"StackCount":     len(groupByStack(services)),
+		"DesiredTasks":   desired,
+		"RunningTasks":   running,
+		"FailedTasks":    failed,
+		"DegradedCount":  degraded,
+		"CPUCapacity":    cpuCapacity,
+		"CPUReserved":    cpuReserved,
+		"CPUPct":         pct(cpuReserved, cpuCapacity),
+		"MemCapacity":    memCapacity,
+		"MemUsed":        memUsed,
+		"MemPct":         pct(memUsed, memCapacity),
+		"HistoryJSON":    clusterHistoryJSON(history),
+		"CurrentVersion": updatecheck.CurrentVersion,
 	})
 }
 

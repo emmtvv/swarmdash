@@ -5,6 +5,19 @@ Notable changes to swarmdash are tracked here, following
 does not yet follow strict semantic versioning across releases — see the
 README's "Known gaps" section for what's still evolving.
 
+## [1.1.1] - 2026-08-23
+
+### Changed
+
+- The dashboard's update-available check now runs client-side: the browser
+  compares the running version against the latest GitHub release
+  (github.com/emmtvv/swarmdash) directly on page load, instead of the admin
+  server polling GitHub every 15 minutes and caching the result. This drops
+  `internal/updatecheck`'s `Checker`/`Run` down to just the `CurrentVersion`
+  constant it was already the source of truth for - still bumped by hand
+  alongside each new entry here. The CSP's `connect-src` now allows
+  `https://api.github.com` for this.
+
 ## [1.1.0] - 2026-08-23
 
 ### Added

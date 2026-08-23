@@ -1,4 +1,11 @@
 {{define "dashboard.html"}}
+{{if and .CurrentVersion (ne .CurrentVersion "dev")}}
+<div class="update-banner" id="update-banner" hidden data-current-version="{{.CurrentVersion}}">
+	<span>A new version of swarmdash is available: <strong data-update-latest></strong> (you're on {{.CurrentVersion}}).</span>
+	<a data-update-link href="#" target="_blank" rel="noopener noreferrer">View release</a>
+	<button type="button" class="update-banner-dismiss" id="update-banner-dismiss" aria-label="Dismiss">&times;</button>
+</div>
+{{end}}
 <h1>Dashboard</h1>
 
 <div class="hero-card {{if .DegradedCount}}crit{{else}}ok{{end}}">

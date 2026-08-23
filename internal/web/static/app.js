@@ -21,25 +21,65 @@
 	});
 })();
 
-// Update-available banner (layout.html): dismissing it hides it for the
-// rest of this browser until a newer version ships, at which point the
-// stored version no longer matches data-dismiss-version and it reappears.
+// Update-available banner (dashboard.html): checked entirely client-side,
+// fresh on every dashboard load - the browser asks GitHub for the latest
+// release and compares it against the version baked into the page, so the
+// admin server never talks to GitHub and keeps no update-related state.
+// Dismissing hides it until a newer version ships, at which point the
+// stored version no longer matches the fetched one and it reappears.
 (function () {
 	const banner = document.getElementById("update-banner");
 	if (!banner) return;
-	try {
-		if (localStorage.getItem("sd-update-dismissed") === banner.dataset.dismissVersion) {
-			banner.remove();
-			return;
-		}
-	} catch (e) {}
-	const dismiss = document.getElementById("update-banner-dismiss");
-	if (dismiss) {
-		dismiss.addEventListener("click", () => {
-			try { localStorage.setItem("sd-update-dismissed", banner.dataset.dismissVersion); } catch (e) {}
-			banner.remove();
-		});
+	const current = banner.dataset.currentVersion;
+	if (!current) return;
+
+	// Mirrors internal/updatecheck's old Go version comparison: split off
+	// any "-"/"+" suffix, compare dotted numeric segments left to right,
+	// treat a missing segment as 0. Anything that doesn't parse this way is
+	// "not newer" rather than wrongly flagging every build as outdated.
+	function parseVersion(v) {
+		v = v.trim().replace(/^v/, "").split(/[-+]/)[0];
+		if (!v) return null;
+		const parts = v.split(".").map(Number);
+		return parts.every((n) => Number.isInteger(n)) ? parts : null;
 	}
+	function isNewer(latest, current) {
+		const lp = parseVersion(latest);
+		const cp = parseVersion(current);
+		if (!lp || !cp) return false;
+		for (let i = 0; i < Math.max(lp.length, cp.length); i++) {
+			const l = lp[i] || 0, c = cp[i] || 0;
+			if (l !== c) return l > c;
+		}
+		return false;
+	}
+
+	fetch("https://api.github.com/repos/emmtvv/swarmdash/releases/latest", {
+		headers: { Accept: "application/vnd.github+json" },
+	})
+		.then((res) => (res.ok ? res.json() : Promise.reject(res.status)))
+		.then((data) => {
+			const latest = (data.tag_name || "").replace(/^v/, "");
+			if (!latest || !isNewer(latest, current)) return;
+			try {
+				if (localStorage.getItem("sd-update-dismissed") === latest) return;
+			} catch (e) {}
+
+			banner.querySelector("[data-update-latest]").textContent = latest;
+			const link = banner.querySelector("[data-update-link]");
+			if (data.html_url) link.href = data.html_url;
+			else link.remove();
+			banner.hidden = false;
+
+			const dismiss = document.getElementById("update-banner-dismiss");
+			if (dismiss) {
+				dismiss.addEventListener("click", () => {
+					try { localStorage.setItem("sd-update-dismissed", latest); } catch (e) {}
+					banner.remove();
+				});
+			}
+		})
+		.catch(() => {}); // GitHub unreachable/rate-limited: fail silently, no banner
 })();
 
 // Node picker: auto-submits its <form> on change (volumes/images pages'
