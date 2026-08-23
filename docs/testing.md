@@ -17,18 +17,3 @@ PR, and a non-blocking [`govulncheck`](https://pkg.go.dev/golang.org/x/vuln/cmd/
 scan of dependencies (see the workflow for why it's informational rather
 than a hard gate right now). Dependabot keeps Go modules, GitHub Actions,
 and the Dockerfile's base images on weekly update PRs.
-
-## Docker Engine compatibility
-
-None of the above touches swarm mode or a real Docker daemon at all, so it
-can't catch a real Docker Engine upgrade breaking Swarm - which has
-happened: Docker 29 shipped Swarm-specific regressions (internal DNS
-resolution, legacy volume plugins) that a lot of existing clusters hit on
-upgrade. The `swarm-engine-compat` CI job covers that gap: it pins the
-runner to specific real engine versions (currently the last 28.x and the
-latest 29.x - see the job for exactly which) via
-[`docker/setup-docker-action`](https://github.com/docker/setup-docker-action),
-initializes swarm mode, starts swarmdash's own `agent`/`admin` against it,
-and confirms a plain `docker service create` actually reaches `Running`
-through the scheduler. It's a smoke test, not full coverage - the versions
-in its matrix need bumping by hand as new engine releases ship.

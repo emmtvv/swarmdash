@@ -33,12 +33,3 @@
   history, and restore is additive (upsert) rather than a full
   point-in-time rollback — it can't undo a deletion made after the backup
   was taken.
-- Docker Engine version: CI's `swarm-engine-compat` job (see
-  [testing.md](testing.md)) runs against the last 28.x release and the
-  latest 29.x release. Docker 29 shipped Swarm-specific regressions
-  (internal DNS resolution, legacy volume plugins) that broke existing
-  clusters for a number of operators on upgrade — swarmdash itself doesn't
-  touch anything version-specific, but its usefulness is bounded by
-  whatever the engine underneath it can actually do reliably. If Swarm
-  behaves oddly right after an engine upgrade, suspect the engine before
-  swarmdash.

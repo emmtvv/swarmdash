@@ -56,14 +56,6 @@ README's "Known gaps" section for what's still evolving.
   exception for `api.github.com` - previously that request always fired
   with no way to opt out short of blocking it at the network layer.
 
-### Added
-
-- CI's new `swarm-engine-compat` job runs the same swarm-init +
-  agent/admin-startup smoke test against pinned real Docker Engine
-  versions (currently the last 28.x and the latest 29.x), so a real engine
-  upgrade breaking Swarm - which Docker 29 did for a number of existing
-  clusters - has a chance of getting caught before it ships.
-
 ## [1.1.1] - 2026-08-23
 
 ### Changed
