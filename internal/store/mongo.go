@@ -1,9 +1,9 @@
 // Package store persists admin-side state (users, sessions, audit log,
-// tokens, ...) in MongoDB. This is the only supported backend: every admin
-// replica points at the same MongoDB deployment (standalone, replica set,
-// or sharded cluster - the driver treats them the same), so running more
-// than one replica for HA is just a matter of raising deploy.replicas, no
-// separate storage mode to opt into.
+// tokens, ...). MongoStore, below, is the multi-replica backend: every
+// admin replica points at the same MongoDB deployment (standalone, replica
+// set, or sharded cluster - the driver treats them the same), so running
+// more than one replica for HA is just a matter of raising deploy.replicas.
+// See sqlite.go for the single-replica, no-external-dependency alternative.
 package store
 
 import (

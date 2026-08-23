@@ -25,20 +25,20 @@ test:
 	go test ./...
 
 # Coverage for the unit-tested packages (pure logic - compose parsing/diff/
-# export, crypto, pagination, pki, secretenv, gitfetch). Excludes internal/
-# admin's HTTP handlers, internal/agent, and cmd/swarmdash, which need a real
-# Docker daemon/MongoDB and are exercised by hand / in CI's integration step
-# instead - see README's Testing section.
+# export, crypto, pagination, pki, secretenv, gitfetch, store). Excludes
+# internal/admin's HTTP handlers, internal/agent, and cmd/swarmdash, which
+# need a real Docker daemon (and, for --storage-driver=mongo, MongoDB) and
+# are exercised by hand / in CI's integration step instead - see README's
+# Testing section.
 test-cover:
 	go test ./... -cover
 
 # Generates .env with a random cluster secret, in the plain-environment-
 # variable form deploy/stack.yml expects (SWARMDASH_CLUSTER_SECRET - see
 # deploy/stack.yml's top comment for why it's an env var rather than a
-# Docker secret). MongoDB's root username/password are left commented out:
-# deploy/stack.yml defaults them to mongo/password, which is fine since the
-# bundled `mongo` service is never reachable from outside the stack (see
-# its comment there) - uncomment and fill in your own to override that.
+# Docker secret). Storage defaults to a SQLite database on a Docker volume,
+# no credentials needed; see deploy/stack.yml's "Optional: HA admin"
+# comment if you want to switch to an external MongoDB deployment instead.
 # Safe to re-run: leaves an existing .env untouched. To rotate a value, edit
 # .env by hand and redeploy - unlike Docker secrets these aren't immutable.
 env:
@@ -48,8 +48,6 @@ env:
 	else \
 		{ \
 			echo "SWARMDASH_CLUSTER_SECRET=$$(openssl rand -hex 32)"; \
-			echo "# SWARMDASH_MONGO_USERNAME=mongo"; \
-			echo "# SWARMDASH_MONGO_PASSWORD=password"; \
 			echo "SWARMDASH_ADMIN_PASSWORD="; \
 		} > .env; \
 		echo "generated .env"; \
@@ -91,11 +89,11 @@ tls-renew: docker
 	@echo "deploy/stack.yml's tls_* secret references, redeploy, then remove the old secrets."
 
 # Bring-up on a fresh Swarm cluster: build the image, generate .env with the
-# cluster secret and MongoDB credentials if it doesn't exist yet, initialize
-# swarm mode if this node isn't in it yet, and deploy the full stack (mongo +
-# admin on a manager, agent on every node). Run this on a node with Docker
-# already installed - if Docker itself isn't installed yet, use `make up`
-# instead, which wraps this after handling that step.
+# cluster secret if it doesn't exist yet, initialize swarm mode if this node
+# isn't in it yet, and deploy the full stack (admin on a manager, agent on
+# every node). Run this on a node with Docker already installed - if Docker
+# itself isn't installed yet, use `make up` instead, which wraps this after
+# handling that step.
 deploy: env
 	DOCKER="$(DOCKER)" scripts/init-swarm.sh
 	$(DOCKER) build --build-arg VERSION=$(VERSION) --build-arg COMMIT=$(COMMIT) -t swarmdash:latest .
@@ -118,7 +116,7 @@ deploy: env
 	@echo "tail the admin logs to grab the generated bootstrap password:"
 	@echo "  docker service logs -f swarmdash_admin"
 
-# Tears the stack down. Leaves .env and the swarmdash_mongo_data volume in
+# Tears the stack down. Leaves .env and the swarmdash_data volume in
 # place, so a re-deploy picks up existing credentials/users/sessions/etc.
 down:
 	$(DOCKER) stack rm swarmdash

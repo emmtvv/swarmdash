@@ -3,34 +3,25 @@
 # containers scheduled there too).
 #
 # admin persists all of its state (users, sessions, audit log, tokens, ...)
-# in MongoDB. This stack bundles a single-replica `mongo` service for
-# convenience; swap it for an external/HA MongoDB deployment (Atlas, a
-# managed instance, a replica set) by deleting the `mongo` service below
-# and pointing admin's SWARMDASH_MONGO_* variables at it instead.
+# in a local SQLite database (--storage-driver=local, the swarmdash
+# default), kept on the swarmdash_data volume below so it survives restarts
+# and redeploys. That's a single file on one node's disk, so admin is
+# pinned to a manager and kept at deploy.replicas: 1 - see "Optional: HA
+# admin" further down if you want more than one replica.
 #
-# Credentials (cluster secret + MongoDB username/password) are passed as
-# plain environment variables, interpolated (${VAR} below) from whatever
-# process environment `docker stack deploy` itself runs in - NOT Docker
-# secrets. Unlike `docker compose`, `docker stack deploy` does NOT read a
-# .env file on its own, so those vars have to actually be exported into
-# your shell first; `make deploy` does that for you (see its recipe), or
-# do it by hand: `set -a; . ./.env; set +a; docker stack deploy ...`.
-# Once deployed, the values are visible in `docker service inspect` /
-# `docker inspect` on the container, unlike a secret's tmpfs-only mount.
-# Simpler to manage (edit .env + redeploy, no immutable-secret dance), but
-# only reach for this on a cluster you already trust for that tradeoff. If
-# you want the Docker-secrets version back, the app supports both - every
-# SWARMDASH_* var below also has a "_FILE" variant that reads from a
-# mounted file (see README's Hardening section).
-#
-# The MongoDB root username/password default to mongo/password below rather
-# than requiring a value in .env: the `mongo` service has no `ports:`
-# entry, so - unlike `admin` - it's never published through the swarm
-# ingress mesh and isn't reachable from outside the stack's own overlay
-# network in the first place, making the password moot against anyone who
-# can't already reach the Docker socket. Override SWARMDASH_MONGO_USERNAME/
-# SWARMDASH_MONGO_PASSWORD in .env if you'd rather not rely on that (e.g.
-# pointing at an external MongoDB deployment instead of the bundled one).
+# Credentials (cluster secret) are passed as a plain environment variable,
+# interpolated (${VAR} below) from whatever process environment `docker
+# stack deploy` itself runs in - NOT a Docker secret. Unlike `docker
+# compose`, `docker stack deploy` does NOT read a .env file on its own, so
+# that var has to actually be exported into your shell first; `make deploy`
+# does that for you (see its recipe), or do it by hand: `set -a; . ./.env;
+# set +a; docker stack deploy ...`. Once deployed, the value is visible in
+# `docker service inspect` / `docker inspect` on the container, unlike a
+# secret's tmpfs-only mount. Simpler to manage (edit .env + redeploy, no
+# immutable-secret dance), but only reach for this on a cluster you already
+# trust for that tradeoff. If you want the Docker-secrets version back, the
+# app supports both - every SWARMDASH_* var below also has a "_FILE"
+# variant that reads from a mounted file (see README's Hardening section).
 #
 # One-shot bring-up (build image + generate .env + deploy), from a manager
 # node with this repo checked out:
@@ -66,20 +57,23 @@
 # then redeploy.
 #
 # --- Optional: HA admin (multiple replicas) --------------------------------
-# All admin state already lives in MongoDB, not on local disk, so scaling
-# out is just raising admin's deploy.replicas below - every replica shares
-# the same MongoDB deployment. The bundled `mongo` service below is a single
-# unreplicated node, though (see the comment on it) - point every admin
-# replica at an external MongoDB replica set instead if you want MongoDB
-# itself to be HA too.
+# admin's state lives in a SQLite file on whichever single node's disk the
+# swarmdash_data volume is on (see the top-of-file comment), so raising
+# deploy.replicas below on its own would just give every replica its own
+# empty, disconnected database. Real HA needs a storage backend that isn't
+# pinned to one node's disk: switch admin to --storage-driver=mongo instead
+# (point it at an external/managed MongoDB deployment - this stack doesn't
+# bundle one), at which point every replica talks to the same database and
+# deploy.replicas can be raised freely. See the README's Storage section
+# under Hardening for the full list of SWARMDASH_MONGO_* variables.
 
 version: "3.8"
 
-# No top-level `secrets:` block by default - the cluster secret and MongoDB
-# credentials moved to plain environment variables (see the top-of-file
-# comment). Only TLS material still uses Docker secrets (certs/keys are
-# files, not sensibly passed as env vars); uncomment this block plus the
-# matching `secrets:` list under agent/admin below if you enable mTLS:
+# No top-level `secrets:` block by default - the cluster secret moved to a
+# plain environment variable (see the top-of-file comment). Only TLS
+# material still uses Docker secrets (certs/keys are files, not sensibly
+# passed as env vars); uncomment this block plus the matching `secrets:`
+# list under agent/admin below if you enable mTLS:
 #
 # secrets:
 #   swarmdash_tls_ca_crt:
@@ -94,26 +88,6 @@ version: "3.8"
 #     external: true
 
 services:
-  mongo:
-    image: mongo:7
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${SWARMDASH_MONGO_USERNAME:-mongo}
-      MONGO_INITDB_ROOT_PASSWORD: ${SWARMDASH_MONGO_PASSWORD:-password}
-    volumes:
-      - swarmdash_mongo_data:/data/db
-    # Single replica, pinned to a manager: Swarm's default local-disk
-    # volumes aren't shared across nodes, so if this task got rescheduled
-    # onto a different node it would start with an empty database. Pinning
-    # keeps it on one node (restart_policy still recovers it there after a
-    # crash); for real HA, point admin at an external MongoDB replica set
-    # instead of using this service at all (see the comment up top).
-    deploy:
-      replicas: 1
-      placement:
-        constraints: [node.role == manager]
-      restart_policy:
-        condition: any
-
   agent:
     image: swarmdash:latest
     command: ["agent"]
@@ -150,17 +124,12 @@ services:
     command: ["admin"]
     environment:
       SWARMDASH_CLUSTER_SECRET: ${SWARMDASH_CLUSTER_SECRET:?set SWARMDASH_CLUSTER_SECRET in .env}
-      # Discrete MongoDB parameters, assembled into a connection string at
-      # startup. Set SWARMDASH_MONGO_URI instead if you're pointing at an
-      # external deployment that needs something these can't express
-      # (mongodb+srv, multiple hosts, ...); it overrides all of these.
-      SWARMDASH_MONGO_HOST: mongo
-      SWARMDASH_MONGO_PORT: "27017"
-      SWARMDASH_MONGO_USERNAME: ${SWARMDASH_MONGO_USERNAME:-mongo}
-      SWARMDASH_MONGO_PASSWORD: ${SWARMDASH_MONGO_PASSWORD:-password}
-      # SWARMDASH_MONGO_DATABASE: swarmdash        # optional, this is the default
-      # SWARMDASH_MONGO_AUTH_SOURCE: admin          # optional, this is the default whenever a username is set
-      # SWARMDASH_MONGO_PARAMS: "replicaSet=rs0"    # optional, appended as extra query params
+      # --storage-driver defaults to "local" (SQLite); spelled out here
+      # anyway since this stack's whole storage story - the volume below,
+      # the single-replica pin - depends on that being the case. See
+      # "Optional: HA admin" up top for switching to --storage-driver=mongo.
+      SWARMDASH_STORAGE_DRIVER: local
+      SWARMDASH_DATA_DIR: /data
       # Optional: bootstrap admin username, defaults to "admin" if unset.
       SWARMDASH_ADMIN_USERNAME: ${SWARMDASH_ADMIN_USERNAME:-}
       # Set this in .env to pin the bootstrap admin password instead of
@@ -176,13 +145,18 @@ services:
     #     target: tls_admin_key
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      # Holds the SQLite database (see SWARMDASH_DATA_DIR above). Swarm's
+      # default local-disk volumes aren't shared across nodes, which is
+      # exactly why admin is pinned to a single manager below rather than
+      # left to float - a rescheduled task on a different node would
+      # otherwise start with an empty database.
+      - swarmdash_data:/data
     # Published via the swarm ingress mesh (the default `mode: ingress`,
     # so `mode` is omitted below) rather than `mode: host`: any manager or
     # worker node can accept a connection to :8870 and Swarm's routing mesh
     # transparently forwards it to whichever node the admin task actually
     # landed on. That's what makes "open http://<any-manager-ip>:8870"
-    # above true regardless of placement, and it keeps working unchanged if
-    # admin is ever scaled beyond one replica.
+    # above true regardless of placement.
     ports:
       - target: 8870
         published: 8870
@@ -199,4 +173,4 @@ networks:
     name: host
 
 volumes:
-  swarmdash_mongo_data:
+  swarmdash_data:

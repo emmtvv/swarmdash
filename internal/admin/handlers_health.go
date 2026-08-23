@@ -11,9 +11,10 @@ import (
 // HEALTHCHECK, a Swarm healthcheck on the admin service, an external
 // uptime check, ...). Deliberately unauthenticated, like /status, but
 // unlike /status it actually exercises the two things admin depends on
-// (MongoDB and the local Docker daemon) rather than just confirming the
-// HTTP server is accepting connections - a stuck Mongo connection should
-// fail the probe even though the process is technically still up.
+// (its store - SQLite or MongoDB, see store.Interface - and the local
+// Docker daemon) rather than just confirming the HTTP server is accepting
+// connections - a stuck store should fail the probe even though the
+// process is technically still up.
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
@@ -22,10 +23,10 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	healthy := true
 
 	if err := s.store.Ping(); err != nil {
-		checks["mongo"] = err.Error()
+		checks["store"] = err.Error()
 		healthy = false
 	} else {
-		checks["mongo"] = "ok"
+		checks["store"] = "ok"
 	}
 
 	if _, err := s.docker.Ping(ctx); err != nil {

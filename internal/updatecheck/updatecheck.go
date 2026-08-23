@@ -27,7 +27,7 @@ const repoLatestReleaseAPI = "https://api.github.com/repos/emmtvv/swarmdash/rele
 // by hand with a manually assembled image/config - so rather than depend on
 // that, this is the single source of truth for the update check. Bump it
 // by hand alongside the latest released entry in CHANGELOG.md.
-const CurrentVersion = "1.0.2"
+const CurrentVersion = "1.1.0"
 
 const checkInterval = 15 * time.Minute
 

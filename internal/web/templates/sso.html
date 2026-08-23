@@ -67,7 +67,7 @@
 		</label>
 		{{if .Config.EnforceSSO}}
 		<div class="error-box" style="margin-top:8px;">
-			Local password login is currently <strong>disabled</strong> - only "Sign in with {{.Config.Label}}" works on the login page, and <span class="mono">POST /login</span> rejects password attempts server-side too. If the identity provider becomes unreachable or misconfigured, every account is locked out until this is switched back off directly in the <span class="mono">sso_config</span> MongoDB collection.
+			Local password login is currently <strong>disabled</strong> - only "Sign in with {{.Config.Label}}" works on the login page, and <span class="mono">POST /login</span> rejects password attempts server-side too. If the identity provider becomes unreachable or misconfigured, every account is locked out until this is switched back off directly in the <span class="mono">sso_config</span> table/collection of the admin database (SQLite or MongoDB, whichever this instance is configured to use).
 		</div>
 		{{else}}
 		<p class="muted" style="margin-top:4px;">Off by default. Confirm SSO sign-in actually works end-to-end before turning this on - once enabled, the only way back in without direct database access is the identity provider itself.</p>

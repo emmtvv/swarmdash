@@ -3,10 +3,13 @@ package store
 import "time"
 
 // Interface is what the admin package depends on for persistence: users,
-// sessions, the audit log, API tokens and registry credentials. The only
-// implementation is MongoStore (internal/store/mongo.go): every admin
-// replica connects to the same MongoDB deployment, so running more than
-// one replica for HA needs no separate storage mode.
+// sessions, the audit log, API tokens and registry credentials. Two
+// implementations exist: MongoStore (internal/store/mongo.go), where every
+// admin replica connects to the same MongoDB deployment so running more
+// than one replica for HA needs no separate storage mode, and SQLiteStore
+// (internal/store/sqlite.go), which persists the same state in a local
+// SQLite database for deployments that don't want to run MongoDB just for
+// the admin UI - at the cost of only supporting a single admin replica.
 type Interface interface {
 	Close() error
 
@@ -69,4 +72,7 @@ type Interface interface {
 	Ping() error
 }
 
-var _ Interface = (*MongoStore)(nil)
+var (
+	_ Interface = (*MongoStore)(nil)
+	_ Interface = (*SQLiteStore)(nil)
+)

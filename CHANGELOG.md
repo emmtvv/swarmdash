@@ -5,6 +5,31 @@ Notable changes to swarmdash are tracked here, following
 does not yet follow strict semantic versioning across releases — see the
 README's "Known gaps" section for what's still evolving.
 
+## [1.1.0] - 2026-08-23
+
+### Added
+
+- Local storage backend: `--storage-driver local` persists admin state
+  (users, sessions, audit log, tokens, ...) in a local SQLite database
+  under `--data-dir`/`SWARMDASH_DATA_DIR` instead of MongoDB, for
+  deployments that don't want to run a MongoDB service just for the admin
+  UI. Schema changes ship as forward-only SQL migrations
+  (`internal/store/migrations`) applied automatically on startup. See
+  `internal/store/sqlite.go` and the README's Storage section.
+
+### Changed
+
+- `--storage-driver` now defaults to `local` instead of `mongo` - running
+  `swarmdash admin` with no storage flags no longer requires a MongoDB
+  instance to be reachable. `mongo` is still available (and still required
+  for running more than one admin replica).
+- [deploy/stack.yml](deploy/stack.yml) dropped the bundled `mongo` service
+  and its `swarmdash_mongo_data` volume. `admin` now stores its SQLite
+  database on a `swarmdash_data` volume instead (`SWARMDASH_DATA_DIR=/data`
+  in the stack). Deployments that want MongoDB (for HA, multiple admin
+  replicas) point `--storage-driver=mongo` at an external deployment - see
+  the "Optional: HA admin" comment in `deploy/stack.yml`.
+
 ## [1.0.2] - 2026-08-22
 
 ### Added

@@ -6,9 +6,10 @@
 go build -o bin/swarmdash ./cmd/swarmdash
 ```
 
-You'll need a local Docker Swarm to exercise `admin`/`agent` against, and a
-MongoDB instance for `admin`'s storage — see the "Running locally against a
-test swarm" section in [README.md](README.md).
+You'll need a local Docker Swarm to exercise `admin`/`agent` against.
+`admin`'s storage defaults to a local SQLite database, no extra setup
+needed; see the "Running locally against a test swarm" section in
+[README.md](README.md) if you want to exercise the MongoDB backend instead.
 
 ## Before opening a PR
 

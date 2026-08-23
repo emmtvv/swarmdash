@@ -45,6 +45,9 @@ func newAdminCmd() *cobra.Command {
 		mongoDB         string
 		mongoAuthSource string
 		mongoParams     string
+
+		storageDriver string
+		dataDir       string
 	)
 
 	cmd := &cobra.Command{
@@ -93,65 +96,90 @@ func newAdminCmd() *cobra.Command {
 				return fmt.Errorf("this node is not a swarm manager (or swarm mode is not active): admin must run on a manager node")
 			}
 
-			if mongoURI == "" {
-				resolved, err := secretenv.Resolve("SWARMDASH_MONGO_URI")
-				if err != nil {
-					return fmt.Errorf("read mongo uri: %w", err)
-				}
-				mongoURI = resolved
+			if storageDriver == "" {
+				storageDriver = os.Getenv("SWARMDASH_STORAGE_DRIVER")
 			}
-			if mongoDB == "" {
-				mongoDB = os.Getenv("SWARMDASH_MONGO_DATABASE")
-			}
-			if mongoDB == "" {
-				mongoDB = "swarmdash"
-			}
-			if mongoURI == "" {
-				if mongoHost == "" {
-					mongoHost = os.Getenv("SWARMDASH_MONGO_HOST")
-				}
-				if mongoHost == "" {
-					mongoHost = "localhost"
-				}
-				if mongoPort == "" {
-					mongoPort = os.Getenv("SWARMDASH_MONGO_PORT")
-				}
-				if mongoPort == "" {
-					mongoPort = "27017"
-				}
-				if mongoUsername == "" {
-					resolved, err := secretenv.Resolve("SWARMDASH_MONGO_USERNAME")
-					if err != nil {
-						return fmt.Errorf("read mongo username: %w", err)
-					}
-					mongoUsername = resolved
-				}
-				if mongoPassword == "" {
-					resolved, err := secretenv.Resolve("SWARMDASH_MONGO_PASSWORD")
-					if err != nil {
-						return fmt.Errorf("read mongo password: %w", err)
-					}
-					mongoPassword = resolved
-				}
-				if mongoAuthSource == "" {
-					mongoAuthSource = os.Getenv("SWARMDASH_MONGO_AUTH_SOURCE")
-				}
-				if mongoAuthSource == "" && mongoUsername != "" {
-					// MONGO_INITDB_ROOT_USERNAME/PASSWORD (see deploy/stack.yml)
-					// always creates the root user in the admin database.
-					mongoAuthSource = "admin"
-				}
-				if mongoParams == "" {
-					mongoParams = os.Getenv("SWARMDASH_MONGO_PARAMS")
-				}
-				mongoURI = buildMongoURI(mongoHost, mongoPort, mongoUsername, mongoPassword, mongoAuthSource, mongoParams)
+			if storageDriver == "" {
+				storageDriver = "local"
 			}
 
-			mdb, err := store.OpenMongo(cmd.Context(), mongoURI, mongoDB)
-			if err != nil {
-				return fmt.Errorf("open mongo store: %w", err)
+			var st store.Interface
+			switch storageDriver {
+			case "mongo":
+				if mongoURI == "" {
+					resolved, err := secretenv.Resolve("SWARMDASH_MONGO_URI")
+					if err != nil {
+						return fmt.Errorf("read mongo uri: %w", err)
+					}
+					mongoURI = resolved
+				}
+				if mongoDB == "" {
+					mongoDB = os.Getenv("SWARMDASH_MONGO_DATABASE")
+				}
+				if mongoDB == "" {
+					mongoDB = "swarmdash"
+				}
+				if mongoURI == "" {
+					if mongoHost == "" {
+						mongoHost = os.Getenv("SWARMDASH_MONGO_HOST")
+					}
+					if mongoHost == "" {
+						mongoHost = "localhost"
+					}
+					if mongoPort == "" {
+						mongoPort = os.Getenv("SWARMDASH_MONGO_PORT")
+					}
+					if mongoPort == "" {
+						mongoPort = "27017"
+					}
+					if mongoUsername == "" {
+						resolved, err := secretenv.Resolve("SWARMDASH_MONGO_USERNAME")
+						if err != nil {
+							return fmt.Errorf("read mongo username: %w", err)
+						}
+						mongoUsername = resolved
+					}
+					if mongoPassword == "" {
+						resolved, err := secretenv.Resolve("SWARMDASH_MONGO_PASSWORD")
+						if err != nil {
+							return fmt.Errorf("read mongo password: %w", err)
+						}
+						mongoPassword = resolved
+					}
+					if mongoAuthSource == "" {
+						mongoAuthSource = os.Getenv("SWARMDASH_MONGO_AUTH_SOURCE")
+					}
+					if mongoAuthSource == "" && mongoUsername != "" {
+						// MONGO_INITDB_ROOT_USERNAME/PASSWORD (see deploy/stack.yml)
+						// always creates the root user in the admin database.
+						mongoAuthSource = "admin"
+					}
+					if mongoParams == "" {
+						mongoParams = os.Getenv("SWARMDASH_MONGO_PARAMS")
+					}
+					mongoURI = buildMongoURI(mongoHost, mongoPort, mongoUsername, mongoPassword, mongoAuthSource, mongoParams)
+				}
+
+				mdb, err := store.OpenMongo(cmd.Context(), mongoURI, mongoDB)
+				if err != nil {
+					return fmt.Errorf("open mongo store: %w", err)
+				}
+				st = mdb
+			case "local":
+				if dataDir == "" {
+					dataDir = os.Getenv("SWARMDASH_DATA_DIR")
+				}
+				if dataDir == "" {
+					dataDir = "./data"
+				}
+				sdb, err := store.OpenSQLite(dataDir)
+				if err != nil {
+					return fmt.Errorf("open local store: %w", err)
+				}
+				st = sdb
+			default:
+				return fmt.Errorf("invalid --storage-driver %q: must be \"mongo\" or \"local\"", storageDriver)
 			}
-			var st store.Interface = mdb
 			defer st.Close()
 
 			srv, err := admin.New(admin.Config{
@@ -189,7 +217,9 @@ func newAdminCmd() *cobra.Command {
 	cmd.Flags().StringVar(&agentTLSCA, "agent-tls-ca", "", "CA certificate used to verify agents' server certificate")
 	cmd.Flags().StringVar(&uiTLSCert, "ui-tls-cert", "", "TLS certificate for the admin web UI/API (enables HTTPS when set with --ui-tls-key)")
 	cmd.Flags().StringVar(&uiTLSKey, "ui-tls-key", "", "TLS private key for the admin web UI/API")
-	cmd.Flags().StringVar(&mongoURI, "mongo-uri", "", "full MongoDB connection string, overrides every other --mongo-* flag below (env SWARMDASH_MONGO_URI, _FILE suffix also works). Every admin replica should point at the same MongoDB deployment")
+	cmd.Flags().StringVar(&storageDriver, "storage-driver", "", "where admin state (users, sessions, audit log, tokens, ...) is persisted: \"local\" (default, a SQLite database - see --data-dir) or \"mongo\" (see --mongo-* below; required for more than one admin replica) (env SWARMDASH_STORAGE_DRIVER)")
+	cmd.Flags().StringVar(&dataDir, "data-dir", "", "directory holding the SQLite database when --storage-driver=local (env SWARMDASH_DATA_DIR; defaults to \"./data\"); ignored otherwise. Only one admin replica may point at a given data dir at a time")
+	cmd.Flags().StringVar(&mongoURI, "mongo-uri", "", "full MongoDB connection string, overrides every other --mongo-* flag below (env SWARMDASH_MONGO_URI, _FILE suffix also works); only used when --storage-driver=mongo. Every admin replica should point at the same MongoDB deployment")
 	cmd.Flags().StringVar(&mongoHost, "mongo-host", "", "MongoDB host (env SWARMDASH_MONGO_HOST; defaults to \"localhost\"), ignored if --mongo-uri is set")
 	cmd.Flags().StringVar(&mongoPort, "mongo-port", "", "MongoDB port (env SWARMDASH_MONGO_PORT; defaults to \"27017\"), ignored if --mongo-uri is set")
 	cmd.Flags().StringVar(&mongoUsername, "mongo-username", "", "MongoDB username (env SWARMDASH_MONGO_USERNAME, _FILE suffix also works), ignored if --mongo-uri is set")
