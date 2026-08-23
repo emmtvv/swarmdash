@@ -33,3 +33,16 @@
   history, and restore is additive (upsert) rather than a full
   point-in-time rollback — it can't undo a deletion made after the backup
   was taken.
+- The "viewer" role is read-only, not secrets-blind: it can see every
+  service/stack's full spec, including environment variable values, both
+  in the service detail page and via `GET /services/{name}/export.yml` /
+  `GET /stacks/{name}/export.yml` — real deployments routinely carry
+  DB passwords or API keys in `environment:`. This is deliberate and
+  consistent across both surfaces (redacting only the export while the
+  detail page shows the same values would be a false sense of security,
+  not an actual fix), unlike the interactive console and file
+  browser/download (`/exec/*`, `/files/*`), which stay admin-only because
+  they can reach arbitrary files inside a container - e.g. bind-mounted
+  Docker secrets - well beyond what's declared in the service spec
+  itself. Only grant "viewer" to people who are trusted with those
+  values, the same as anyone with shell access to a node.

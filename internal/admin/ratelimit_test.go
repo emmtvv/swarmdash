@@ -10,7 +10,7 @@ import (
 )
 
 func TestIPRateLimiter_BlocksOverBurstPerIP(t *testing.T) {
-	rl := newIPRateLimiter(rate.Every(time.Hour), 2)
+	rl := newIPRateLimiter(rate.Every(time.Hour), 2, nil)
 
 	if !rl.allow("203.0.113.1") {
 		t.Fatal("1st request should be allowed within burst")
@@ -29,7 +29,7 @@ func TestIPRateLimiter_BlocksOverBurstPerIP(t *testing.T) {
 }
 
 func TestIPRateLimiter_Middleware_Returns429WhenBlocked(t *testing.T) {
-	rl := newIPRateLimiter(rate.Every(time.Hour), 1)
+	rl := newIPRateLimiter(rate.Every(time.Hour), 1, func(r *http.Request) string { return "203.0.113.1" })
 	var calls int
 	h := rl.middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++

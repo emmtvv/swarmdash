@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -163,6 +164,73 @@ func TestLoginLockout_KeyedPerIP_DoesNotBlockOtherClients(t *testing.T) {
 	s.handleLoginSubmit(w, g4LoginRequest("dave", "rightpw"))
 	if w.Code != http.StatusSeeOther || w.Header().Get("Location") != "/" {
 		t.Errorf("status = %d, location = %q; want a successful login redirect to /", w.Code, w.Header().Get("Location"))
+	}
+}
+
+func TestParseTrustedProxies(t *testing.T) {
+	nets, err := parseTrustedProxies([]string{"203.0.113.9", " 10.0.0.0/8 ", ""})
+	if err != nil {
+		t.Fatalf("parseTrustedProxies: %v", err)
+	}
+	if len(nets) != 2 {
+		t.Fatalf("got %d networks, want 2 (blank entries skipped): %v", len(nets), nets)
+	}
+	if !nets[0].Contains(net.ParseIP("203.0.113.9")) {
+		t.Errorf("bare IP %q should parse as a /32 containing itself", nets[0])
+	}
+	if !nets[1].Contains(net.ParseIP("10.1.2.3")) {
+		t.Errorf("CIDR %q should contain 10.1.2.3", nets[1])
+	}
+}
+
+func TestParseTrustedProxies_RejectsInvalidEntry(t *testing.T) {
+	if _, err := parseTrustedProxies([]string{"not-an-ip"}); err == nil {
+		t.Error("parseTrustedProxies() with an invalid entry should return an error")
+	}
+}
+
+func TestClientIP_IgnoresForwardedForByDefault(t *testing.T) {
+	s := newTestServer(t, nil)
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "203.0.113.9:1234"
+	r.Header.Set("X-Forwarded-For", "10.0.0.1")
+
+	if got := s.clientIP(r); got != "203.0.113.9" {
+		t.Errorf("clientIP() = %q, want RemoteAddr %q: X-Forwarded-For must not be trusted without --trusted-proxies", got, "203.0.113.9")
+	}
+}
+
+func TestClientIP_TrustsForwardedForFromTrustedProxy(t *testing.T) {
+	s := newTestServer(t, nil)
+	nets, err := parseTrustedProxies([]string{"203.0.113.9"})
+	if err != nil {
+		t.Fatalf("parseTrustedProxies: %v", err)
+	}
+	s.trustedProxies = nets
+
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "203.0.113.9:1234"
+	r.Header.Set("X-Forwarded-For", "198.51.100.5, 203.0.113.9")
+
+	if got := s.clientIP(r); got != "198.51.100.5" {
+		t.Errorf("clientIP() = %q, want the real client 198.51.100.5 (rightmost untrusted hop)", got)
+	}
+}
+
+func TestClientIP_IgnoresForwardedForWhenRemoteAddrIsNotATrustedProxy(t *testing.T) {
+	s := newTestServer(t, nil)
+	nets, err := parseTrustedProxies([]string{"203.0.113.9"})
+	if err != nil {
+		t.Fatalf("parseTrustedProxies: %v", err)
+	}
+	s.trustedProxies = nets
+
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "198.51.100.99:1234" // not the configured trusted proxy
+	r.Header.Set("X-Forwarded-For", "1.2.3.4")
+
+	if got := s.clientIP(r); got != "198.51.100.99" {
+		t.Errorf("clientIP() = %q, want RemoteAddr: a spoofed header from a non-proxy address must not override it", got)
 	}
 }
 

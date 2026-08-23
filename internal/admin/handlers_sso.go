@@ -134,7 +134,7 @@ func (s *Server) handleSSOLogin(w http.ResponseWriter, r *http.Request) {
 		Value:    state + ":" + verifier,
 		Path:     "/sso/callback",
 		HttpOnly: true,
-		Secure:   isSecureRequest(r),
+		Secure:   s.isSecureRequest(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   300,
 	})
@@ -159,7 +159,7 @@ func (s *Server) handleSSOCallback(w http.ResponseWriter, r *http.Request) {
 		fail("sso session expired, please try again")
 		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: ssoStateCookieName, Value: "", Path: "/sso/callback", Secure: isSecureRequest(r), MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: ssoStateCookieName, Value: "", Path: "/sso/callback", Secure: s.isSecureRequest(r), MaxAge: -1})
 	parts := strings.SplitN(stateCookie.Value, ":", 2)
 	if len(parts) != 2 || parts[0] != r.URL.Query().Get("state") {
 		fail("sso state mismatch, please try again")

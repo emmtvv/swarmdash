@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"crypto/subtle"
+	"net"
 	"net/http"
 	"strings"
 )
@@ -18,9 +19,22 @@ const csrfCookieName = "swarmdash_csrf"
 // browsers never send them in cleartext, but don't hard-code it, since an
 // admin reachable only over plain HTTP (a trusted, internal cluster
 // network) would otherwise never be able to log in at all.
-func isSecureRequest(r *http.Request) bool {
+//
+// X-Forwarded-Proto is only trusted from a --trusted-proxies address -
+// same gate clientIP applies to X-Forwarded-For (see auth.go). Without
+// that flag any client could otherwise claim X-Forwarded-Proto: https on
+// a plaintext connection and get a Secure cookie the browser then refuses
+// to send back over HTTP, silently breaking its own session.
+func (s *Server) isSecureRequest(r *http.Request) bool {
 	if r.TLS != nil {
 		return true
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	if !s.isTrustedProxy(host) {
+		return false
 	}
 	return r.Header.Get("X-Forwarded-Proto") == "https"
 }
@@ -99,7 +113,7 @@ func (s *Server) security(next http.Handler) http.Handler {
 				Value:    token,
 				Path:     "/",
 				HttpOnly: true,
-				Secure:   isSecureRequest(r),
+				Secure:   s.isSecureRequest(r),
 				SameSite: http.SameSiteLaxMode,
 			})
 		}

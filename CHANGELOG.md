@@ -5,6 +5,26 @@ Notable changes to swarmdash are tracked here, following
 does not yet follow strict semantic versioning across releases — see the
 README's "Known gaps" section for what's still evolving.
 
+## [1.2.1] - 2026-08-23
+
+### Security
+
+- Fixed a trust-model asymmetry introduced by the 1.2.0 rate limiting/lockout
+  and `Secure`-cookie work: `clientIP` never trusted `X-Forwarded-For`, but
+  `isSecureRequest` unconditionally trusted `X-Forwarded-Proto`. Behind a
+  reverse proxy (Traefik, nginx, a cloud load balancer, ...) every request
+  shares the proxy's address, which collapsed the per-IP global/login rate
+  limiters and the (username, IP) lockout onto one bucket for every client -
+  reopening the exact targeted-lockout gap migration `0002` closed, and
+  making the global/login limiters into a self-inflicted denial of service.
+  Both headers are now gated together on the same decision: off by default
+  (today's safe behavior), or trusted from addresses listed in the new
+  `--trusted-proxies` flag. See the Hardening doc.
+- The global rate limiter no longer wraps `/static/`: a single page load
+  pulls in several static assets alongside the dynamic request, so counting
+  them against the same per-IP burst as the rest of the app could exhaust it
+  before a real request was served.
+
 ## [1.2.0] - 2026-08-23
 
 ### Security

@@ -20,6 +20,12 @@ type ipRateLimiter struct {
 	visitors map[string]*visitor
 	limit    rate.Limit
 	burst    int
+
+	// clientIP resolves the bucket key for a request - normally
+	// (*Server).clientIP, bound at construction time so middleware doesn't
+	// need a *Server receiver of its own. Tests that only exercise allow()
+	// directly never call this.
+	clientIP func(*http.Request) string
 }
 
 type visitor struct {
@@ -30,11 +36,12 @@ type visitor struct {
 const rateLimiterIdleTTL = 10 * time.Minute
 const rateLimiterSweepThreshold = 4096
 
-func newIPRateLimiter(limit rate.Limit, burst int) *ipRateLimiter {
+func newIPRateLimiter(limit rate.Limit, burst int, clientIP func(*http.Request) string) *ipRateLimiter {
 	return &ipRateLimiter{
 		visitors: make(map[string]*visitor),
 		limit:    limit,
 		burst:    burst,
+		clientIP: clientIP,
 	}
 }
 
@@ -64,7 +71,7 @@ func (rl *ipRateLimiter) allow(ip string) bool {
 // sees them.
 func (rl *ipRateLimiter) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !rl.allow(clientIP(r)) {
+		if !rl.allow(rl.clientIP(r)) {
 			http.Error(w, "too many requests - slow down and try again shortly", http.StatusTooManyRequests)
 			return
 		}

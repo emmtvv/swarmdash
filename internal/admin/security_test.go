@@ -14,6 +14,34 @@ func g4NextHandler(called *bool) http.Handler {
 	})
 }
 
+func TestIsSecureRequest_IgnoresForwardedProtoByDefault(t *testing.T) {
+	s := newTestServer(t, nil)
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "203.0.113.9:1234"
+	r.Header.Set("X-Forwarded-Proto", "https")
+
+	if s.isSecureRequest(r) {
+		t.Error("isSecureRequest() = true, want false: X-Forwarded-Proto must not be trusted without --trusted-proxies")
+	}
+}
+
+func TestIsSecureRequest_TrustsForwardedProtoFromTrustedProxy(t *testing.T) {
+	s := newTestServer(t, nil)
+	nets, err := parseTrustedProxies([]string{"203.0.113.9"})
+	if err != nil {
+		t.Fatalf("parseTrustedProxies: %v", err)
+	}
+	s.trustedProxies = nets
+
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.RemoteAddr = "203.0.113.9:1234"
+	r.Header.Set("X-Forwarded-Proto", "https")
+
+	if !s.isSecureRequest(r) {
+		t.Error("isSecureRequest() = false, want true: X-Forwarded-Proto from a trusted proxy should be honored")
+	}
+}
+
 func TestSecurity_SetsHeaders(t *testing.T) {
 	s := newTestServer(t, nil)
 	var called bool

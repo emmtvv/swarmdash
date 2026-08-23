@@ -10,6 +10,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"sync"
@@ -44,6 +45,17 @@ type Config struct {
 	// that secures admin<->agent.
 	UITLSCertFile string
 	UITLSKeyFile  string
+
+	// TrustedProxies lists the IPs/CIDRs of reverse proxies (e.g. a
+	// Traefik/nginx sitting in front of admin) allowed to set
+	// X-Forwarded-For/X-Forwarded-Proto. Empty (the default) means neither
+	// header is trusted: clientIP falls back to RemoteAddr and
+	// isSecureRequest falls back to r.TLS - safe, but means every proxied
+	// request looks like it came from the proxy's own address (see
+	// clientIP in auth.go). Set this to the proxy's address when running
+	// behind one, so per-IP rate limiting, login lockout, and the Secure
+	// cookie flag see the real client again.
+	TrustedProxies []string
 }
 
 type Server struct {
@@ -75,6 +87,11 @@ type Server struct {
 	loginLimiter  *ipRateLimiter
 	globalLimiter *ipRateLimiter
 
+	// trustedProxies backs clientIP (auth.go) and isSecureRequest
+	// (security.go); see Config.TrustedProxies. Empty unless
+	// --trusted-proxies is set.
+	trustedProxies []*net.IPNet
+
 	// execSlots caps concurrent interactive /ws/exec sessions (see
 	// handleExecProxy in wsproxy.go): a buffered channel used purely as a
 	// counting semaphore, sized maxConcurrentExecSessions.
@@ -95,22 +112,28 @@ func New(cfg Config, docker *client.Client, st store.Interface) (*Server, error)
 	if err != nil {
 		return nil, fmt.Errorf("agent tls config: %w", err)
 	}
-	return &Server{
-		cfg:      cfg,
-		docker:   docker,
-		store:    st,
-		log:      slog.New(slog.NewTextHandler(os.Stdout, nil)).With("component", "admin"),
-		renderer: web.NewRenderer(),
-		agentTLS: agentTLS,
-		// 5 attempts/minute/IP, burst 5: generous enough for a real user
-		// mistyping a password, tight enough to make spraying many
-		// usernames from one address slow going.
-		loginLimiter: newIPRateLimiter(rate.Every(12*time.Second), 5),
-		// 20 req/s/IP, burst 40: a loose backstop against naive flooding,
-		// not meant to shape legitimate dashboard/SSE traffic.
-		globalLimiter: newIPRateLimiter(rate.Limit(20), 40),
-		execSlots:     make(chan struct{}, maxConcurrentExecSessions),
-	}, nil
+	trustedProxies, err := parseTrustedProxies(cfg.TrustedProxies)
+	if err != nil {
+		return nil, fmt.Errorf("trusted proxies: %w", err)
+	}
+	s := &Server{
+		cfg:            cfg,
+		docker:         docker,
+		store:          st,
+		log:            slog.New(slog.NewTextHandler(os.Stdout, nil)).With("component", "admin"),
+		renderer:       web.NewRenderer(),
+		agentTLS:       agentTLS,
+		trustedProxies: trustedProxies,
+		execSlots:      make(chan struct{}, maxConcurrentExecSessions),
+	}
+	// 5 attempts/minute/IP, burst 5: generous enough for a real user
+	// mistyping a password, tight enough to make spraying many usernames
+	// from one address slow going.
+	s.loginLimiter = newIPRateLimiter(rate.Every(12*time.Second), 5, s.clientIP)
+	// 20 req/s/IP, burst 40: a loose backstop against naive flooding, not
+	// meant to shape legitimate dashboard/SSE traffic.
+	s.globalLimiter = newIPRateLimiter(rate.Limit(20), 40, s.clientIP)
+	return s, nil
 }
 
 // buildAgentTLSConfig loads the admin client certificate and CA pool used
@@ -147,8 +170,6 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(web.StaticFS)))
-
 	mux.HandleFunc("GET /status", s.handleStatusPage)
 	mux.HandleFunc("GET /health", s.handleHealth)
 	mux.HandleFunc("POST /hooks/deploy/{token}", s.handleDeployHookTrigger)
@@ -166,7 +187,18 @@ func (s *Server) Handler() http.Handler {
 
 	mux.Handle("/", s.requireAuth(s.requireRole(protected)))
 
-	return s.logging(s.globalLimiter.middleware(s.security(mux)))
+	// /static/ sits outside globalLimiter: a single page load pulls in
+	// layout/app CSS, app.js, htmx, xterm, xterm-addon-fit, and the
+	// favicon, so a couple of concurrent dashboard sessions (each also
+	// holding an SSE stream and polling) can burn through the limiter's
+	// burst on static assets alone before a single dynamic request is
+	// served. It still gets security()'s response headers and logging(),
+	// just not IP throttling meant for the dynamic app.
+	top := http.NewServeMux()
+	top.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(web.StaticFS)))
+	top.Handle("/", s.globalLimiter.middleware(mux))
+
+	return s.logging(s.security(top))
 }
 
 func (s *Server) ListenAndServe(ctx context.Context) error {

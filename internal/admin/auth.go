@@ -129,7 +129,7 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 
 	username := r.FormValue("username")
 	password := r.FormValue("password")
-	ip := clientIP(r)
+	ip := s.clientIP(r)
 
 	// Checked before touching the user record so an unknown username locks
 	// out the same way a known one does - it doesn't create a timing/
@@ -197,18 +197,99 @@ func loginAttemptKey(username, ip string) string {
 	return username + "\x00" + ip
 }
 
-// clientIP extracts the request's remote address, stripping the port
-// net/http always includes in RemoteAddr. Best-effort: an admin behind a
-// reverse proxy that doesn't forward the original client address sees
-// every request as coming from the proxy, which just means the lockout
-// keys off the proxy's address - no worse than treating every request as
-// one shared bucket, which is what a username-only key already did.
-func clientIP(r *http.Request) string {
+// clientIP resolves the request's originating client address. By default
+// (no --trusted-proxies) it's just RemoteAddr with net/http's port
+// stripped: best-effort, since an admin behind a reverse proxy that
+// doesn't forward the original client address sees every request as
+// coming from the proxy, which just means the lockout keys off the
+// proxy's address - no worse than treating every request as one shared
+// bucket, which is what a username-only key already did.
+//
+// When --trusted-proxies is set and RemoteAddr matches it, X-Forwarded-For
+// is trusted instead: read right-to-left (closest hop first, per RFC 7239
+// intent) and return the first address that isn't itself a trusted proxy.
+// Gated on the same trust decision as isSecureRequest (see security.go) so
+// the two headers a proxied deployment relies on - X-Forwarded-For here,
+// X-Forwarded-Proto there - are either both trusted or neither is; an
+// operator who hasn't configured --trusted-proxies gets today's safe
+// default on both.
+func (s *Server) clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
-		return r.RemoteAddr
+		host = r.RemoteAddr
+	}
+	if !s.isTrustedProxy(host) {
+		return host
+	}
+	xff := r.Header.Get("X-Forwarded-For")
+	for _, part := range reverseSplit(xff, ",") {
+		candidate := strings.TrimSpace(part)
+		if candidate == "" || s.isTrustedProxy(candidate) {
+			continue
+		}
+		return candidate
 	}
 	return host
+}
+
+// reverseSplit splits s on sep and returns the parts in reverse order.
+func reverseSplit(s, sep string) []string {
+	if s == "" {
+		return nil
+	}
+	parts := strings.Split(s, sep)
+	for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
+		parts[i], parts[j] = parts[j], parts[i]
+	}
+	return parts
+}
+
+// isTrustedProxy reports whether addr (no port) falls inside one of the
+// --trusted-proxies networks. Empty s.trustedProxies (the default) means
+// nothing is trusted, which is what makes clientIP/isSecureRequest fail
+// closed to today's safe behavior when the flag isn't set.
+func (s *Server) isTrustedProxy(addr string) bool {
+	ip := net.ParseIP(addr)
+	if ip == nil {
+		return false
+	}
+	for _, n := range s.trustedProxies {
+		if n.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// parseTrustedProxies turns --trusted-proxies' comma-separated list of IPs
+// and/or CIDRs into networks for isTrustedProxy. A bare IP is treated as a
+// /32 (or /128 for IPv6) - the common case of naming a proxy's single
+// address rather than a whole subnet.
+func parseTrustedProxies(raw []string) ([]*net.IPNet, error) {
+	var nets []*net.IPNet
+	for _, entry := range raw {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if !strings.Contains(entry, "/") {
+			ip := net.ParseIP(entry)
+			if ip == nil {
+				return nil, fmt.Errorf("invalid trusted proxy address %q", entry)
+			}
+			if ip.To4() != nil {
+				entry += "/32"
+			} else {
+				entry += "/128"
+			}
+		}
+		_, n, err := net.ParseCIDR(entry)
+		if err != nil {
+			return nil, fmt.Errorf("invalid trusted proxy %q: %w", entry, err)
+		}
+		nets = append(nets, n)
+	}
+	return nets, nil
 }
 
 // loginLockedFor reports how much longer the (username, ip) pair is locked
@@ -282,7 +363,7 @@ func (s *Server) startSession(w http.ResponseWriter, r *http.Request, username s
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isSecureRequest(r),
+		Secure:   s.isSecureRequest(r),
 		SameSite: http.SameSiteLaxMode,
 		Expires:  now.Add(sessionTTL),
 	})
@@ -293,7 +374,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(sessionCookieName); err == nil {
 		_ = s.store.DeleteSession(hashToken(c.Value))
 	}
-	http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: "", Path: "/", Secure: isSecureRequest(r), MaxAge: -1})
+	http.SetCookie(w, &http.Cookie{Name: sessionCookieName, Value: "", Path: "/", Secure: s.isSecureRequest(r), MaxAge: -1})
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 

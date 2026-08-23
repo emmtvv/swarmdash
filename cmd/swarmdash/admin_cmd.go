@@ -28,6 +28,8 @@ func newAdminCmd() *cobra.Command {
 		uiTLSCert    string
 		uiTLSKey     string
 
+		trustedProxies []string
+
 		sf storeFlags
 	)
 
@@ -95,6 +97,7 @@ func newAdminCmd() *cobra.Command {
 				AgentTLSCAFile:    agentTLSCA,
 				UITLSCertFile:     uiTLSCert,
 				UITLSKeyFile:      uiTLSKey,
+				TrustedProxies:    trustedProxies,
 			}, docker, st)
 			if err != nil {
 				return err
@@ -118,6 +121,7 @@ func newAdminCmd() *cobra.Command {
 	cmd.Flags().StringVar(&agentTLSCA, "agent-tls-ca", "", "CA certificate used to verify agents' server certificate")
 	cmd.Flags().StringVar(&uiTLSCert, "ui-tls-cert", "", "TLS certificate for the admin web UI/API (enables HTTPS when set with --ui-tls-key)")
 	cmd.Flags().StringVar(&uiTLSKey, "ui-tls-key", "", "TLS private key for the admin web UI/API")
+	cmd.Flags().StringSliceVar(&trustedProxies, "trusted-proxies", nil, "IPs/CIDRs of reverse proxies (e.g. Traefik/nginx) allowed to set X-Forwarded-For and X-Forwarded-Proto; comma-separated, repeatable. Unset (default) means neither header is trusted: every proxied request is seen as coming from the proxy itself, which collapses per-IP rate limiting and login lockout onto one shared bucket - set this when admin sits behind a reverse proxy")
 	sf.register(cmd)
 
 	return cmd

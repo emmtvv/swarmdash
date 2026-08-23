@@ -12,6 +12,19 @@
   cluster — it mints a brand new CA and invalidates every certificate
   issued from the old one.
 - HTTPS for the admin UI itself: `--ui-tls-cert`/`--ui-tls-key`.
+- Running admin behind a reverse proxy (Traefik, nginx, a cloud load
+  balancer, ...) that terminates TLS: set `--trusted-proxies` to the
+  proxy's address (or its CIDR, if it isn't fixed - e.g. a Kubernetes
+  Service's pod subnet), comma-separated for more than one. Without it,
+  every request looks like it comes from the proxy - the same address for
+  every client - which collapses the per-IP request limiter and the
+  (username, IP) login lockout onto one shared bucket instead of one per
+  real client, and cookies never get the `Secure` attribute because admin
+  can't tell the original connection was HTTPS. `--trusted-proxies` fixes
+  both: it's what gates `X-Forwarded-For` (client IP) and
+  `X-Forwarded-Proto` (scheme) being trusted at all, so only set it to
+  addresses that are actually the proxy - trusting an address a client
+  could spoof reopens the same spoofing hole the flag exists to close.
 - Cluster secret as a Docker secret: [deploy/stack.yml](../deploy/stack.yml)
   passes it as a plain environment variable by default (see that file's
   top comment for the tradeoff). Every `SWARMDASH_*` value admin/agent

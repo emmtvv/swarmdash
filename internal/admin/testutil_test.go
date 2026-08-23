@@ -111,16 +111,17 @@ func newTestStore(t *testing.T) store.Interface {
 // *Server by hand instead - this covers the common case.
 func newTestServer(t *testing.T, docker *client.Client) *Server {
 	t.Helper()
-	return &Server{
-		cfg:           Config{AgentPort: "0"},
-		docker:        docker,
-		store:         newTestStore(t),
-		log:           slog.New(slog.NewTextHandler(io.Discard, nil)),
-		renderer:      web.NewRenderer(),
-		loginLimiter:  newIPRateLimiter(rate.Inf, 0),
-		globalLimiter: newIPRateLimiter(rate.Inf, 0),
-		execSlots:     make(chan struct{}, maxConcurrentExecSessions),
+	s := &Server{
+		cfg:       Config{AgentPort: "0"},
+		docker:    docker,
+		store:     newTestStore(t),
+		log:       slog.New(slog.NewTextHandler(io.Discard, nil)),
+		renderer:  web.NewRenderer(),
+		execSlots: make(chan struct{}, maxConcurrentExecSessions),
 	}
+	s.loginLimiter = newIPRateLimiter(rate.Inf, 0, s.clientIP)
+	s.globalLimiter = newIPRateLimiter(rate.Inf, 0, s.clientIP)
+	return s
 }
 
 var (
