@@ -947,6 +947,7 @@ label:has(> input[type=checkbox]) {
 	margin-bottom: 16px;
 	font-size: 13px;
 }
+.update-banner[hidden] { display: none; }
 .update-banner span { flex: 1; color: var(--text); }
 .update-banner strong { color: var(--accent-2); }
 .update-banner a { color: var(--accent-2); font-weight: 600; white-space: nowrap; }
