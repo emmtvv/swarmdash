@@ -161,7 +161,7 @@ func TestSQLiteStorePersistsAcrossReopen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenSQLite (reopen): %v", err)
 	}
-	defer reopened.Close()
+	defer func() { _ = reopened.Close() }()
 
 	u, err := reopened.GetUser("alice")
 	if err != nil || u.Role != "admin" {
@@ -196,7 +196,7 @@ func TestSQLiteStorePersistsAcrossReopen(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenSQLite (second reopen): %v", err)
 	}
-	defer reopened2.Close()
+	defer func() { _ = reopened2.Close() }()
 }
 
 func TestSQLiteStoreDeployHookLookups(t *testing.T) {
@@ -283,7 +283,7 @@ func TestMigrateIsIdempotentAndForwardOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("OpenSQLite: %v", err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	var versions []int
 	rows, err := s.db.Query(`SELECT version FROM schema_migrations ORDER BY version`)
@@ -297,7 +297,7 @@ func TestMigrateIsIdempotentAndForwardOnly(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	rows.Close()
+	_ = rows.Close()
 	if len(versions) != 1 || versions[0] != 1 {
 		t.Fatalf("schema_migrations = %v, want [1]", versions)
 	}
@@ -351,7 +351,7 @@ func TestMigrateFSAppliesNewVersionsIncrementally(t *testing.T) {
 	if err != nil {
 		t.Fatalf("sql.Open (reopen): %v", err)
 	}
-	defer db2.Close()
+	defer func() { _ = db2.Close() }()
 	if err := migrateFS(db2, v2, "migrations"); err != nil {
 		t.Fatalf("migrateFS (v2): %v", err)
 	}
@@ -378,7 +378,7 @@ func TestMigrateFSAppliesNewVersionsIncrementally(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	rows.Close()
+	_ = rows.Close()
 	if len(versions) != 2 || versions[0] != 1 || versions[1] != 2 {
 		t.Fatalf("schema_migrations = %v, want [1 2]", versions)
 	}

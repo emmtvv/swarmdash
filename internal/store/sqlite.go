@@ -151,7 +151,7 @@ func (s *SQLiteStore) ListUsers() ([]User, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []User
 	for rows.Next() {
 		var u User
@@ -227,7 +227,7 @@ func (s *SQLiteStore) ListAudit(skip, limit int) ([]AuditEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []AuditEntry
 	for rows.Next() {
 		var e AuditEntry
@@ -265,7 +265,7 @@ func (s *SQLiteStore) ListAPITokens() ([]APIToken, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []APIToken
 	for rows.Next() {
 		var t APIToken
@@ -318,7 +318,7 @@ func (s *SQLiteStore) ListRegistryCredentials() ([]RegistryCredential, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []RegistryCredential
 	for rows.Next() {
 		var c RegistryCredential
@@ -355,7 +355,7 @@ func (s *SQLiteStore) ListTaskEvents(skip, limit int, serviceName string) ([]Tas
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []TaskEvent
 	for rows.Next() {
 		var e TaskEvent
@@ -392,7 +392,7 @@ func (s *SQLiteStore) ListWebhooks() ([]Webhook, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []Webhook
 	for rows.Next() {
 		var w Webhook
@@ -434,7 +434,7 @@ func (s *SQLiteStore) ListGitStacks() ([]GitStack, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []GitStack
 	for rows.Next() {
 		var g GitStack
@@ -477,7 +477,7 @@ func (s *SQLiteStore) ListDeployHooks() ([]DeployHook, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []DeployHook
 	for rows.Next() {
 		var h DeployHook
@@ -494,7 +494,7 @@ func (s *SQLiteStore) ListDeployHooksForService(serviceName string) ([]DeployHoo
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []DeployHook
 	for rows.Next() {
 		var h DeployHook
@@ -538,7 +538,7 @@ func (s *SQLiteStore) ListClusterSamples(since time.Time) ([]ClusterSample, erro
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []ClusterSample
 	for rows.Next() {
 		var cs ClusterSample

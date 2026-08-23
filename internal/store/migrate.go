@@ -46,7 +46,7 @@ func migrateFS(db *sql.DB, fsys fs.FS, root string) error {
 	for rows.Next() {
 		var v int
 		if err := rows.Scan(&v); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return fmt.Errorf("read schema_migrations: %w", err)
 		}
 		applied[v] = true
@@ -54,7 +54,7 @@ func migrateFS(db *sql.DB, fsys fs.FS, root string) error {
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("read schema_migrations: %w", err)
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	entries, err := fs.ReadDir(fsys, root)
 	if err != nil {
@@ -82,11 +82,11 @@ func migrateFS(db *sql.DB, fsys fs.FS, root string) error {
 			return fmt.Errorf("begin migration %s: %w", name, err)
 		}
 		if _, err := tx.Exec(string(script)); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return fmt.Errorf("apply migration %s: %w", name, err)
 		}
 		if _, err := tx.Exec(`INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)`, version, time.Now()); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return fmt.Errorf("record migration %s: %w", name, err)
 		}
 		if err := tx.Commit(); err != nil {
