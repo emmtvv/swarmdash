@@ -49,7 +49,7 @@ jobs:
 
       - uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.5.0
+          version: v2.14.0
 
   # Informational only (see the job comment below) - a red run here should
   # prompt a look, not block merges, since as of this writing both flagged
