@@ -26,24 +26,15 @@ func TestImageTag(t *testing.T) {
 	}
 }
 
-func TestSortedEnv(t *testing.T) {
-	t.Run("nil container spec", func(t *testing.T) {
-		spec := swarm.ServiceSpec{}
-		if got := sortedEnv(spec); got != "" {
-			t.Errorf("sortedEnv() = %q, want empty", got)
-		}
-	})
-
-	t.Run("sorts regardless of input order", func(t *testing.T) {
-		a := specWithEnv([]string{"B=2", "A=1"})
-		b := specWithEnv([]string{"A=1", "B=2"})
-		if sortedEnv(a) != sortedEnv(b) {
-			t.Errorf("sortedEnv differs for reordered but equal env: %q vs %q", sortedEnv(a), sortedEnv(b))
-		}
-		if want := "A=1,B=2"; sortedEnv(a) != want {
-			t.Errorf("sortedEnv() = %q, want %q", sortedEnv(a), want)
-		}
-	})
+func TestSortedJoin(t *testing.T) {
+	if got := sortedJoin([]string{"B=2", "A=1"}); got != "A=1, B=2" {
+		t.Errorf("sortedJoin() = %q", got)
+	}
+	in := []string{"b", "a"}
+	sortedJoin(in)
+	if in[0] != "b" {
+		t.Error("sortedJoin must not reorder its input")
+	}
 }
 
 func TestReplicasOf(t *testing.T) {
@@ -88,7 +79,7 @@ func TestMountsOf(t *testing.T) {
 			},
 		}
 		got := mountsOf(spec)
-		want := []string{"data:/var/data", "/host/logs:/logs"}
+		want := []string{":data:/var/data", ":/host/logs:/logs"}
 		if len(got) != len(want) {
 			t.Fatalf("mountsOf() = %v, want %v", got, want)
 		}
@@ -133,7 +124,7 @@ func TestDiffServiceSpec(t *testing.T) {
 	t.Run("no changes", func(t *testing.T) {
 		old := baseSpec()
 		new := baseSpec()
-		got := diffServiceSpec(old, new)
+		got := diffServiceSpec(old, new, nil)
 		if len(got) != 0 {
 			t.Fatalf("diffServiceSpec() = %v, want no changes", got)
 		}
@@ -143,7 +134,7 @@ func TestDiffServiceSpec(t *testing.T) {
 		old := baseSpec()
 		new := baseSpec()
 		new.TaskTemplate.ContainerSpec.Image = "nginx:1.27"
-		got := diffServiceSpec(old, new)
+		got := diffServiceSpec(old, new, nil)
 		want := "image: nginx:1.26 -> nginx:1.27"
 		assertContains(t, got, want)
 	})
@@ -152,7 +143,7 @@ func TestDiffServiceSpec(t *testing.T) {
 		old := baseSpec()
 		old.TaskTemplate.ContainerSpec.Image = "nginx:1.26@sha256:deadbeef"
 		new := baseSpec()
-		got := diffServiceSpec(old, new)
+		got := diffServiceSpec(old, new, nil)
 		for _, c := range got {
 			if len(c) >= 5 && c[:5] == "image" {
 				t.Fatalf("unexpected image change for digest-pinned equal tag: %v", got)
@@ -164,7 +155,7 @@ func TestDiffServiceSpec(t *testing.T) {
 		old := baseSpec()
 		new := baseSpec()
 		new.TaskTemplate.ContainerSpec.Env = []string{"FOO=different"}
-		got := diffServiceSpec(old, new)
+		got := diffServiceSpec(old, new, nil)
 		assertContains(t, got, "environment changed")
 	})
 
@@ -173,24 +164,64 @@ func TestDiffServiceSpec(t *testing.T) {
 		new := baseSpec()
 		n := uint64(9)
 		new.Mode.Replicated.Replicas = &n
-		got := diffServiceSpec(old, new)
+		got := diffServiceSpec(old, new, nil)
 		assertContains(t, got, "replicas: 2 -> 9")
 	})
 
-	t.Run("mount count change", func(t *testing.T) {
+	t.Run("mount change", func(t *testing.T) {
 		old := baseSpec()
 		new := baseSpec()
 		new.TaskTemplate.ContainerSpec.Mounts = append(new.TaskTemplate.ContainerSpec.Mounts,
-			mount.Mount{Source: "extra", Target: "/extra"})
-		got := diffServiceSpec(old, new)
-		assertContains(t, got, "mounts: 1 -> 2")
+			mount.Mount{Type: mount.TypeVolume, Source: "extra", Target: "/extra"})
+		got := diffServiceSpec(old, new, nil)
+		assertContains(t, got, "mounts: :data:/data -> :data:/data, volume:extra:/extra")
+	})
+
+	t.Run("entrypoint and command", func(t *testing.T) {
+		old := baseSpec()
+		new := baseSpec()
+		new.TaskTemplate.ContainerSpec.Command = []string{"/entry.sh"}
+		new.TaskTemplate.ContainerSpec.Args = []string{"serve"}
+		got := diffServiceSpec(old, new, nil)
+		assertContains(t, got, "entrypoint: none -> /entry.sh")
+		assertContains(t, got, "command: none -> serve")
+	})
+
+	t.Run("networks compare by name even when the live spec holds IDs", func(t *testing.T) {
+		old := baseSpec()
+		old.TaskTemplate.Networks = []swarm.NetworkAttachmentConfig{{Target: "net-id-1"}}
+		new := baseSpec()
+		new.TaskTemplate.Networks = []swarm.NetworkAttachmentConfig{{Target: "app_front"}}
+		if got := diffServiceSpec(old, new, map[string]string{"net-id-1": "app_front"}); len(got) != 0 {
+			t.Fatalf("diffServiceSpec() = %v, want no changes", got)
+		}
+		new.TaskTemplate.Networks = []swarm.NetworkAttachmentConfig{{Target: "app_back"}}
+		got := diffServiceSpec(old, new, map[string]string{"net-id-1": "app_front"})
+		assertContains(t, got, "networks: app_front -> app_back")
+	})
+
+	t.Run("secret switched to a new version", func(t *testing.T) {
+		old := baseSpec()
+		old.TaskTemplate.ContainerSpec.Secrets = []*swarm.SecretReference{{SecretName: "pw", File: &swarm.SecretReferenceFileTarget{Name: "pw"}}}
+		new := baseSpec()
+		new.TaskTemplate.ContainerSpec.Secrets = []*swarm.SecretReference{{SecretName: "pw_v2", File: &swarm.SecretReferenceFileTarget{Name: "pw"}}}
+		got := diffServiceSpec(old, new, nil)
+		assertContains(t, got, "secrets: pw->pw -> pw_v2->pw")
+	})
+
+	t.Run("ports", func(t *testing.T) {
+		old := baseSpec()
+		new := baseSpec()
+		new.EndpointSpec = &swarm.EndpointSpec{Ports: []swarm.PortConfig{{PublishedPort: 80, TargetPort: 8080, PublishMode: swarm.PortConfigPublishModeHost}}}
+		got := diffServiceSpec(old, new, nil)
+		assertContains(t, got, "ports: none -> 80:8080/tcp@host")
 	})
 
 	t.Run("resources change", func(t *testing.T) {
 		old := baseSpec()
 		new := baseSpec()
 		new.TaskTemplate.Resources.Limits = &swarm.Limit{NanoCPUs: 2_000_000_000, MemoryBytes: 1073741824}
-		got := diffServiceSpec(old, new)
+		got := diffServiceSpec(old, new, nil)
 		wantOld := resourceSummary(old)
 		wantNew := resourceSummary(new)
 		assertContains(t, got, "resources: "+wantOld+" -> "+wantNew)
@@ -200,17 +231,9 @@ func TestDiffServiceSpec(t *testing.T) {
 		old := swarm.ServiceSpec{TaskTemplate: swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{Image: "x"}}}
 		new := old
 		new.TaskTemplate.Resources = &swarm.ResourceRequirements{Limits: &swarm.Limit{NanoCPUs: 1_000_000_000}}
-		got := diffServiceSpec(old, new)
+		got := diffServiceSpec(old, new, nil)
 		assertContains(t, got, "resources: none -> "+resourceSummary(new))
 	})
-}
-
-func specWithEnv(env []string) swarm.ServiceSpec {
-	return swarm.ServiceSpec{
-		TaskTemplate: swarm.TaskSpec{
-			ContainerSpec: &swarm.ContainerSpec{Env: env},
-		},
-	}
 }
 
 func baseSpec() swarm.ServiceSpec {

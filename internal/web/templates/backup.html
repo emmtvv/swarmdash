@@ -1,11 +1,11 @@
 {{define "backup.html"}}
 <h1>Backup &amp; restore</h1>
-<p class="muted">Exports users, roles, API tokens, webhooks, registry credentials, GitOps stacks and SSO settings as a single JSON file. Audit log and metrics history are intentionally left out - this is a configuration snapshot, not a full database dump.</p>
+<p class="muted">Exports users, roles, API tokens, webhooks, registry credentials, GitOps stacks, stack compose history, saved templates and SSO settings as a single JSON file. Audit log and metrics history are intentionally left out - this is a configuration snapshot, not a full database dump.</p>
 
 {{if .Restored}}
 <div class="card" style="border-color:var(--green);">
 	<h2 style="margin-top:0;">Restore complete</h2>
-	<p>Merged {{.RestoredUsers}} user(s) and {{.RestoredTokens}} API token(s), plus webhooks/registries/GitOps stacks/SSO config from the uploaded file. Existing records not present in the file were left untouched.</p>
+	<p>Merged {{.RestoredUsers}} user(s) and {{.RestoredTokens}} API token(s), plus webhooks/registries/GitOps stacks/stack history/templates/SSO config from the uploaded file. Existing records not present in the file were left untouched.</p>
 	{{if .Warnings}}
 	<div class="error-box">
 		<strong>Some encrypted fields could not be decrypted:</strong>
@@ -28,6 +28,8 @@
 			<tr><td>Registry credentials</td><td class="mono">{{.RegistryCount}}</td></tr>
 			<tr><td>GitOps stacks</td><td class="mono">{{.GitStackCount}}</td></tr>
 			<tr><td>Deploy hooks</td><td class="mono">{{.DeployHookCount}}</td></tr>
+			<tr><td>Stack compose versions</td><td class="mono">{{.StackVersionCount}}</td></tr>
+			<tr><td>Saved templates</td><td class="mono">{{.StackTemplateCount}}</td></tr>
 			<tr><td>SSO configured</td><td class="mono">{{if .HasSSO}}yes{{else}}no{{end}}</td></tr>
 		</tbody>
 	</table>
@@ -36,7 +38,7 @@
 
 <div class="card">
 	<h2 style="margin-top:0;">Restore from backup</h2>
-	<p class="muted">Merges the uploaded file into the current store: records are created or overwritten by ID, nothing already present is deleted. Encrypted fields (registry passwords, GitOps access tokens, the SSO client secret) only decrypt successfully if this instance uses the same <span class="mono">--cluster-secret</span> the backup was taken with.</p>
+	<p class="muted">Merges the uploaded file into the current store: records are created or overwritten by ID, nothing already present is deleted. Encrypted fields (registry passwords, GitOps access tokens, stack deploy variables, the SSO client secret) only decrypt successfully if this instance uses the same <span class="mono">--cluster-secret</span> the backup was taken with.</p>
 	<form method="post" action="/settings/backup/restore" enctype="multipart/form-data" data-confirm="Restore users and settings from this backup file? Existing records with the same ID will be overwritten.">
 		<div class="file-picker">
 			<input type="file" name="file" id="restore-file" accept="application/json" required>

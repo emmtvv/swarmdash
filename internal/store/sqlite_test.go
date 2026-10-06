@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -298,8 +299,8 @@ func TestMigrateIsIdempotentAndForwardOnly(t *testing.T) {
 		versions = append(versions, v)
 	}
 	_ = rows.Close()
-	if len(versions) != 4 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 || versions[3] != 4 {
-		t.Fatalf("schema_migrations = %v, want [1 2 3 4]", versions)
+	if len(versions) != 5 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 || versions[3] != 4 || versions[4] != 5 {
+		t.Fatalf("schema_migrations = %v, want [1 2 3 4 5]", versions)
 	}
 
 	// Running migrate again against an already-migrated DB must not
@@ -405,5 +406,87 @@ func TestMigrationVersion(t *testing.T) {
 		if err != nil || got != c.want {
 			t.Errorf("migrationVersion(%q) = %d, %v; want %d, nil", c.name, got, err, c.want)
 		}
+	}
+}
+
+func TestSQLiteStoreStackVersions(t *testing.T) {
+	s := openTestSQLite(t)
+	now := time.Now().UTC().Truncate(time.Second)
+
+	for i := 1; i <= 5; i++ {
+		v := StackVersion{ID: fmt.Sprintf("a%d", i), StackName: "app", Version: i, Compose: fmt.Sprintf("v%d", i), Source: "ui", CreatedAt: now}
+		if i == 5 {
+			v.VarsEnc = []byte{1, 2, 3}
+		}
+		if err := s.PutStackVersion(v); err != nil {
+			t.Fatalf("PutStackVersion: %v", err)
+		}
+	}
+	if err := s.PutStackVersion(StackVersion{ID: "b1", StackName: "other", Version: 1, Compose: "x", CreatedAt: now}); err != nil {
+		t.Fatalf("PutStackVersion: %v", err)
+	}
+
+	list, err := s.ListStackVersions("app")
+	if err != nil {
+		t.Fatalf("ListStackVersions: %v", err)
+	}
+	if len(list) != 5 || list[0].Version != 5 || list[4].Version != 1 {
+		t.Fatalf("ListStackVersions(app) = %+v, want 5..1", list)
+	}
+	if string(list[0].VarsEnc) != "\x01\x02\x03" || list[1].VarsEnc != nil {
+		t.Errorf("VarsEnc round trip: %v / %v", list[0].VarsEnc, list[1].VarsEnc)
+	}
+	all, _ := s.ListStackVersions("")
+	if len(all) != 6 {
+		t.Errorf("ListStackVersions(\"\") = %d entries, want 6", len(all))
+	}
+
+	got, err := s.GetStackVersion("a3")
+	if err != nil || got.Compose != "v3" {
+		t.Fatalf("GetStackVersion = %+v, %v", got, err)
+	}
+	if _, err := s.GetStackVersion("missing"); err != ErrNotFound {
+		t.Errorf("GetStackVersion(missing) err = %v, want ErrNotFound", err)
+	}
+
+	if err := s.PruneStackVersions("app", 2); err != nil {
+		t.Fatalf("PruneStackVersions: %v", err)
+	}
+	list, _ = s.ListStackVersions("app")
+	if len(list) != 2 || list[0].Version != 5 || list[1].Version != 4 {
+		t.Fatalf("after prune = %+v, want versions 5 and 4", list)
+	}
+	if other, _ := s.ListStackVersions("other"); len(other) != 1 {
+		t.Errorf("prune touched another stack: %+v", other)
+	}
+}
+
+func TestSQLiteStoreStackTemplates(t *testing.T) {
+	s := openTestSQLite(t)
+	now := time.Now().UTC().Truncate(time.Second)
+	for _, tpl := range []StackTemplate{
+		{ID: "t2", Name: "zeta", Compose: "services: {}", CreatedAt: now},
+		{ID: "t1", Name: "alpha", Description: "d", Compose: "services: {}", CreatedAt: now},
+	} {
+		if err := s.PutStackTemplate(tpl); err != nil {
+			t.Fatalf("PutStackTemplate: %v", err)
+		}
+	}
+	list, err := s.ListStackTemplates()
+	if err != nil || len(list) != 2 || list[0].Name != "alpha" {
+		t.Fatalf("ListStackTemplates = %+v, %v (want sorted by name)", list, err)
+	}
+	if err := s.PutStackTemplate(StackTemplate{ID: "t1", Name: "alpha", Description: "updated", Compose: "x", CreatedAt: now}); err != nil {
+		t.Fatalf("PutStackTemplate upsert: %v", err)
+	}
+	got, err := s.GetStackTemplate("t1")
+	if err != nil || got.Description != "updated" {
+		t.Fatalf("GetStackTemplate = %+v, %v", got, err)
+	}
+	if err := s.DeleteStackTemplate("t1"); err != nil {
+		t.Fatalf("DeleteStackTemplate: %v", err)
+	}
+	if _, err := s.GetStackTemplate("t1"); err != ErrNotFound {
+		t.Errorf("after delete err = %v, want ErrNotFound", err)
 	}
 }

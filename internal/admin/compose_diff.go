@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/swarm"
 
 	"swarmdash/internal/compose"
@@ -13,39 +14,35 @@ import (
 
 type serviceDiff struct {
 	Name    string
-	Action  string // "create", "update", "unchanged"
+	Action  string // "create", "update", "unchanged", or "orphan" (in the stack, not in the file)
 	Changes []string
 }
 
 // previewCompose computes what applyCompose would do without touching
 // anything, by building the same target specs and diffing them against
-// whatever's currently deployed.
+// whatever's currently deployed. Services the stack has but the file no
+// longer defines come back as "orphan" - removed only if the deploy is
+// submitted with prune.
 func (s *Server) previewCompose(ctx context.Context, stackName string, file *compose.File) ([]serviceDiff, error) {
-	netNameFor, err := s.ensureComposeNetworksDryRun(ctx, stackName, file.Networks)
-	if err != nil {
-		return nil, err
-	}
-	secretRefs, err := s.resolveExternalSecrets(ctx, file.Secrets)
-	if err != nil {
-		return nil, err
-	}
-	configRefs, err := s.resolveExternalConfigs(ctx, file.Configs)
+	env, err := s.resolveCompose(ctx, stackName, file, true)
 	if err != nil {
 		return nil, err
 	}
 
-	names := make([]string, 0, len(file.Services))
-	for name := range file.Services {
-		names = append(names, name)
+	// A created service's network attachments name networks by ID; map
+	// them back so they compare against the names the file resolves to.
+	netNames := map[string]string{}
+	if nets, err := s.docker.NetworkList(ctx, network.ListOptions{}); err == nil {
+		for _, n := range nets {
+			netNames[n.ID] = n.Name
+		}
 	}
-	sort.Strings(names)
 
 	var diffs []serviceDiff
-	for _, svcName := range names {
-		svcDef := file.Services[svcName]
+	for _, svcName := range sortedServiceNames(file) {
 		fullName := stackName + "_" + svcName
 
-		newSpec, err := buildServiceSpec(fullName, stackName, svcDef, netNameFor, secretRefs, configRefs)
+		newSpec, err := buildServiceSpec(fullName, file.Services[svcName], env)
 		if err != nil {
 			return nil, fmt.Errorf("service %q: %w", svcName, err)
 		}
@@ -56,87 +53,105 @@ func (s *Server) previewCompose(ctx context.Context, stackName string, file *com
 			continue
 		}
 
-		changes := diffServiceSpec(existing.Spec, newSpec)
+		changes := diffServiceSpec(existing.Spec, newSpec, netNames)
 		action := "unchanged"
 		if len(changes) > 0 {
 			action = "update"
 		}
 		diffs = append(diffs, serviceDiff{Name: svcName, Action: action, Changes: changes})
 	}
+
+	orphans, err := s.orphanedStackServices(ctx, stackName, file)
+	if err != nil {
+		return nil, err
+	}
+	for _, svc := range orphans {
+		diffs = append(diffs, serviceDiff{
+			Name:    strings.TrimPrefix(svc.Spec.Name, stackName+"_"),
+			Action:  "orphan",
+			Changes: []string{"no longer in the file - removed only with \"Remove services not in the file\""},
+		})
+	}
 	return diffs, nil
 }
 
-// ensureComposeNetworksDryRun mirrors ensureComposeNetworks's name
-// resolution but never creates anything - a preview must not have side
-// effects.
-func (s *Server) ensureComposeNetworksDryRun(ctx context.Context, stackName string, defs map[string]compose.NetworkDef) (map[string]string, error) {
-	out := map[string]string{}
-	for key, def := range defs {
-		if def.External {
-			name := def.Name
-			if name == "" {
-				name = key
-			}
-			out[key] = name
-			continue
-		}
-		out[key] = stackName + "_" + key
-	}
-	return out, nil
-}
-
-func diffServiceSpec(old, new swarm.ServiceSpec) []string {
+// diffServiceSpec lists human-readable differences between a running
+// service's spec and a freshly-built target spec. It deliberately compares
+// normalized summaries rather than the raw structs: the daemon fills in
+// defaults (digest-pinned images, network IDs, platform placement, ...)
+// that would otherwise show up as spurious changes on every preview.
+func diffServiceSpec(old, new swarm.ServiceSpec, netNames map[string]string) []string {
 	var changes []string
+	add := func(label, o, n string) {
+		if o == n {
+			return
+		}
+		if len(o) > 60 || len(n) > 60 {
+			changes = append(changes, label+" changed")
+			return
+		}
+		changes = append(changes, fmt.Sprintf("%s: %s -> %s", label, orDefault(o, "none"), orDefault(n, "none")))
+	}
 
-	oldImage := ""
-	if old.TaskTemplate.ContainerSpec != nil {
-		oldImage = old.TaskTemplate.ContainerSpec.Image
-	}
-	newImage := ""
-	if new.TaskTemplate.ContainerSpec != nil {
-		newImage = new.TaskTemplate.ContainerSpec.Image
-	}
+	oc, nc := containerSpecOf(old), containerSpecOf(new)
 	// The running service's image is digest-pinned by the daemon
 	// (QueryRegistry resolves "nginx:alpine" to "nginx:alpine@sha256:...")
 	// once it's actually applied, but the freshly-built target spec here
 	// never is - that resolution only happens inside ServiceUpdate/Create
 	// itself. Compare on the tag as written so an unpinned compose image
 	// that already matches doesn't show up as a spurious change.
-	if imageTag(oldImage) != imageTag(newImage) {
-		changes = append(changes, fmt.Sprintf("image: %s -> %s", oldImage, newImage))
-	}
-
-	if oldEnv, newEnv := sortedEnv(old), sortedEnv(new); oldEnv != newEnv {
+	add("image", imageTag(oc.Image), imageTag(nc.Image))
+	add("entrypoint", strings.Join(oc.Command, " "), strings.Join(nc.Command, " "))
+	add("command", strings.Join(oc.Args, " "), strings.Join(nc.Args, " "))
+	if sortedJoin(oc.Env) != sortedJoin(nc.Env) {
 		changes = append(changes, "environment changed")
 	}
-
-	oldReplicas, newReplicas := replicasOf(old), replicasOf(new)
-	if oldReplicas != newReplicas {
-		changes = append(changes, fmt.Sprintf("replicas: %d -> %d", oldReplicas, newReplicas))
+	if joinKVSorted(oc.Labels) != joinKVSorted(nc.Labels) {
+		changes = append(changes, "container labels changed")
 	}
-
-	oldMounts := len(mountsOf(old))
-	newMounts := len(mountsOf(new))
-	if oldMounts != newMounts {
-		changes = append(changes, fmt.Sprintf("mounts: %d -> %d", oldMounts, newMounts))
+	if joinKVSorted(old.Labels) != joinKVSorted(new.Labels) {
+		changes = append(changes, "service labels changed")
 	}
-
-	oldRes := resourceSummary(old)
-	newRes := resourceSummary(new)
-	if oldRes != newRes {
-		changes = append(changes, fmt.Sprintf("resources: %s -> %s", orDefault(oldRes, "none"), orDefault(newRes, "none")))
-	}
-
+	add("user", oc.User, nc.User)
+	add("working_dir", oc.Dir, nc.Dir)
+	add("replicas", modeSummary(old), modeSummary(new))
+	add("mounts", sortedJoin(mountsOf(old)), sortedJoin(mountsOf(new)))
+	add("ports", portsSummary(old), portsSummary(new))
+	add("networks", sortedJoin(networksOf(old, netNames)), sortedJoin(networksOf(new, netNames)))
+	add("secrets", sortedJoin(secretsOf(oc)), sortedJoin(secretsOf(nc)))
+	add("configs", sortedJoin(configsOf(oc)), sortedJoin(configsOf(nc)))
+	add("healthcheck", healthSummary(oc), healthSummary(nc))
+	add("resources", resourceSummary(old), resourceSummary(new))
+	add("constraints", sortedJoin(constraintsOf(old)), sortedJoin(constraintsOf(new)))
 	return changes
 }
 
-func sortedEnv(spec swarm.ServiceSpec) string {
+func containerSpecOf(spec swarm.ServiceSpec) swarm.ContainerSpec {
 	if spec.TaskTemplate.ContainerSpec == nil {
-		return ""
+		return swarm.ContainerSpec{}
 	}
-	env := append([]string{}, spec.TaskTemplate.ContainerSpec.Env...)
-	sort.Strings(env)
-	return strings.Join(env, ",")
+	return *spec.TaskTemplate.ContainerSpec
+}
+
+func sortedJoin(list []string) string {
+	cp := append([]string{}, list...)
+	sort.Strings(cp)
+	return strings.Join(cp, ", ")
+}
+
+func joinKVSorted(m map[string]string) string {
+	var out []string
+	for _, k := range sortedKeys(m) {
+		out = append(out, k+"="+m[k])
+	}
+	return strings.Join(out, ",")
+}
+
+func modeSummary(spec swarm.ServiceSpec) string {
+	if spec.Mode.Global != nil {
+		return "global"
+	}
+	return fmt.Sprintf("%d", replicasOf(spec))
 }
 
 func replicasOf(spec swarm.ServiceSpec) uint64 {
@@ -147,14 +162,81 @@ func replicasOf(spec swarm.ServiceSpec) uint64 {
 }
 
 func mountsOf(spec swarm.ServiceSpec) []string {
-	if spec.TaskTemplate.ContainerSpec == nil {
-		return nil
-	}
 	var out []string
-	for _, m := range spec.TaskTemplate.ContainerSpec.Mounts {
-		out = append(out, m.Source+":"+m.Target)
+	for _, m := range containerSpecOf(spec).Mounts {
+		entry := string(m.Type) + ":" + m.Source + ":" + m.Target
+		if m.ReadOnly {
+			entry += ":ro"
+		}
+		out = append(out, entry)
 	}
 	return out
+}
+
+func portsSummary(spec swarm.ServiceSpec) string {
+	if spec.EndpointSpec == nil {
+		return ""
+	}
+	var out []string
+	for _, p := range spec.EndpointSpec.Ports {
+		entry := fmt.Sprintf("%d:%d/%s", p.PublishedPort, p.TargetPort, orDefault(string(p.Protocol), "tcp"))
+		if p.PublishMode == swarm.PortConfigPublishModeHost {
+			entry += "@host"
+		}
+		out = append(out, entry)
+	}
+	return sortedJoin(out)
+}
+
+func networksOf(spec swarm.ServiceSpec, netNames map[string]string) []string {
+	var out []string
+	for _, na := range spec.TaskTemplate.Networks {
+		name := na.Target
+		if n, ok := netNames[name]; ok {
+			name = n
+		}
+		out = append(out, name)
+	}
+	return out
+}
+
+func secretsOf(cs swarm.ContainerSpec) []string {
+	var out []string
+	for _, sr := range cs.Secrets {
+		target := ""
+		if sr.File != nil {
+			target = sr.File.Name
+		}
+		out = append(out, sr.SecretName+"->"+target)
+	}
+	return out
+}
+
+func configsOf(cs swarm.ContainerSpec) []string {
+	var out []string
+	for _, cr := range cs.Configs {
+		target := ""
+		if cr.File != nil {
+			target = cr.File.Name
+		}
+		out = append(out, cr.ConfigName+"->"+target)
+	}
+	return out
+}
+
+func healthSummary(cs swarm.ContainerSpec) string {
+	hc := cs.Healthcheck
+	if hc == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s every %s", strings.Join(hc.Test, " "), hc.Interval)
+}
+
+func constraintsOf(spec swarm.ServiceSpec) []string {
+	if spec.TaskTemplate.Placement == nil {
+		return nil
+	}
+	return spec.TaskTemplate.Placement.Constraints
 }
 
 func resourceSummary(spec swarm.ServiceSpec) string {
@@ -162,6 +244,9 @@ func resourceSummary(spec swarm.ServiceSpec) string {
 		return ""
 	}
 	l := spec.TaskTemplate.Resources.Limits
+	if l.NanoCPUs == 0 && l.MemoryBytes == 0 {
+		return ""
+	}
 	return fmt.Sprintf("cpu=%s mem=%s", cpusToString(l.NanoCPUs), bytesToString(l.MemoryBytes))
 }
 

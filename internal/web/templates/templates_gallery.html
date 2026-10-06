@@ -1,6 +1,25 @@
 {{define "templates_gallery.html"}}
 <h1>Templates</h1>
-<p class="muted">Built-in compose templates for common self-hosted services. "Use template" pre-fills the deploy form - review and edit (especially placeholder passwords) before deploying.</p>
+<p class="muted">Compose templates for common self-hosted services, plus your own (saved with "Save as template" on the deploy form). "Use template" pre-fills the deploy form - review and edit (especially placeholder passwords) before deploying.</p>
+
+{{if .Custom}}
+<h2>Your templates</h2>
+<div class="grid">
+	{{range .Custom}}
+	<div class="stat-card" style="text-align:left;">
+		<div class="l" style="font-weight:600;font-size:1.05em;">{{.Name}}</div>
+		<p class="muted" style="margin:8px 0 12px;">{{if .Description}}{{.Description}}{{else}}Saved by {{.CreatedBy}} {{ago .CreatedAt}}.{{end}}</p>
+		<div class="card-row">
+			<a href="/stacks/deploy?template={{.ID}}" class="btn secondary small">Use template</a>
+			<form class="inline" method="post" action="/stacks/templates/{{.ID}}/delete" data-confirm="Delete template {{.Name}}?">
+				<button type="submit" class="btn danger small">Delete</button>
+			</form>
+		</div>
+	</div>
+	{{end}}
+</div>
+<h2>Built-in</h2>
+{{end}}
 
 <div class="grid">
 	{{range .Templates}}

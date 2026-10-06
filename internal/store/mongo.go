@@ -25,8 +25,8 @@ type MongoStore struct {
 
 // Config for the collections used below:
 //   - users, sessions, api_tokens, registry_credentials, webhooks,
-//     gitops_stacks, deploy_hooks are keyed by their natural string ID
-//     (_id), so Put is a straight upsert.
+//     gitops_stacks, deploy_hooks, stack_versions, stack_templates are
+//     keyed by their natural string ID (_id), so Put is a straight upsert.
 //   - audit_log, task_events, cluster_samples are append-only logs; each
 //     gets an auto-incrementing "seq" (via the counters collection) so
 //     ordering/pagination matches the old bbolt-backed behavior.
@@ -83,6 +83,7 @@ func (m *MongoStore) ensureIndexes(ctx context.Context) error {
 		{"deploy_hooks", "hash"},
 		{"deploy_hooks", "service_name"},
 		{"task_events", "service_name"},
+		{"stack_versions", "stack_name"},
 	} {
 		if _, err := m.col(idx.collection).Indexes().CreateOne(ctx, mongo.IndexModel{
 			Keys: bson.D{{Key: idx.key, Value: 1}},
@@ -590,4 +591,95 @@ func (m *MongoStore) Ping() error {
 	ctx, cancel := ctxTimeout()
 	defer cancel()
 	return m.client.Ping(ctx, nil)
+}
+
+func (m *MongoStore) PutStackVersion(v StackVersion) error {
+	ctx, cancel := ctxTimeout()
+	defer cancel()
+	_, err := m.col("stack_versions").ReplaceOne(ctx, bson.M{"_id": v.ID}, v, options.Replace().SetUpsert(true))
+	return err
+}
+
+func (m *MongoStore) ListStackVersions(stackName string) ([]StackVersion, error) {
+	ctx, cancel := ctxTimeout()
+	defer cancel()
+	filter := bson.M{}
+	if stackName != "" {
+		filter["stack_name"] = stackName
+	}
+	cur, err := m.col("stack_versions").Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "stack_name", Value: 1}, {Key: "version", Value: -1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var out []StackVersion
+	err = cur.All(ctx, &out)
+	return out, err
+}
+
+func (m *MongoStore) GetStackVersion(id string) (StackVersion, error) {
+	ctx, cancel := ctxTimeout()
+	defer cancel()
+	var v StackVersion
+	err := m.col("stack_versions").FindOne(ctx, bson.M{"_id": id}).Decode(&v)
+	return v, notFound(err)
+}
+
+func (m *MongoStore) PruneStackVersions(stackName string, keep int) error {
+	ctx, cancel := ctxTimeout()
+	defer cancel()
+	// Find the version number of the oldest one to keep, then delete
+	// everything older - Mongo has no DELETE ... LIMIT/OFFSET.
+	cur, err := m.col("stack_versions").Find(ctx, bson.M{"stack_name": stackName},
+		options.Find().SetSort(bson.D{{Key: "version", Value: -1}}).SetSkip(int64(keep-1)).SetLimit(1).SetProjection(bson.M{"version": 1}))
+	if err != nil {
+		return err
+	}
+	defer cur.Close(ctx)
+	if !cur.Next(ctx) {
+		return cur.Err()
+	}
+	var cutoff struct {
+		Version int `bson:"version"`
+	}
+	if err := cur.Decode(&cutoff); err != nil {
+		return err
+	}
+	_, err = m.col("stack_versions").DeleteMany(ctx, bson.M{"stack_name": stackName, "version": bson.M{"$lt": cutoff.Version}})
+	return err
+}
+
+func (m *MongoStore) PutStackTemplate(t StackTemplate) error {
+	ctx, cancel := ctxTimeout()
+	defer cancel()
+	_, err := m.col("stack_templates").ReplaceOne(ctx, bson.M{"_id": t.ID}, t, options.Replace().SetUpsert(true))
+	return err
+}
+
+func (m *MongoStore) ListStackTemplates() ([]StackTemplate, error) {
+	ctx, cancel := ctxTimeout()
+	defer cancel()
+	cur, err := m.col("stack_templates").Find(ctx, bson.M{}, options.Find().SetSort(bson.D{{Key: "name", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var out []StackTemplate
+	err = cur.All(ctx, &out)
+	return out, err
+}
+
+func (m *MongoStore) GetStackTemplate(id string) (StackTemplate, error) {
+	ctx, cancel := ctxTimeout()
+	defer cancel()
+	var t StackTemplate
+	err := m.col("stack_templates").FindOne(ctx, bson.M{"_id": id}).Decode(&t)
+	return t, notFound(err)
+}
+
+func (m *MongoStore) DeleteStackTemplate(id string) error {
+	ctx, cancel := ctxTimeout()
+	defer cancel()
+	_, err := m.col("stack_templates").DeleteOne(ctx, bson.M{"_id": id})
+	return err
 }

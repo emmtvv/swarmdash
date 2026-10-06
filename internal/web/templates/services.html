@@ -1,5 +1,8 @@
 {{define "services.html"}}
-<h1>Services</h1>
+<div class="page-header">
+	<h1>Services</h1>
+	<a href="/services/new" class="btn">New service</a>
+</div>
 <form method="post" action="/services/bulk" id="bulk-form" data-confirm="Apply {value} to the selected services?" data-confirm-field="action">
 	<div class="card-row" style="margin-bottom:8px;">
 		<select name="action">

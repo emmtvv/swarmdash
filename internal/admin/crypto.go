@@ -76,12 +76,12 @@ func decryptWithKey(key []byte, ciphertext []byte) (string, error) {
 
 // RotateClusterSecret re-encrypts every value at rest that was encrypted
 // with the old cluster secret's derived key (registry passwords, GitOps
-// auth tokens, the SSO client secret) so it can be decrypted with the new
-// one instead - the migration a plain "change the env var and redeploy"
-// can't do on its own, since the encryption key has never been separable
-// from the cluster secret. Callers are responsible for actually rolling
-// the cluster secret out to every admin/agent afterwards; this only
-// touches the store's ciphertext columns.
+// auth tokens, stack deploy variables, the SSO client secret) so it can be
+// decrypted with the new one instead - the migration a plain "change the
+// env var and redeploy" can't do on its own, since the encryption key has
+// never been separable from the cluster secret. Callers are responsible
+// for actually rolling the cluster secret out to every admin/agent
+// afterwards; this only touches the store's ciphertext columns.
 //
 // Not atomic across rows: a failure partway through leaves some rows
 // re-encrypted under newSecret and others still under oldSecret. Safe to
@@ -125,6 +125,24 @@ func RotateClusterSecret(st store.Interface, oldSecret, newSecret string) error 
 		g.AuthTokenEnc = reenc
 		if err := st.PutGitStack(g); err != nil {
 			return fmt.Errorf("save gitops stack %q: %w", g.StackName, err)
+		}
+	}
+
+	versions, err := st.ListStackVersions("")
+	if err != nil {
+		return fmt.Errorf("list stack versions: %w", err)
+	}
+	for _, v := range versions {
+		reenc, changed, err := rotateCiphertext(oldKey, newKey, v.VarsEnc)
+		if err != nil {
+			return fmt.Errorf("stack %q version %d: %w", v.StackName, v.Version, err)
+		}
+		if !changed {
+			continue
+		}
+		v.VarsEnc = reenc
+		if err := st.PutStackVersion(v); err != nil {
+			return fmt.Errorf("save stack %q version %d: %w", v.StackName, v.Version, err)
 		}
 	}
 

@@ -1,8 +1,24 @@
 {{define "stack_deploy.html"}}
+{{if .Editing}}
+<div class="breadcrumb"><a href="/stacks">Stacks</a> / <a href="/stacks/{{.Name}}">{{.Name}}</a> / Edit</div>
+<h1>Edit stack {{.Name}}{{if .LoadedVersion}} <span class="muted" style="font-size:0.6em;font-weight:400;">from v{{.LoadedVersion}}</span>{{end}}</h1>
+{{else}}
 <h1>Deploy stack from compose</h1>
-<p class="muted">Supports a pragmatic subset of the compose format: image, command, environment, labels, ports, volumes (short syntax), networks, deploy.replicas/mode/placement/resources/update_config/restart_policy. Secrets and configs must already exist (create them under Secrets/Configs first) and are referenced with <span class="mono">external: true</span>. No build:, no bind-mount host paths resolved against your local machine.</p>
+{{end}}
+<p class="muted">Supports the compose features that map onto swarm services: image, entrypoint/command, environment, labels, user/working_dir/hostname, healthcheck, logging, ulimits/sysctls/capabilities, ports and volumes (short and long syntax), networks with aliases, secrets/configs with target/uid/gid/mode, and deploy.* (replicas/mode, placement, resources, update/rollback config, restart policy, endpoint_mode). Top-level volumes may set a driver and driver_opts (e.g. NFS); top-level configs may carry inline <span class="mono">content:</span>. Secrets must already exist (Secrets page) and are referenced with <span class="mono">external: true</span>. <span class="mono">${VAR}</span> references are filled from Variables below. Anything else is reported in the preview and ignored.</p>
 
 {{if .Error}}<div class="error-box">{{.Error}}</div>{{end}}
+{{if .Notice}}<div class="notice-box">{{.Notice}}</div>{{end}}
+{{if .GitOpsRepo}}<div class="warn-box">This stack is managed by GitOps (<span class="mono">{{.GitOpsRepo}}</span>) - a manual deploy is overwritten by the next sync that finds a new commit. Change the file in git instead.</div>{{end}}
+
+{{if .Warnings}}
+<div class="warn-box">
+	<strong>Warnings</strong>
+	<ul>
+	{{range .Warnings}}<li>{{.}}</li>{{end}}
+	</ul>
+</div>
+{{end}}
 
 {{if .Diffs}}
 <div class="card">
@@ -16,6 +32,7 @@
 				<td>
 					{{if eq .Action "create"}}<span class="badge state-active">create</span>
 					{{else if eq .Action "update"}}<span class="badge state-pending">update</span>
+					{{else if eq .Action "orphan"}}<span class="badge state-failed">{{if $.Prune}}remove{{else}}not in file{{end}}</span>
 					{{else}}<span class="badge">unchanged</span>{{end}}
 				</td>
 				<td class="muted">{{range .Changes}}{{.}}<br>{{end}}</td>
@@ -33,7 +50,7 @@
 	<label for="compose">Compose YAML</label>
 	<textarea id="compose" name="compose" rows="22" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;" required placeholder="services:
   web:
-    image: nginx:alpine
+    image: nginx:${TAG:-alpine}
     ports:
       - &quot;8080:80&quot;
     deploy:
@@ -43,9 +60,36 @@
           cpus: &quot;0.5&quot;
           memory: 256M">{{.Compose}}</textarea>
 
+	<label for="vars">Variables <span class="muted" style="font-weight:400;">(KEY=value per line, like a .env file - stored encrypted with the stack's history)</span></label>
+	<textarea id="vars" name="vars" rows="4" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;" placeholder="TAG=1.27-alpine">{{.Vars}}</textarea>
+
+	<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:12px;">
+		<input type="checkbox" name="prune" style="width:auto;" {{if .Prune}}checked{{end}}>
+		Remove services not in the file (the stack's other services are deleted; their volumes are kept)
+	</label>
+
 	<div class="card-row" style="margin-top:12px;">
 		<button type="submit" formaction="/stacks/deploy/preview" class="btn secondary">Preview</button>
 		<button type="submit" class="btn">Deploy</button>
 	</div>
+
+	<details class="card" style="margin-top:16px;">
+		<summary style="cursor:pointer;font-weight:600;">Save as template</summary>
+		<p class="muted">Saves the compose file above (not its variables) to Stacks &rarr; Templates. Saving under an existing template's name replaces it.</p>
+		<div class="card-row">
+			<div>
+				<label for="template_name">Template name</label>
+				<input type="text" id="template_name" name="template_name" style="width:240px;">
+			</div>
+			<div style="flex:1 1 300px;">
+				<label for="template_description">Description</label>
+				<input type="text" id="template_description" name="template_description" style="width:100%;">
+			</div>
+			<div>
+				<label>&nbsp;</label>
+				<button type="submit" formaction="/stacks/templates" formnovalidate class="btn secondary">Save template</button>
+			</div>
+		</div>
+	</details>
 </form>
 {{end}}

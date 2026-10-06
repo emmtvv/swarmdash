@@ -1,0 +1,42 @@
+{{define "service_new.html"}}
+<div class="breadcrumb"><a href="/services">Services</a> / New service</div>
+<h1>New service</h1>
+
+{{if .Error}}<div class="error-box">{{.Error}}</div>{{end}}
+
+<form method="post" action="/services">
+	<div class="card">
+		<div class="card-row">
+			<div>
+				<label for="name">Name</label>
+				<input type="text" id="name" name="name" value="{{.Form.Name}}" required pattern="[a-zA-Z0-9][a-zA-Z0-9_.\-]*" style="width:220px;">
+			</div>
+			<div>
+				<label for="stack">Stack (optional)</label>
+				<input type="text" id="stack" name="stack" value="{{.Form.Stack}}" pattern="[a-zA-Z0-9][a-zA-Z0-9_.\-]*" placeholder="none" style="width:180px;">
+			</div>
+			<div style="flex:1 1 280px;">
+				<label for="image">Image</label>
+				<input type="text" id="image" name="image" value="{{.Form.Image}}" required placeholder="nginx:alpine" style="width:100%;font-family:ui-monospace,monospace;">
+			</div>
+			<div>
+				<label for="mode">Mode</label>
+				<select id="mode" name="mode" style="width:130px;">
+					<option value="replicated" {{if eq .Form.Mode "replicated"}}selected{{end}}>replicated</option>
+					<option value="global" {{if eq .Form.Mode "global"}}selected{{end}}>global</option>
+				</select>
+			</div>
+			<div>
+				<label for="replicas">Replicas</label>
+				<input type="number" id="replicas" name="replicas" value="{{.Form.Replicas}}" min="0" style="width:90px;">
+			</div>
+		</div>
+		<p class="muted" style="margin-bottom:0;">With a stack, the service is created as <span class="mono">&lt;stack&gt;_&lt;name&gt;</span> and shows up under that stack. If the stack is deployed from a compose file, the service isn't in that file - a later deploy with "Remove services not in the file" would remove it.</p>
+	</div>
+
+	<div class="card">
+		{{template "service_fields" .Editor}}
+		<button type="submit" class="btn" style="margin-top:16px;">Create service</button>
+	</div>
+</form>
+{{end}}

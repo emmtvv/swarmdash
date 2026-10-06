@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/docker/docker/api/types/mount"
@@ -108,14 +109,14 @@ func TestExportService_Replicated(t *testing.T) {
 	if out.Image != "nginx:alpine" {
 		t.Errorf("Image = %q", out.Image)
 	}
-	wantCommand := []string{"nginx", "-g", "daemon off;"}
-	if len(out.Command) != len(wantCommand) {
-		t.Fatalf("Command = %v, want %v", out.Command, wantCommand)
+	// ContainerSpec.Command is the image ENTRYPOINT override; compose's
+	// command: maps to Args.
+	wantEntrypoint := []string{"nginx", "-g", "daemon off;"}
+	if !reflect.DeepEqual([]string(out.Entrypoint), wantEntrypoint) {
+		t.Errorf("Entrypoint = %v, want %v", out.Entrypoint, wantEntrypoint)
 	}
-	for i, c := range wantCommand {
-		if out.Command[i] != c {
-			t.Errorf("Command[%d] = %q, want %q", i, out.Command[i], c)
-		}
+	if len(out.Command) != 0 {
+		t.Errorf("Command = %v, want none", out.Command)
 	}
 	if out.Environment["FOO"] != "bar" || out.Environment["BAZ"] != "qux" {
 		t.Errorf("Environment = %v", out.Environment)
@@ -124,41 +125,28 @@ func TestExportService_Replicated(t *testing.T) {
 		t.Errorf("Labels = %v", out.Labels)
 	}
 
-	wantVolumes := []string{"data:/var/www:ro", "/host/cache:/cache"}
-	if len(out.Volumes) != len(wantVolumes) {
-		t.Fatalf("Volumes = %v, want %v", out.Volumes, wantVolumes)
+	wantVolumes := []compose.VolumeMount{
+		{Type: "volume", Source: "data", Target: "/var/www", ReadOnly: true},
+		{Type: "bind", Source: "/host/cache", Target: "/cache"},
 	}
-	for i, v := range wantVolumes {
-		if out.Volumes[i] != v {
-			t.Errorf("Volumes[%d] = %q, want %q", i, out.Volumes[i], v)
-		}
+	if !reflect.DeepEqual(out.Volumes, wantVolumes) {
+		t.Errorf("Volumes = %+v, want %+v", out.Volumes, wantVolumes)
 	}
 
-	if len(out.Secrets) != 1 || out.Secrets[0] != "db_password" {
+	if len(out.Secrets) != 1 || out.Secrets[0] != (compose.FileRef{Source: "db_password"}) {
 		t.Errorf("Secrets = %v", out.Secrets)
 	}
-	if len(out.Configs) != 1 || out.Configs[0] != "app_config" {
+	if len(out.Configs) != 1 || out.Configs[0] != (compose.FileRef{Source: "app_config"}) {
 		t.Errorf("Configs = %v", out.Configs)
 	}
 
-	wantPorts := []string{"8080:80", "9000:9000/udp"}
-	if len(out.Ports) != len(wantPorts) {
-		t.Fatalf("Ports = %v, want %v", out.Ports, wantPorts)
-	}
-	for i, p := range wantPorts {
-		if out.Ports[i] != p {
-			t.Errorf("Ports[%d] = %q, want %q", i, out.Ports[i], p)
-		}
+	wantPorts := compose.PortList{{Target: 80, Published: 8080}, {Target: 9000, Published: 9000, Protocol: "udp"}}
+	if !reflect.DeepEqual(out.Ports, wantPorts) {
+		t.Errorf("Ports = %v, want %v", out.Ports, wantPorts)
 	}
 
-	wantNetworks := []string{"front", "back"}
-	if len(out.Networks) != len(wantNetworks) {
-		t.Fatalf("Networks = %v, want %v", out.Networks, wantNetworks)
-	}
-	for i, n := range wantNetworks {
-		if out.Networks[i] != n {
-			t.Errorf("Networks[%d] = %q, want %q", i, out.Networks[i], n)
-		}
+	if got := out.Networks.Names(); !reflect.DeepEqual(got, []string{"front", "back"}) {
+		t.Errorf("Networks = %v", got)
 	}
 
 	if out.Deploy.Mode != "" {
@@ -223,7 +211,7 @@ func TestExportService_PortDefaultProtocolOmitted(t *testing.T) {
 		},
 	}
 	out := exportService(svc)
-	if len(out.Ports) != 1 || out.Ports[0] != "80:80" {
+	if len(out.Ports) != 1 || out.Ports[0].String() != "80:80" {
 		t.Errorf("Ports = %v, want [80:80]", out.Ports)
 	}
 }
@@ -232,7 +220,7 @@ func TestExportComposeYAML_RoundTrips(t *testing.T) {
 	svc := fullReplicatedService()
 	exported := exportService(svc)
 
-	data, err := exportComposeYAML(map[string]compose.Service{"web": exported})
+	data, err := exportComposeYAML(&compose.File{Services: map[string]compose.Service{"web": exported}})
 	if err != nil {
 		t.Fatalf("exportComposeYAML: %v", err)
 	}

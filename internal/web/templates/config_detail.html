@@ -1,0 +1,44 @@
+{{define "config_detail.html"}}
+<div class="breadcrumb"><a href="/configs">Configs</a> / {{.Config.Spec.Name}}</div>
+<div class="page-header">
+	<h1 class="mono">{{.Config.Spec.Name}}</h1>
+	<div class="actions">
+		<form class="inline" method="post" action="/configs/{{.Config.ID}}/delete" data-confirm="Delete config {{.Config.Spec.Name}}?{{if .Uses}} {{len .Uses}} service(s) still use it - Docker will refuse.{{end}}">
+			<button type="submit" class="btn danger">Delete</button>
+		</form>
+	</div>
+</div>
+
+{{template "rotation_result" .Result}}
+
+<div class="card">
+	<div class="card-row">
+		<div class="field"><div class="muted">ID</div><div class="mono">{{shortID .Config.ID}}</div></div>
+		<div class="field"><div class="muted">Created</div><div>{{ago .Config.CreatedAt}}</div></div>
+		{{range $k, $v := .Config.Spec.Labels}}<div class="field"><div class="muted">{{$k}}</div><div class="mono">{{$v}}</div></div>{{end}}
+	</div>
+</div>
+
+{{template "file_uses" (dict "Uses" .Uses "Kind" "config")}}
+
+<div class="card">
+	<h2 style="margin-top:0;">Edit</h2>
+	<p class="muted" style="margin-top:0;">Swarm configs are immutable, so saving creates a new config with this content and switches every service above to it, keeping the path it's mounted at - their tasks restart with the new content.</p>
+	{{template "compose_stacks_warning" (dict "ComposeStacks" .ComposeStacks "Kind" "config")}}
+	<form method="post" action="/configs/{{.Config.ID}}/rotate" data-confirm="Create a new config and restart the services using {{.Config.Spec.Name}}?">
+		<label for="data">Content</label>
+		<textarea id="data" name="data" rows="16" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;" required>{{.Content}}</textarea>
+		<div class="card-row" style="margin-top:8px;">
+			<div>
+				<label for="new_name">New config name</label>
+				<input type="text" id="new_name" name="new_name" placeholder="{{.SuggestedName}}" style="width:280px;">
+			</div>
+			<div>
+				<label>&nbsp;</label>
+				<label style="display:flex;align-items:center;gap:8px;font-weight:400;"><input type="checkbox" name="delete_old" style="width:auto;" checked> Delete {{.Config.Spec.Name}} afterwards</label>
+			</div>
+		</div>
+		<button type="submit" class="btn" style="margin-top:12px;">Save as new version</button>
+	</form>
+</div>
+{{end}}

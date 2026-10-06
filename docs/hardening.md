@@ -34,8 +34,8 @@
   code changes - `make cluster-secret` creates the Docker secret, then
   uncomment the matching sections in `deploy/stack.yml` ("Optional:
   cluster secret as a Docker secret").
-- Rotating the cluster secret: registry passwords, GitOps auth tokens, and
-  the SSO client secret are all encrypted at rest with a key derived from
+- Rotating the cluster secret: registry passwords, GitOps auth tokens,
+  stack deploy variables, and the SSO client secret are all encrypted at rest with a key derived from
   `SWARMDASH_CLUSTER_SECRET` (see [../internal/admin/crypto.go](../internal/admin/crypto.go)).
   Changing that value and redeploying, on its own, makes every one of those
   permanently undecryptable — there's nothing to rotate the *encryption*

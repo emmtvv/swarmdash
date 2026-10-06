@@ -46,3 +46,22 @@
   Docker secrets - well beyond what's declared in the service spec
   itself. Only grant "viewer" to people who are trusted with those
   values, the same as anyone with shell access to a node.
+- Compose deploys keep named volumes under their compose key (`data`), not
+  `docker stack deploy`'s `<stack>_data` - swarmdash has always done this,
+  and switching now would point existing services at new, empty volumes.
+  Set `name:` on the top-level volume if you need a specific name.
+- `env_file:` and `file:`-based secrets/configs can't be resolved -
+  swarmdash only ever sees the compose file's own text (pasted, or the one
+  file GitOps fetches). Use `${VAR}` references with the Variables field,
+  inline config `content:`, and pre-created secrets instead. GitOps stacks
+  have no Variables field yet, so only `${VAR:-default}` defaults apply
+  there.
+- Stacks deployed before compose history existed (or with `docker stack
+  deploy` directly) have no stored file; "Edit" starts from a compose file
+  generated from their running services, which covers what swarmdash can
+  express but may drop daemon-level details it can't (e.g. generic
+  resources, credential specs).
+- A config's detail page shows its content and is admin-only: unlike a
+  secret, a config can be read back through the Docker API, and configs
+  routinely carry credentials (htpasswd files, DSNs) - a viewer still sees
+  which services use a config, not what's in it.

@@ -56,6 +56,19 @@ type Interface interface {
 	GetGitStack(id string) (GitStack, error)
 	DeleteGitStack(id string) error
 
+	PutStackVersion(v StackVersion) error
+	// ListStackVersions returns a stack's versions, newest first; an empty
+	// stackName lists every stack's.
+	ListStackVersions(stackName string) ([]StackVersion, error)
+	GetStackVersion(id string) (StackVersion, error)
+	// PruneStackVersions deletes all but the newest keep versions of a stack.
+	PruneStackVersions(stackName string, keep int) error
+
+	PutStackTemplate(t StackTemplate) error
+	ListStackTemplates() ([]StackTemplate, error)
+	GetStackTemplate(id string) (StackTemplate, error)
+	DeleteStackTemplate(id string) error
+
 	PutDeployHook(h DeployHook) error
 	ListDeployHooks() ([]DeployHook, error)
 	ListDeployHooksForService(serviceName string) ([]DeployHook, error)

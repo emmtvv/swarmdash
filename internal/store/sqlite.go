@@ -616,3 +616,109 @@ func (s *SQLiteStore) PutAppSettings(a AppSettings) error {
 		a.ID, a.UpdateCheckDisabled)
 	return err
 }
+
+const stackVersionColumns = `id, stack_name, version, compose, vars_enc, source, note, created_by, created_at`
+
+func scanStackVersion(row interface{ Scan(...any) error }) (StackVersion, error) {
+	var v StackVersion
+	err := row.Scan(&v.ID, &v.StackName, &v.Version, &v.Compose, &v.VarsEnc, &v.Source, &v.Note, &v.CreatedBy, &v.CreatedAt)
+	return v, err
+}
+
+func (s *SQLiteStore) PutStackVersion(v StackVersion) error {
+	_, err := s.db.Exec(`
+		INSERT INTO stack_versions (`+stackVersionColumns+`)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			stack_name = excluded.stack_name,
+			version = excluded.version,
+			compose = excluded.compose,
+			vars_enc = excluded.vars_enc,
+			source = excluded.source,
+			note = excluded.note,
+			created_by = excluded.created_by,
+			created_at = excluded.created_at`,
+		v.ID, v.StackName, v.Version, v.Compose, v.VarsEnc, v.Source, v.Note, v.CreatedBy, v.CreatedAt)
+	return err
+}
+
+func (s *SQLiteStore) ListStackVersions(stackName string) ([]StackVersion, error) {
+	query := `SELECT ` + stackVersionColumns + ` FROM stack_versions`
+	var args []any
+	if stackName != "" {
+		query += ` WHERE stack_name = ?`
+		args = append(args, stackName)
+	}
+	query += ` ORDER BY stack_name, version DESC`
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []StackVersion
+	for rows.Next() {
+		v, err := scanStackVersion(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
+func (s *SQLiteStore) GetStackVersion(id string) (StackVersion, error) {
+	v, err := scanStackVersion(s.db.QueryRow(`SELECT `+stackVersionColumns+` FROM stack_versions WHERE id = ?`, id))
+	return v, notFoundSQL(err)
+}
+
+func (s *SQLiteStore) PruneStackVersions(stackName string, keep int) error {
+	_, err := s.db.Exec(`
+		DELETE FROM stack_versions
+		WHERE stack_name = ? AND id NOT IN (
+			SELECT id FROM stack_versions WHERE stack_name = ? ORDER BY version DESC LIMIT ?
+		)`, stackName, stackName, keep)
+	return err
+}
+
+func (s *SQLiteStore) PutStackTemplate(t StackTemplate) error {
+	_, err := s.db.Exec(`
+		INSERT INTO stack_templates (id, name, description, compose, created_by, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET
+			name = excluded.name,
+			description = excluded.description,
+			compose = excluded.compose,
+			created_by = excluded.created_by,
+			created_at = excluded.created_at`,
+		t.ID, t.Name, t.Description, t.Compose, t.CreatedBy, t.CreatedAt)
+	return err
+}
+
+func (s *SQLiteStore) ListStackTemplates() ([]StackTemplate, error) {
+	rows, err := s.db.Query(`SELECT id, name, description, compose, created_by, created_at FROM stack_templates ORDER BY name`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []StackTemplate
+	for rows.Next() {
+		var t StackTemplate
+		if err := rows.Scan(&t.ID, &t.Name, &t.Description, &t.Compose, &t.CreatedBy, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+func (s *SQLiteStore) GetStackTemplate(id string) (StackTemplate, error) {
+	var t StackTemplate
+	err := s.db.QueryRow(`SELECT id, name, description, compose, created_by, created_at FROM stack_templates WHERE id = ?`, id).
+		Scan(&t.ID, &t.Name, &t.Description, &t.Compose, &t.CreatedBy, &t.CreatedAt)
+	return t, notFoundSQL(err)
+}
+
+func (s *SQLiteStore) DeleteStackTemplate(id string) error {
+	_, err := s.db.Exec(`DELETE FROM stack_templates WHERE id = ?`, id)
+	return err
+}

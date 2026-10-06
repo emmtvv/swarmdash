@@ -35,88 +35,14 @@ func (s *Server) handleServiceUpdateSpec(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "get service: "+err.Error(), http.StatusNotFound)
 		return
 	}
-
-	svc.Spec.TaskTemplate.ContainerSpec.Env = parseLines(r.FormValue("env"))
-	svc.Spec.TaskTemplate.ContainerSpec.Labels = parseKVLines(r.FormValue("labels"))
-	svc.Spec.TaskTemplate.ContainerSpec.Command = parseLines(r.FormValue("entrypoint"))
-	svc.Spec.TaskTemplate.ContainerSpec.Args = parseLines(r.FormValue("command"))
-
-	mounts, err := parseMounts(parseLines(r.FormValue("mounts")))
-	if err != nil {
-		http.Error(w, "invalid mounts: "+err.Error(), http.StatusBadRequest)
+	if svc.Spec.TaskTemplate.ContainerSpec == nil {
+		http.Error(w, "service has no container spec", http.StatusBadRequest)
 		return
 	}
-	svc.Spec.TaskTemplate.ContainerSpec.Mounts = mounts
 
-	networks, err := s.parseNetworkAttachments(ctx, parseLines(r.FormValue("networks")))
-	if err != nil {
+	if err := s.applyEditorForm(ctx, r, &svc.Spec); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	}
-	svc.Spec.TaskTemplate.Networks = networks
-
-	ports, err := parsePorts(parseLines(r.FormValue("ports")))
-	if err != nil {
-		http.Error(w, "invalid ports: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	if len(ports) > 0 {
-		svc.Spec.EndpointSpec = &swarm.EndpointSpec{Ports: ports}
-	} else {
-		svc.Spec.EndpointSpec = nil
-	}
-
-	secretRefs, err := s.parseSecretRefs(ctx, parseLines(r.FormValue("secrets")))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	svc.Spec.TaskTemplate.ContainerSpec.Secrets = secretRefs
-
-	configRefs, err := s.parseConfigRefs(ctx, parseLines(r.FormValue("configs")))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	svc.Spec.TaskTemplate.ContainerSpec.Configs = configRefs
-
-	healthcheck, err := parseHealthcheckForm(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	svc.Spec.TaskTemplate.ContainerSpec.Healthcheck = healthcheck
-
-	constraints := parseLines(r.FormValue("constraints"))
-	preferences := parseLines(r.FormValue("preferences"))
-	if len(constraints) > 0 || len(preferences) > 0 {
-		p := &swarm.Placement{Constraints: constraints}
-		for _, descriptor := range preferences {
-			p.Preferences = append(p.Preferences, swarm.PlacementPreference{Spread: &swarm.SpreadOver{SpreadDescriptor: descriptor}})
-		}
-		svc.Spec.TaskTemplate.Placement = p
-	} else {
-		svc.Spec.TaskTemplate.Placement = nil
-	}
-
-	res, err := parseServiceResourceForm(r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	svc.Spec.TaskTemplate.Resources = res
-
-	if cond := r.FormValue("restart_condition"); cond != "" {
-		svc.Spec.TaskTemplate.RestartPolicy = &swarm.RestartPolicy{Condition: swarm.RestartPolicyCondition(cond)}
-	}
-
-	parallelism, _ := strconv.ParseUint(r.FormValue("update_parallelism"), 10, 64)
-	delay, _ := time.ParseDuration(orDefault(r.FormValue("update_delay"), "0s"))
-	svc.Spec.UpdateConfig = &swarm.UpdateConfig{
-		Parallelism:   parallelism,
-		Delay:         delay,
-		Order:         orDefault(r.FormValue("update_order"), "stop-first"),
-		FailureAction: orDefault(r.FormValue("update_failure_action"), "pause"),
 	}
 
 	if _, err := s.docker.ServiceUpdate(ctx, svc.ID, svc.Version, svc.Spec, swarm.ServiceUpdateOptions{}); err != nil {
@@ -125,6 +51,115 @@ func (s *Server) handleServiceUpdateSpec(w http.ResponseWriter, r *http.Request)
 	}
 	s.audit(r, "service.update_spec", svc.Spec.Name, "", nil)
 	redirect(w, r, "/services/"+name)
+}
+
+// applyEditorForm writes the service editor form's fields (see
+// partial_service_fields.html) into spec, which must have a non-nil
+// ContainerSpec. Shared by the advanced editor on a service's page and the
+// New service form, so both accept exactly the same input.
+func (s *Server) applyEditorForm(ctx context.Context, r *http.Request, spec *swarm.ServiceSpec) error {
+	cs := spec.TaskTemplate.ContainerSpec
+	cs.Env = parseLines(r.FormValue("env"))
+	cs.Labels = parseKVLines(r.FormValue("labels"))
+	cs.Command = parseLines(r.FormValue("entrypoint"))
+	cs.Args = parseLines(r.FormValue("command"))
+
+	mounts, err := parseMounts(parseLines(r.FormValue("mounts")))
+	if err != nil {
+		return fmt.Errorf("invalid mounts: %w", err)
+	}
+	cs.Mounts = mounts
+
+	networks, err := s.parseNetworkAttachments(ctx, parseLines(r.FormValue("networks")))
+	if err != nil {
+		return err
+	}
+	spec.TaskTemplate.Networks = networks
+
+	ports, err := parsePorts(parseLines(r.FormValue("ports")))
+	if err != nil {
+		return fmt.Errorf("invalid ports: %w", err)
+	}
+	if len(ports) > 0 {
+		spec.EndpointSpec = &swarm.EndpointSpec{Ports: ports}
+	} else {
+		spec.EndpointSpec = nil
+	}
+
+	if cs.Secrets, err = s.parseSecretRefs(ctx, parseLines(r.FormValue("secrets"))); err != nil {
+		return err
+	}
+	if cs.Configs, err = s.parseConfigRefs(ctx, parseLines(r.FormValue("configs"))); err != nil {
+		return err
+	}
+	if cs.Healthcheck, err = parseHealthcheckForm(r); err != nil {
+		return err
+	}
+
+	constraints := parseLines(r.FormValue("constraints"))
+	preferences := parseLines(r.FormValue("preferences"))
+	if len(constraints) > 0 || len(preferences) > 0 {
+		p := &swarm.Placement{Constraints: constraints}
+		for _, descriptor := range preferences {
+			p.Preferences = append(p.Preferences, swarm.PlacementPreference{Spread: &swarm.SpreadOver{SpreadDescriptor: descriptor}})
+		}
+		spec.TaskTemplate.Placement = p
+	} else {
+		spec.TaskTemplate.Placement = nil
+	}
+
+	if spec.TaskTemplate.Resources, err = parseServiceResourceForm(r); err != nil {
+		return err
+	}
+
+	if cond := r.FormValue("restart_condition"); cond != "" {
+		spec.TaskTemplate.RestartPolicy = &swarm.RestartPolicy{Condition: swarm.RestartPolicyCondition(cond)}
+	}
+
+	parallelism, _ := strconv.ParseUint(r.FormValue("update_parallelism"), 10, 64)
+	delay, _ := time.ParseDuration(orDefault(r.FormValue("update_delay"), "0s"))
+	spec.UpdateConfig = &swarm.UpdateConfig{
+		Parallelism:   parallelism,
+		Delay:         delay,
+		Order:         orDefault(r.FormValue("update_order"), "stop-first"),
+		FailureAction: orDefault(r.FormValue("update_failure_action"), "pause"),
+	}
+	return nil
+}
+
+// editorFormFromRequest echoes a submitted editor form back as
+// editorFormData, so a failed New service submit re-renders with what the
+// user typed instead of an empty form.
+func editorFormFromRequest(r *http.Request) editorFormData {
+	parallelism, _ := strconv.ParseUint(r.FormValue("update_parallelism"), 10, 64)
+	return editorFormData{
+		Env:               r.FormValue("env"),
+		Labels:            r.FormValue("labels"),
+		Mounts:            r.FormValue("mounts"),
+		Constraints:       r.FormValue("constraints"),
+		Preferences:       r.FormValue("preferences"),
+		Networks:          r.FormValue("networks"),
+		Ports:             r.FormValue("ports"),
+		Secrets:           r.FormValue("secrets"),
+		Configs:           r.FormValue("configs"),
+		Entrypoint:        r.FormValue("entrypoint"),
+		Command:           r.FormValue("command"),
+		HealthTest:        r.FormValue("health_test"),
+		HealthDisabled:    r.FormValue("health_disabled") == "on",
+		HealthInterval:    r.FormValue("health_interval"),
+		HealthTimeout:     r.FormValue("health_timeout"),
+		HealthStartPeriod: r.FormValue("health_start_period"),
+		HealthRetries:     r.FormValue("health_retries"),
+		CPULimit:          r.FormValue("cpu_limit"),
+		MemLimit:          r.FormValue("mem_limit"),
+		CPUReservation:    r.FormValue("cpu_reservation"),
+		MemReservation:    r.FormValue("mem_reservation"),
+		RestartCondition:  orDefault(r.FormValue("restart_condition"), "any"),
+		UpdateParallelism: parallelism,
+		UpdateDelay:       r.FormValue("update_delay"),
+		UpdateOrder:       orDefault(r.FormValue("update_order"), "stop-first"),
+		UpdateFailure:     orDefault(r.FormValue("update_failure_action"), "pause"),
+	}
 }
 
 // parseNetworkAttachments resolves overlay network names (one per line) to
@@ -137,7 +172,7 @@ func (s *Server) parseNetworkAttachments(ctx context.Context, names []string) ([
 		if err != nil {
 			return nil, fmt.Errorf("look up network %q: %w", name, err)
 		}
-		if len(nets) == 0 {
+		if !hasExactNetwork(nets, name) {
 			return nil, fmt.Errorf("network %q not found - create it under Networks first", name)
 		}
 		out = append(out, swarm.NetworkAttachmentConfig{Target: name})
@@ -155,16 +190,13 @@ func (s *Server) parseSecretRefs(ctx context.Context, lines []string) ([]*swarm.
 		if !ok || target == "" {
 			target = name
 		}
-		list, err := s.docker.SecretList(ctx, swarm.SecretListOptions{Filters: filters.NewArgs(filters.Arg("name", name))})
+		sec, err := s.findSecretByName(ctx, name)
 		if err != nil {
-			return nil, fmt.Errorf("look up secret %q: %w", name, err)
-		}
-		if len(list) == 0 {
-			return nil, fmt.Errorf("secret %q not found - create it under Secrets first", name)
+			return nil, err
 		}
 		out = append(out, &swarm.SecretReference{
-			SecretID:   list[0].ID,
-			SecretName: list[0].Spec.Name,
+			SecretID:   sec.ID,
+			SecretName: sec.Spec.Name,
 			File: &swarm.SecretReferenceFileTarget{
 				Name: target,
 				UID:  "0",
@@ -184,16 +216,13 @@ func (s *Server) parseConfigRefs(ctx context.Context, lines []string) ([]*swarm.
 		if !ok || target == "" {
 			target = name
 		}
-		list, err := s.docker.ConfigList(ctx, swarm.ConfigListOptions{Filters: filters.NewArgs(filters.Arg("name", name))})
+		cfg, err := s.findConfigByName(ctx, name)
 		if err != nil {
-			return nil, fmt.Errorf("look up config %q: %w", name, err)
-		}
-		if len(list) == 0 {
-			return nil, fmt.Errorf("config %q not found - create it under Configs first", name)
+			return nil, err
 		}
 		out = append(out, &swarm.ConfigReference{
-			ConfigID:   list[0].ID,
-			ConfigName: list[0].Spec.Name,
+			ConfigID:   cfg.ID,
+			ConfigName: cfg.Spec.Name,
 			File: &swarm.ConfigReferenceFileTarget{
 				Name: target,
 				UID:  "0",

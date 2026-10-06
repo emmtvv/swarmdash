@@ -5,6 +5,74 @@ Notable changes to swarmdash are tracked here, following
 does not yet follow strict semantic versioning across releases — see the
 README's "Known gaps" section for what's still evolving.
 
+## [1.2.3] - 2026-10-06
+
+### Added
+
+- **New service form** (Services → New service) - create a service without
+  writing compose: name, optional stack, image, mode/replicas and every
+  field of the advanced editor. **Clone** on a service's page opens it
+  pre-filled from that service.
+- **Stack edit, history and rollback.** Every successful deploy (deploy
+  form, GitOps sync, rollback) stores the compose file and its variables
+  as a numbered version (last 50 per stack; variables encrypted at rest).
+  A stack's page gets **Edit** - the deploy form on the latest version, or
+  on a compose file generated from the running services for stacks with
+  no stored file - and a History table to open, download or roll back to
+  any version.
+- "Remove services not in the file" on the deploy form (prune), and the
+  preview now lists such services.
+- Much broader compose support: `entrypoint`, `user`, `working_dir`,
+  `hostname`, `stop_grace_period`, `stop_signal`, `init`, `read_only`,
+  `tty`, `cap_add`/`cap_drop`, `sysctls`, `ulimits`, `dns`, `extra_hosts`,
+  `healthcheck`, `logging`; long syntax for ports (incl. `mode: host`),
+  volumes (tmpfs, bind propagation, nocopy) and secrets/configs
+  (`target`/`uid`/`gid`/`mode`); port ranges; network aliases;
+  `deploy.endpoint_mode`, `rollback_config`, `placement.max_replicas_per_node`,
+  `resources.limits.pids`, restart policy `delay`/`max_attempts`/`window`;
+  top-level volume `driver`/`driver_opts` (NFS/CIFS) and config `content:`.
+- `${VAR}` interpolation (all compose forms, incl. defaults, required
+  variables and `$$`) from a new Variables field on the deploy form.
+- Unsupported or misspelled compose keys are listed as warnings in the
+  preview instead of being silently ignored.
+- Custom templates: "Save as template" on the deploy form; delete from the
+  gallery.
+- Secrets and Configs pages show which services use each one; new detail
+  pages (`/secrets/{id}`, `/configs/{id}` - the latter admin-only, as it
+  shows the content) list every attaching service and its mount path.
+- **Secret/config rotation**: create a new version, switch every service
+  using the old one to it (mount paths unchanged), optionally delete the
+  old one.
+- Backup/restore and `rotate-cluster-secret` cover stack history and saved
+  templates.
+
+### Changed
+
+- Compose `command:` now sets the image's CMD (container args), and the new
+  `entrypoint:` sets its ENTRYPOINT - previously `command:` replaced the
+  ENTRYPOINT, which broke images whose entrypoint script wraps the command
+  (postgres, redis, nginx, ...). Redeploying an existing compose file
+  shows this as a change in the preview.
+- A secret/config attached from compose is mounted at its compose key by
+  default (as `docker stack deploy` does), not at the underlying object's
+  `name:` - so pointing `name:` at a rotated version keeps the path.
+- Compose-deployed environment variables are applied in sorted order, so
+  redeploying an unchanged file no longer restarts tasks just because Go
+  map iteration reordered them; services are also applied in a stable
+  (alphabetical) order.
+- Stack/service export produces a complete, redeployable file: top-level
+  networks/secrets/configs/volumes are declared, networks by name instead
+  of ID, and the new fields above round-trip.
+- The preview diff covers entrypoint/command, labels, ports, networks,
+  secrets/configs, healthcheck and constraints, and mounts by content
+  rather than count.
+
+### Fixed
+
+- Secret, config and network lookups by name (service editor and compose
+  deploy) matched by prefix - `db` could silently resolve to `db_password`.
+  They now require an exact name.
+
 ## [1.2.2] - 2026-08-23
 
 ### Security

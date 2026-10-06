@@ -3,6 +3,7 @@
 <div class="page-header">
 	<h1>{{.Name}}</h1>
 	<div class="actions">
+		<a href="/stacks/deploy?stack={{.Name}}" class="btn">Edit</a>
 		<a href="/stacks/{{.Name}}/export.yml" class="btn secondary">Export compose</a>
 		<form method="post" action="/stacks/{{.Name}}/restart" data-confirm="Restart every service in stack {{.Name}}?">
 			<button type="submit" class="btn secondary">Restart all</button>
@@ -12,6 +13,10 @@
 		</form>
 	</div>
 </div>
+
+{{if .GitOps}}
+<div class="notice-box">Deployed by GitOps from <span class="mono">{{.GitOps.RepoURL}}</span> ({{.GitOps.Ref}}:{{.GitOps.ComposePath}}) - edit the file in git; a manual edit here is overwritten by the next sync that finds a new commit. <a href="/stacks/gitops">GitOps settings</a></div>
+{{end}}
 
 <table>
 	<thead><tr><th>Service</th><th>Mode</th><th>Replicas</th><th>Image</th></tr></thead>
@@ -26,4 +31,32 @@
 	{{end}}
 	</tbody>
 </table>
+
+<h2>History</h2>
+{{if .Versions}}
+<table>
+	<thead><tr><th>Version</th><th>Deployed</th><th>By</th><th>Source</th><th></th></tr></thead>
+	<tbody>
+	{{range $i, $v := .Versions}}
+		<tr>
+			<td class="mono">v{{$v.Version}}{{if eq $i 0}} <span class="badge state-active">current</span>{{end}}</td>
+			<td class="muted">{{ago $v.CreatedAt}}</td>
+			<td class="muted">{{$v.CreatedBy}}</td>
+			<td class="muted">{{$v.Source}}{{if $v.Note}} &middot; {{$v.Note}}{{end}}</td>
+			<td>
+				<a href="/stacks/deploy?stack={{$.Name}}&amp;version={{$v.ID}}" class="btn small secondary">Open in editor</a>
+				<a href="/stacks/{{$.Name}}/versions/{{$v.ID}}/compose.yml" class="btn small secondary">Download</a>
+				{{if ne $i 0}}
+				<form class="inline" method="post" action="/stacks/{{$.Name}}/versions/{{$v.ID}}/rollback" data-confirm="Redeploy v{{$v.Version}} of {{$.Name}}? Services that version doesn't define are removed (their volumes are kept).">
+					<button type="submit" class="btn small secondary">Roll back</button>
+				</form>
+				{{end}}
+			</td>
+		</tr>
+	{{end}}
+	</tbody>
+</table>
+{{else}}
+<p class="muted">No compose file stored for this stack yet - it was deployed before swarmdash kept stack history, or outside swarmdash. "Edit" starts from a compose file generated from its running services; the first deploy from there starts the history.</p>
+{{end}}
 {{end}}

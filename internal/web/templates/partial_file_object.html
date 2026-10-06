@@ -1,0 +1,39 @@
+{{/* Shared pieces of the secret/config detail pages. */}}
+{{define "rotation_result"}}
+{{if .}}
+<div class="ok-box">
+	Created this version to replace <span class="mono">{{.OldName}}</span>.
+	{{if .Updated}}Switched {{len .Updated}} service{{if gt (len .Updated) 1}}s{{end}} over: {{range $i, $s := .Updated}}{{if $i}}, {{end}}<a href="/services/{{$s}}">{{$s}}</a>{{end}} - their tasks are rolling now.{{else}}No service was using it.{{end}}
+	{{if .Deleted}}Deleted <span class="mono">{{.OldName}}</span>.{{end}}
+</div>
+{{if .DeleteErr}}<div class="error-box">Could not delete <span class="mono">{{.OldName}}</span>: {{.DeleteErr}}</div>{{end}}
+{{end}}
+{{end}}
+
+{{/* Dot: map with Uses ([]fileUse), ComposeStacks ([]string), Kind ("secret"/"config"). */}}
+{{define "file_uses"}}
+<h2>Used by</h2>
+<table>
+	<thead><tr><th>Service</th><th>Stack</th><th>Mounted at</th></tr></thead>
+	<tbody>
+	{{range .Uses}}
+		<tr>
+			<td><a href="/services/{{.Service}}">{{.Service}}</a></td>
+			<td class="muted">{{if .Stack}}<a href="/stacks/{{.Stack}}">{{.Stack}}</a>{{else}}-{{end}}</td>
+			<td class="mono muted">{{.Target}}</td>
+		</tr>
+	{{else}}
+		<tr><td colspan="3" class="muted">No service uses this {{.Kind}}.</td></tr>
+	{{end}}
+	</tbody>
+</table>
+{{end}}
+
+{{define "compose_stacks_warning"}}
+{{if .ComposeStacks}}
+<div class="warn-box">
+	{{range $i, $s := .ComposeStacks}}{{if $i}}, {{end}}<a href="/stacks/{{$s}}">{{$s}}</a>{{end}}
+	{{if gt (len .ComposeStacks) 1}}are{{else}}is{{end}} deployed from a compose file that references this {{.Kind}} by name. After rotating, set <span class="mono">name: &lt;new name&gt;</span> on its entry under the top-level <span class="mono">{{.Kind}}s:</span> (keep the key, so the file path in the container stays the same) - otherwise the next deploy of that stack switches back to the old {{.Kind}}, or fails if it was deleted.
+</div>
+{{end}}
+{{end}}

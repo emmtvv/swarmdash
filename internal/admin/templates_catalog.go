@@ -1,11 +1,11 @@
 package admin
 
-// StackTemplate is a built-in, ready-to-deploy compose file offered from
-// the template gallery (Stacks -> Templates). Deliberately static/built-in
-// only for now, no user-defined templates - see the plan this shipped
-// under for why. Each Compose body is meant to be edited (at minimum, the
-// placeholder passwords) in the deploy preview step before submitting,
-// exactly like pasting compose YAML by hand already works.
+// StackTemplate is a ready-to-deploy compose file offered from the
+// template gallery (Stacks -> Templates): either one of the built-ins below
+// or a custom one saved from the deploy form (store.StackTemplate). Each
+// Compose body is meant to be edited (at minimum, the placeholder
+// passwords) in the deploy preview step before submitting, exactly like
+// pasting compose YAML by hand already works.
 type StackTemplate struct {
 	ID          string
 	Name        string
@@ -122,11 +122,17 @@ volumes:
 	},
 }
 
-func findTemplate(id string) (StackTemplate, bool) {
+// findTemplate looks a template up by ID among the built-in ones first,
+// then the custom ones saved from the deploy form.
+func (s *Server) findTemplate(id string) (StackTemplate, bool) {
 	for _, t := range builtinTemplates {
 		if t.ID == id {
 			return t, true
 		}
 	}
-	return StackTemplate{}, false
+	t, err := s.store.GetStackTemplate(id)
+	if err != nil {
+		return StackTemplate{}, false
+	}
+	return StackTemplate{ID: t.ID, Name: t.Name, Description: t.Description, Compose: t.Compose}, true
 }

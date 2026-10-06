@@ -38,6 +38,8 @@ func protectedRoutes(s *Server) []route {
 
 		{"GET /stacks", s.handleStacksPage, true},
 		{"GET /stacks/templates", s.handleTemplatesPage, true},
+		{"POST /stacks/templates", s.handleTemplateSave, false},
+		{"POST /stacks/templates/{id}/delete", s.handleTemplateDelete, false},
 		{"GET /stacks/deploy", s.handleStackDeployPage, true},
 		{"POST /stacks/deploy/preview", s.handleStackDeployPreview, false},
 		{"POST /stacks/deploy", s.handleStackDeploySubmit, false},
@@ -49,8 +51,12 @@ func protectedRoutes(s *Server) []route {
 		{"GET /stacks/{name}/export.yml", s.handleStackExport, true},
 		{"POST /stacks/{name}/restart", s.handleStackRestart, false},
 		{"POST /stacks/{name}/delete", s.handleStackDelete, false},
+		{"GET /stacks/{name}/versions/{id}/compose.yml", s.handleStackVersionDownload, true},
+		{"POST /stacks/{name}/versions/{id}/rollback", s.handleStackRollback, false},
 
 		{"GET /services", s.handleServicesPage, true},
+		{"GET /services/new", s.handleServiceNewPage, true},
+		{"POST /services", s.handleServiceCreate, false},
 		{"GET /services/{name}", s.handleServiceDetail, true},
 		{"GET /services/{name}/events", s.handleServiceEvents, true},
 		{"GET /services/{name}/export.yml", s.handleServiceExport, true},
@@ -73,10 +79,17 @@ func protectedRoutes(s *Server) []route {
 
 		{"GET /secrets", s.handleSecretsPage, true},
 		{"POST /secrets", s.handleSecretCreate, false},
+		{"GET /secrets/{id}", s.handleSecretDetail, true},
+		{"POST /secrets/{id}/rotate", s.handleSecretRotate, false},
 		{"POST /secrets/{id}/delete", s.handleSecretDelete, false},
 
 		{"GET /configs", s.handleConfigsPage, true},
 		{"POST /configs", s.handleConfigCreate, false},
+		// Unlike a secret's, a config's content can be read back - and
+		// configs routinely carry credentials anyway (an nginx htpasswd,
+		// an app config with a DSN), so the detail page is admin-only.
+		{"GET /configs/{id}", s.handleConfigDetail, false},
+		{"POST /configs/{id}/rotate", s.handleConfigRotate, false},
 		{"POST /configs/{id}/delete", s.handleConfigDelete, false},
 
 		{"GET /images", s.handleImagesPage, true},

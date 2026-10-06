@@ -12,8 +12,13 @@
 
 - **Stacks, services, tasks, nodes** — list/detail views, scale, update
   image, rollback, force restart, bulk actions, placement constraints.
-- **Deploy from compose**, with a dry-run preview, a template gallery, and
-  GitOps (point a stack at a git repo/branch and it stays in sync).
+- **Create services from a form** or **deploy from compose** (long syntax,
+  `${VAR}` variables, healthchecks, NFS volumes...), with a dry-run
+  preview, stack **edit/history/rollback**, a template gallery with your
+  own templates, and GitOps (point a stack at a git repo/branch and it
+  stays in sync).
+- **Secrets & configs**: see which services use each one, and rotate them
+  (new version, every service switched over, old one deleted) in one step.
 - **Web-based console** per task — exec shell (full TTY), live logs, live
   `docker stats`, a file browser, all proxied to the right node.
 - **Live rollout view**, cluster topology graph, dashboard history, and a
@@ -35,22 +40,60 @@
   (parallelism/delay/order/failure-action).
 - Stack delete (removes every service with that stack label — Docker has
   no atomic stack-delete API) and stack-wide force-restart.
-- **Deploy a stack from a compose file** (Stacks → Deploy stack): a
-  pragmatic subset of the compose format — image, command, environment,
-  labels, ports, volumes (short syntax), networks, deploy.replicas/mode/
-  placement/resources/update_config/restart_policy. No `build:` (Swarm
-  can't build images anyway), no local bind-mount resolution. Secrets/
-  configs must already exist and are referenced with `external: true` —
-  swarmdash never lets compose file content create a secret's value.
-- Export any service, or a whole stack, back to compose YAML.
+- **Create a service from a form** (Services → New service): name,
+  optional stack, image, mode/replicas, plus every field of the advanced
+  editor (env, entrypoint/command, ports, mounts, networks, secrets/configs,
+  healthcheck, resources, placement, restart and rolling-update policy) -
+  no compose file needed for a one-off service. **Clone** on a service's
+  page opens the same form pre-filled from it (minus published ports,
+  which can't be shared).
+- **Deploy a stack from a compose file** (Stacks → Deploy stack): the
+  compose features that map onto swarm services - image, entrypoint/
+  command (shell-style string or list), environment, labels, user,
+  working_dir, hostname, stop_grace_period/stop_signal, init, read_only,
+  cap_add/cap_drop, sysctls, ulimits, dns, extra_hosts, healthcheck,
+  logging, ports and volumes in both short and long syntax (host-mode
+  ports, port ranges, tmpfs, bind propagation, nocopy), networks with
+  aliases, secrets/configs with target/uid/gid/mode, and deploy.replicas/
+  mode/endpoint_mode/labels/placement (incl. max_replicas_per_node)/
+  resources (incl. pids)/update_config/rollback_config/restart_policy.
+  Top-level volumes can set `driver`/`driver_opts` (e.g. NFS), carried on
+  every mount so swarm creates them on whichever node a task lands on;
+  top-level configs can carry inline `content:` (created as a
+  content-addressed `<stack>_<key>_<hash>` config, so changing it rolls the
+  services). Secrets must already exist and are referenced with
+  `external: true` - swarmdash never lets compose file content create a
+  secret's value. Anything unsupported (`build:`, `depends_on:`,
+  `env_file:`, typos...) is listed as a warning in the preview instead of
+  being silently dropped.
+- **Variables**: `${VAR}`, `${VAR:-default}`, `${VAR:?error}`, `$$` etc.
+  are interpolated like compose does, from a `.env`-style Variables field
+  on the deploy form. Variables are stored encrypted with the stack's
+  history.
+- **Edit a stack / history / rollback**: every successful deploy (form,
+  GitOps sync, rollback) stores the compose file and its variables as a
+  numbered version (last 50 per stack). A stack's page has **Edit** (opens
+  the deploy form on the latest version; for a stack with no stored file,
+  on a compose file generated from its running services) and a History
+  table to open, download or **roll back** to any version. "Remove
+  services not in the file" on the deploy form (and every rollback)
+  removes the stack's services the file no longer defines, like
+  `docker stack deploy --prune`.
+- Export any service, or a whole stack, back to compose YAML - complete
+  enough to deploy again unchanged: networks/secrets/configs/volumes are
+  declared at the top level (the stack's own networks by key, everything
+  else as external).
 - **Dry-run preview** for compose deploys (Stacks → Deploy stack →
-  Preview): shows create/update/unchanged per service and what would
-  change (image, env, replicas, mounts, resources) before anything is
-  touched.
+  Preview): shows create/update/unchanged/remove per service and what
+  would change (image, entrypoint/command, env, labels, replicas, mounts,
+  ports, networks, secrets/configs, healthcheck, resources, constraints)
+  before anything is touched.
 - **Template gallery** (Stacks → Templates): built-in compose templates
   for common self-hosted services (Postgres, MySQL, Redis, MongoDB, nginx,
-  Adminer) — "Use template" pre-fills the deploy form, same preview/submit
-  flow as pasting compose by hand.
+  Adminer) plus your own - "Save as template" on the deploy form stores
+  the current compose file (saving under an existing name replaces it).
+  "Use template" pre-fills the deploy form, same preview/submit flow as
+  pasting compose by hand.
 - **GitOps stack deploy** (Stacks → GitOps deploy): point a stack at a git
   repo/branch/compose path instead of pasting YAML. "Sync now" or a poll
   interval (1–60 min) re-fetches the compose file and re-applies it
@@ -89,7 +132,16 @@
   directory browser + file download, and a log-file download — all
   proxied through admin to the right node's agent, with the browser-facing
   websockets auto-reconnecting on drop.
-- Networks / Secrets / Configs: list, create, delete.
+- Networks / Secrets / Configs: list, create, delete. The Secrets and
+  Configs lists show which services use each one; a secret's or config's
+  page lists every service attaching it and where it's mounted.
+- **Secret/config rotation**: swarm secrets and configs are immutable, so
+  "Rotate" (secrets) / "Edit" (configs - the page shows the current
+  content) creates a new version (`name_v2`, `name_v3`, ... or a name you
+  pick), switches every service using the old one to it while keeping the
+  path it's mounted at, and optionally deletes the old one. Stacks deployed
+  from a stored compose file are flagged, since their file needs
+  `name: <new name>` to keep the new version on the next deploy.
 - Node actions: activate / pause / drain, promote / demote.
 - Images: per-node list + prune (dangling, or `all` for every unused
   image), since images live on each node's daemon rather than swarm-wide.
@@ -126,11 +178,12 @@
   for the lockout risk that comes with it. Not SAML - see
   [known-gaps.md](known-gaps.md).
 - **Backup & restore** (Settings → Backup): download users, roles, API
-  tokens, webhooks, registry credentials, GitOps stacks and SSO config as
-  one JSON file; restore merges it back in (creates/overwrites by ID,
+  tokens, webhooks, registry credentials, GitOps stacks, stack compose
+  history, saved templates and SSO config as one JSON file; restore merges it back in (creates/overwrites by ID,
   never deletes). Deliberately scoped to configuration, not history - the
   audit log and metrics samples aren't included. Encrypted fields
-  (registry passwords, GitOps tokens, the SSO client secret) travel as
+  (registry passwords, GitOps tokens, stack deploy variables, the SSO
+  client secret) travel as
   ciphertext and only decrypt again on an admin instance using the same
   `--cluster-secret` the backup was taken with; restore flags anything it
   can't decrypt instead of silently importing it.

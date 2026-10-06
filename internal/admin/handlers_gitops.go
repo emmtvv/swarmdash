@@ -140,11 +140,19 @@ func (s *Server) syncGitStack(ctx context.Context, gs store.GitStack) error {
 	if err != nil {
 		return s.recordGitOpsResult(gs, commit, fmt.Errorf("parse compose file: %w", err))
 	}
-	if _, err := s.applyCompose(ctx, gs.StackName, file); err != nil {
+	if _, err := s.applyCompose(ctx, gs.StackName, file, applyOptions{}); err != nil {
 		return s.recordGitOpsResult(gs, commit, fmt.Errorf("apply: %w", err))
 	}
+	s.recordStackVersion(gs.StackName, string(content), "", "gitops", "commit "+shortCommit(commit), "gitops")
 
 	return s.recordGitOpsResult(gs, commit, nil)
+}
+
+func shortCommit(commit string) string {
+	if len(commit) > 12 {
+		return commit[:12]
+	}
+	return commit
 }
 
 // recordGitOpsResult persists the outcome of a sync attempt back onto the

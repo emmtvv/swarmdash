@@ -12,6 +12,7 @@ import (
 
 func g1SecretsMux(secrets []swarm.Secret) *http.ServeMux {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /services", jsonHandler([]swarm.Service{}))
 	mux.HandleFunc("/secrets", jsonHandler(secrets))
 	mux.HandleFunc("/secrets/create", jsonHandler(swarm.SecretCreateResponse{ID: "sec-new"}))
 	mux.HandleFunc("/secrets/sec1", func(w http.ResponseWriter, r *http.Request) {

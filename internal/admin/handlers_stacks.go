@@ -37,11 +37,21 @@ func (s *Server) handleStackDetail(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	s.render(w, r, "stack_detail.html", map[string]any{
+	versions, err := s.store.ListStackVersions(name)
+	if err != nil {
+		http.Error(w, "list stack versions: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	data := map[string]any{
 		"User":     userFromContext(r),
 		"Name":     name,
 		"Services": stackServices,
-	})
+		"Versions": versions,
+	}
+	if gs, ok := s.gitStackFor(name); ok {
+		data["GitOps"] = gs
+	}
+	s.render(w, r, "stack_detail.html", data)
 }
 
 // handleStackDelete removes every service belonging to the stack. Docker

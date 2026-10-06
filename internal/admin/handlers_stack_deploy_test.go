@@ -28,6 +28,7 @@ func g2DeployMux(serviceNotFound bool, existing swarm.Service) *http.ServeMux {
 	})
 	mux.HandleFunc("POST /services/create", jsonHandler(swarm.ServiceCreateResponse{ID: "new1"}))
 	mux.HandleFunc("POST /services/{id}/update", jsonHandler(swarm.ServiceUpdateResponse{}))
+	mux.HandleFunc("GET /services", jsonHandler([]swarm.Service{}))
 	return mux
 }
 
@@ -145,7 +146,7 @@ func TestHandleStackDeploySubmit_Create(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListAudit: %v", err)
 	}
-	if len(entries) != 1 || entries[0].Action != "stack.deploy" || entries[0].Detail != "created=1 updated=0" || !entries[0].Success {
+	if len(entries) != 1 || entries[0].Action != "stack.deploy" || entries[0].Detail != "created=1 updated=0 removed=0" || !entries[0].Success {
 		t.Fatalf("unexpected audit entries: %+v", entries)
 	}
 }

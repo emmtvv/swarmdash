@@ -8,6 +8,7 @@
 	<h1>{{.Service.Spec.Name}}</h1>
 	<div class="actions">
 		<a href="/services/{{.Service.Spec.Name}}/export.yml" class="btn secondary">Export compose</a>
+		<a href="/services/new?from={{.Service.Spec.Name}}" class="btn secondary">Clone</a>
 		<a href="/services/{{.Service.Spec.Name}}/logs" class="btn secondary">Logs</a>
 		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/restart" data-confirm="Force-restart all tasks?">
 			<button type="submit" class="btn secondary">Restart</button>
@@ -52,152 +53,8 @@
 <details class="card">
 	<summary style="cursor:pointer;font-weight:600;">Advanced settings</summary>
 	<form method="post" action="/services/{{.Service.Spec.Name}}/spec" style="margin-top:16px;">
-		<div class="section-label">Container</div>
-		<div class="form-grid">
-			<div>
-				<label for="entrypoint">Entrypoint (overrides image ENTRYPOINT)</label>
-				<textarea id="entrypoint" name="entrypoint" hidden data-list-editor="line" data-placeholders="/bin/sh">{{.Editor.Entrypoint}}</textarea>
-			</div>
-			<div>
-				<label for="command">Command (overrides image CMD)</label>
-				<textarea id="command" name="command" hidden data-list-editor="line" data-placeholders="-c">{{.Editor.Command}}</textarea>
-			</div>
-			<div>
-				<label for="env">Environment variables</label>
-				<textarea id="env" name="env" hidden data-list-editor="kv">{{.Editor.Env}}</textarea>
-			</div>
-			<div>
-				<label for="labels">Labels</label>
-				<textarea id="labels" name="labels" hidden data-list-editor="kv">{{.Editor.Labels}}</textarea>
-			</div>
-			<div>
-				<label for="mounts">Mounts</label>
-				<textarea id="mounts" name="mounts" hidden data-list-editor="mount">{{.Editor.Mounts}}</textarea>
-			</div>
-		</div>
-
-		<div class="section-label">Networking</div>
-		<div class="form-grid">
-			<div>
-				<label for="ports">Published ports</label>
-				<textarea id="ports" name="ports" hidden data-list-editor="port">{{.Editor.Ports}}</textarea>
-			</div>
-			<div>
-				<label for="networks">Attached networks (must already exist)</label>
-				<textarea id="networks" name="networks" hidden data-list-editor="line" data-placeholders="network-name">{{.Editor.Networks}}</textarea>
-			</div>
-		</div>
-
-		<div class="section-label">Secrets &amp; configs</div>
-		<div class="form-grid">
-			<div>
-				<label for="secrets">Secrets</label>
-				<textarea id="secrets" name="secrets" hidden data-list-editor="ref">{{.Editor.Secrets}}</textarea>
-			</div>
-			<div>
-				<label for="configs">Configs</label>
-				<textarea id="configs" name="configs" hidden data-list-editor="ref">{{.Editor.Configs}}</textarea>
-			</div>
-		</div>
-
-		<div class="section-label">Placement</div>
-		<div class="form-grid">
-			<div>
-				<label for="constraints">Placement constraints</label>
-				<textarea id="constraints" name="constraints" hidden data-list-editor="line" data-placeholders="node.role==worker">{{.Editor.Constraints}}</textarea>
-			</div>
-			<div>
-				<label for="preferences">Spread preferences</label>
-				<textarea id="preferences" name="preferences" hidden data-list-editor="line" data-placeholders="node.labels.zone">{{.Editor.Preferences}}</textarea>
-			</div>
-		</div>
-
-		<div class="section-label">Healthcheck</div>
-		<div class="card-row">
-			<div style="flex:1 1 260px;">
-				<label for="health_test">Test command (run via /bin/sh -c)</label>
-				<input type="text" id="health_test" name="health_test" value="{{.Editor.HealthTest}}" placeholder="curl -f http://localhost/health || exit 1" style="width:100%;font-family:ui-monospace,monospace;">
-			</div>
-			<div>
-				<label for="health_interval">Interval</label>
-				<input type="text" id="health_interval" name="health_interval" value="{{.Editor.HealthInterval}}" placeholder="30s" style="width:90px;">
-			</div>
-			<div>
-				<label for="health_timeout">Timeout</label>
-				<input type="text" id="health_timeout" name="health_timeout" value="{{.Editor.HealthTimeout}}" placeholder="10s" style="width:90px;">
-			</div>
-			<div>
-				<label for="health_start_period">Start period</label>
-				<input type="text" id="health_start_period" name="health_start_period" value="{{.Editor.HealthStartPeriod}}" placeholder="0s" style="width:90px;">
-			</div>
-			<div>
-				<label for="health_retries">Retries</label>
-				<input type="number" id="health_retries" name="health_retries" value="{{.Editor.HealthRetries}}" min="0" style="width:80px;">
-			</div>
-			<div>
-				<label>&nbsp;</label>
-				<label><input type="checkbox" name="health_disabled" {{if .Editor.HealthDisabled}}checked{{end}}> Disable healthcheck</label>
-			</div>
-		</div>
-
-		<div class="section-label">Resources &amp; restart</div>
-		<div class="card-row">
-			<div>
-				<label for="cpu_limit">CPU limit</label>
-				<input type="text" id="cpu_limit" name="cpu_limit" value="{{.Editor.CPULimit}}" placeholder="0.5" style="width:100px;">
-			</div>
-			<div>
-				<label for="mem_limit">Memory limit</label>
-				<input type="text" id="mem_limit" name="mem_limit" value="{{.Editor.MemLimit}}" placeholder="256M" style="width:100px;">
-			</div>
-			<div>
-				<label for="cpu_reservation">CPU reservation</label>
-				<input type="text" id="cpu_reservation" name="cpu_reservation" value="{{.Editor.CPUReservation}}" placeholder="0.1" style="width:100px;">
-			</div>
-			<div>
-				<label for="mem_reservation">Memory reservation</label>
-				<input type="text" id="mem_reservation" name="mem_reservation" value="{{.Editor.MemReservation}}" placeholder="64M" style="width:100px;">
-			</div>
-			<div>
-				<label for="restart_condition">Restart policy</label>
-				<select id="restart_condition" name="restart_condition" style="width:120px;">
-					<option value="any" {{if eq .Editor.RestartCondition "any"}}selected{{end}}>any</option>
-					<option value="on-failure" {{if eq .Editor.RestartCondition "on-failure"}}selected{{end}}>on-failure</option>
-					<option value="none" {{if eq .Editor.RestartCondition "none"}}selected{{end}}>none</option>
-				</select>
-			</div>
-		</div>
-
-		<div class="section-label">Rolling update</div>
-		<div class="card-row">
-			<div>
-				<label for="update_parallelism">Update parallelism</label>
-				<input type="number" id="update_parallelism" name="update_parallelism" value="{{.Editor.UpdateParallelism}}" min="0" style="width:100px;">
-			</div>
-			<div>
-				<label for="update_delay">Update delay</label>
-				<input type="text" id="update_delay" name="update_delay" value="{{.Editor.UpdateDelay}}" placeholder="10s" style="width:100px;">
-			</div>
-			<div>
-				<label for="update_order">Update order</label>
-				<select id="update_order" name="update_order" style="width:130px;">
-					<option value="stop-first" {{if eq .Editor.UpdateOrder "stop-first"}}selected{{end}}>stop-first</option>
-					<option value="start-first" {{if eq .Editor.UpdateOrder "start-first"}}selected{{end}}>start-first</option>
-				</select>
-			</div>
-			<div>
-				<label for="update_failure_action">On update failure</label>
-				<select id="update_failure_action" name="update_failure_action" style="width:130px;">
-					<option value="pause" {{if eq .Editor.UpdateFailure "pause"}}selected{{end}}>pause</option>
-					<option value="continue" {{if eq .Editor.UpdateFailure "continue"}}selected{{end}}>continue</option>
-					<option value="rollback" {{if eq .Editor.UpdateFailure "rollback"}}selected{{end}}>rollback</option>
-				</select>
-			</div>
-			<div>
-				<label>&nbsp;</label>
-				<button type="submit" class="btn">Save advanced settings</button>
-			</div>
-		</div>
+		{{template "service_fields" .Editor}}
+		<button type="submit" class="btn" style="margin-top:16px;">Save advanced settings</button>
 	</form>
 </details>
 

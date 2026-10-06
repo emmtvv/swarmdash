@@ -170,6 +170,36 @@ type DeployHook struct {
 	AllowImageOverride bool `bson:"allow_image_override,omitempty" json:"allow_image_override,omitempty"`
 }
 
+// StackVersion is one compose file deployed to a stack - recorded on every
+// successful deploy (the deploy form, a GitOps sync, a rollback), so the
+// stack can later be edited starting from what was actually deployed and
+// rolled back to an earlier file. Version counts up per stack. VarsEnc is
+// the ${VAR} values the file was interpolated with, as opaque ciphertext
+// (same convention as RegistryCredential.PasswordEnc), since variables
+// routinely carry passwords.
+type StackVersion struct {
+	ID        string    `bson:"_id" json:"id"`
+	StackName string    `bson:"stack_name" json:"stack_name"`
+	Version   int       `bson:"version" json:"version"`
+	Compose   string    `bson:"compose" json:"compose"`
+	VarsEnc   []byte    `bson:"vars_enc,omitempty" json:"vars_enc,omitempty"`
+	Source    string    `bson:"source" json:"source"`                 // "ui", "gitops", "rollback"
+	Note      string    `bson:"note,omitempty" json:"note,omitempty"` // e.g. the git commit, or "rollback to v3"
+	CreatedBy string    `bson:"created_by" json:"created_by"`
+	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+}
+
+// StackTemplate is a user-saved compose template, offered in the template
+// gallery (Stacks -> Templates) next to the built-in ones.
+type StackTemplate struct {
+	ID          string    `bson:"_id" json:"id"`
+	Name        string    `bson:"name" json:"name"`
+	Description string    `bson:"description" json:"description"`
+	Compose     string    `bson:"compose" json:"compose"`
+	CreatedBy   string    `bson:"created_by" json:"created_by"`
+	CreatedAt   time.Time `bson:"created_at" json:"created_at"`
+}
+
 // SSOConfig is the single (singleton, _id "sso") document holding this
 // cluster's OIDC single sign-on settings, configured from Settings -> SSO.
 // ClientSecretEnc follows the same opaque-ciphertext convention as

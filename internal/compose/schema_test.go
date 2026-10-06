@@ -94,13 +94,13 @@ configs:
 	if web.Labels["app"] != "web" {
 		t.Fatalf("web.Labels = %v", web.Labels)
 	}
-	if len(web.Ports) != 1 || web.Ports[0] != "8080:80" {
+	if len(web.Ports) != 1 || web.Ports[0] != (Port{Target: 80, Published: 8080}) {
 		t.Fatalf("web.Ports = %v", web.Ports)
 	}
-	if len(web.Volumes) != 1 || web.Volumes[0] != "data:/var/www" {
+	if len(web.Volumes) != 1 || web.Volumes[0].Source != "data" || web.Volumes[0].Target != "/var/www" || web.Volumes[0].Type != "volume" {
 		t.Fatalf("web.Volumes = %v", web.Volumes)
 	}
-	if !equalStrList(web.Networks, StrList{"front"}) {
+	if !equalStrList(web.Networks.Names(), StrList{"front"}) {
 		t.Fatalf("web.Networks = %v", web.Networks)
 	}
 
@@ -257,7 +257,7 @@ func TestEnvMap_UnmarshalYAML(t *testing.T) {
 }
 
 func TestStrList_UnmarshalYAML(t *testing.T) {
-	t.Run("scalar form splits on whitespace", func(t *testing.T) {
+	t.Run("scalar form splits shell-style", func(t *testing.T) {
 		var w strListWrapper
 		if err := yaml.Unmarshal([]byte("list: run-worker --verbose\n"), &w); err != nil {
 			t.Fatalf("unmarshal: %v", err)

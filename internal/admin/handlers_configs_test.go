@@ -12,6 +12,7 @@ import (
 
 func g1ConfigsMux(configs []swarm.Config) *http.ServeMux {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /services", jsonHandler([]swarm.Service{}))
 	mux.HandleFunc("/configs", jsonHandler(configs))
 	mux.HandleFunc("/configs/create", jsonHandler(swarm.ConfigCreateResponse{ID: "cfg-new"}))
 	mux.HandleFunc("/configs/cfg1", func(w http.ResponseWriter, r *http.Request) {
