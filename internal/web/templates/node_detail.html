@@ -36,6 +36,30 @@
 	</div>
 </div>
 
+<h2 id="tasks">Tasks</h2>
+<div class="table-wrap">
+<input type="text" class="table-search" data-table-search placeholder="Filter tasks...">
+<table data-enhance>
+	<thead><tr><th>Task</th><th>State</th><th>Desired</th><th>Image</th><th>Container</th><th>Updated</th><th>Message</th><th data-no-sort></th></tr></thead>
+	<tbody>
+	{{range .Tasks}}
+		<tr>
+			<td>{{if .ServiceName}}<a href="/services/{{.ServiceName}}">{{.ServiceName}}</a>{{if .Slot}}.{{.Slot}}{{end}}{{else}}<span class="mono muted">{{shortID .ServiceID}}</span>{{end}}</td>
+			<td><span class="badge state-{{.Status.State}}">{{.Status.State}}</span></td>
+			<td class="muted">{{.DesiredState}}</td>
+			<td class="mono muted">{{if .Spec.ContainerSpec}}{{imageName .Spec.ContainerSpec.Image}}{{end}}</td>
+			<td class="mono muted">{{if .Status.ContainerStatus}}{{shortID .Status.ContainerStatus.ContainerID}}{{end}}</td>
+			<td class="muted">{{ago .Status.Timestamp}}</td>
+			<td class="muted">{{.Status.Err}}{{.Status.Message}}</td>
+			<td>{{if eq .Status.State "running"}}<a href="/exec/{{.ID}}" class="btn small secondary">Console</a> <a href="/logs/{{.ID}}" class="btn small secondary">Logs</a>{{end}}</td>
+		</tr>
+	{{else}}
+		<tr><td colspan="8" class="muted">No tasks scheduled on this node.</td></tr>
+	{{end}}
+	</tbody>
+</table>
+</div>
+
 <h2>Labels</h2>
 <p class="muted">Used for placement constraints (<span class="mono">node.labels.zone==a</span>) and spread preferences.</p>
 <table>

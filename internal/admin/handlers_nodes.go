@@ -2,7 +2,9 @@ package admin
 
 import (
 	"net/http"
+	"sort"
 
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/swarm"
 
 	"swarmdash/internal/httpx"
@@ -60,9 +62,24 @@ func (s *Server) handleNodesPage(w http.ResponseWriter, r *http.Request) {
 	for i, n := range nodes {
 		rows[i] = newNodeRow(n, nodeResourceStats{})
 	}
+	// Running-task counts are a convenience column; if the task list
+	// fails the page still renders, just without them.
+	var running map[string]int
+	if tasks, err := s.docker.TaskList(r.Context(), swarm.TaskListOptions{
+		Filters: filters.NewArgs(filters.Arg("desired-state", "running")),
+	}); err == nil {
+		running = make(map[string]int, len(nodes))
+		for _, t := range tasks {
+			if t.Status.State == swarm.TaskStateRunning {
+				running[t.NodeID]++
+			}
+		}
+	}
 	s.render(w, r, "nodes.html", map[string]any{
-		"User":  userFromContext(r),
-		"Nodes": rows,
+		"User":         userFromContext(r),
+		"Nodes":        rows,
+		"RunningTasks": running,
+		"TasksOK":      running != nil,
 	})
 }
 
@@ -180,16 +197,51 @@ func (s *Server) setNodeRole(w http.ResponseWriter, r *http.Request, role swarm.
 	redirect(w, r, "/nodes")
 }
 
+// nodeTaskRow is a task as listed on the node detail page, with its
+// service name resolved so rows read "web.2" instead of a bare service ID.
+type nodeTaskRow struct {
+	swarm.Task
+	ServiceName string
+}
+
 func (s *Server) handleNodeDetail(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	node, _, err := s.docker.NodeInspectWithRaw(r.Context(), id)
+	ctx := r.Context()
+	node, _, err := s.docker.NodeInspectWithRaw(ctx, id)
 	if err != nil {
 		http.Error(w, "get node: "+err.Error(), http.StatusNotFound)
 		return
 	}
+	tasks, err := s.listTasksForNode(ctx, node.ID)
+	if err != nil {
+		http.Error(w, "list tasks: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	services, err := s.docker.ServiceList(ctx, swarm.ServiceListOptions{})
+	if err != nil {
+		http.Error(w, "list services: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	serviceNames := make(map[string]string, len(services))
+	for _, svc := range services {
+		serviceNames[svc.ID] = svc.Spec.Name
+	}
+
+	rows := make([]nodeTaskRow, len(tasks))
+	for i, t := range tasks {
+		rows[i] = nodeTaskRow{Task: t, ServiceName: serviceNames[t.ServiceID]}
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].ServiceName != rows[j].ServiceName {
+			return rows[i].ServiceName < rows[j].ServiceName
+		}
+		return rows[i].Slot < rows[j].Slot
+	})
+
 	s.render(w, r, "node_detail.html", map[string]any{
-		"User": userFromContext(r),
-		"Node": newNodeRow(node, nodeResourceStats{}),
+		"User":  userFromContext(r),
+		"Node":  newNodeRow(node, nodeResourceStats{}),
+		"Tasks": rows,
 	})
 }
 

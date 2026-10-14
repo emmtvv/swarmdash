@@ -39,6 +39,18 @@ func (s *Server) listTasksForService(ctx context.Context, serviceID string) ([]s
 	return tasks, nil
 }
 
+// listTasksForNode returns the tasks the scheduler currently wants running
+// on nodeID - the equivalent of `docker node ps`, minus the shutdown
+// history of replaced/rescheduled tasks.
+func (s *Server) listTasksForNode(ctx context.Context, nodeID string) ([]swarm.Task, error) {
+	return s.docker.TaskList(ctx, swarm.TaskListOptions{
+		Filters: filters.NewArgs(
+			filters.Arg("node", nodeID),
+			filters.Arg("desired-state", "running"),
+		),
+	})
+}
+
 func (s *Server) getService(ctx context.Context, id string) (swarm.Service, error) {
 	svc, _, err := s.docker.ServiceInspectWithRaw(ctx, id, swarm.ServiceInspectOptions{})
 	return svc, err

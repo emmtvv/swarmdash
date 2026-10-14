@@ -61,6 +61,29 @@ func TestHandleNodesPage(t *testing.T) {
 	}
 }
 
+func TestHandleNodesPage_RunningTaskCounts(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/nodes", jsonHandler([]swarm.Node{{ID: "n1", Description: swarm.NodeDescription{Hostname: "node-a"}}}))
+	mux.HandleFunc("/tasks", jsonHandler([]swarm.Task{
+		{NodeID: "n1", Status: swarm.TaskStatus{State: swarm.TaskStateRunning}},
+		{NodeID: "n1", Status: swarm.TaskStatus{State: swarm.TaskStateRunning}},
+		{NodeID: "n1", Status: swarm.TaskStatus{State: swarm.TaskStatePreparing}},
+	}))
+	docker := newFakeDocker(t, mux)
+	s := newTestServer(t, docker)
+
+	r := withUser(httptest.NewRequest(http.MethodGet, "/nodes", nil), testAdmin)
+	w := httptest.NewRecorder()
+	s.handleNodesPage(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `<a href="/nodes/n1#tasks">2 running</a>`) {
+		t.Errorf("body missing running task count, got: %s", w.Body.String())
+	}
+}
+
 func TestHandleNodesPage_DockerError(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/nodes", func(w http.ResponseWriter, r *http.Request) {
@@ -342,7 +365,24 @@ func TestHandleNodePromote_NotFound(t *testing.T) {
 
 func TestHandleNodeDetail(t *testing.T) {
 	node := swarm.Node{ID: "n1", Description: swarm.NodeDescription{Hostname: "node-a"}}
-	docker := newFakeDocker(t, g3NodeMux(node, http.StatusOK))
+	mux := g3NodeMux(node, http.StatusOK)
+	var taskFilters string
+	mux.HandleFunc("GET /tasks", func(w http.ResponseWriter, r *http.Request) {
+		taskFilters = r.URL.Query().Get("filters")
+		jsonHandler([]swarm.Task{{
+			ID:           "t1",
+			ServiceID:    "svc1",
+			NodeID:       "n1",
+			Slot:         2,
+			DesiredState: swarm.TaskStateRunning,
+			Status:       swarm.TaskStatus{State: swarm.TaskStateRunning},
+			Spec:         swarm.TaskSpec{ContainerSpec: &swarm.ContainerSpec{Image: "nginx:1.27@sha256:abc"}},
+		}})(w, r)
+	})
+	mux.HandleFunc("GET /services", jsonHandler([]swarm.Service{
+		{ID: "svc1", Spec: swarm.ServiceSpec{Annotations: swarm.Annotations{Name: "web"}}},
+	}))
+	docker := newFakeDocker(t, mux)
 	s := newTestServer(t, docker)
 
 	r := withUser(httptest.NewRequest(http.MethodGet, "/nodes/n1", nil), testAdmin)
@@ -353,8 +393,33 @@ func TestHandleNodeDetail(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body: %s", w.Code, w.Body.String())
 	}
-	if !strings.Contains(w.Body.String(), "node-a") {
-		t.Errorf("body missing node hostname, got: %s", w.Body.String())
+	body := w.Body.String()
+	for _, want := range []string{"node-a", `href="/services/web">web</a>.2`, "nginx:1.27", `href="/logs/t1"`} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body missing %q, got: %s", want, body)
+		}
+	}
+	if !strings.Contains(taskFilters, `"node":{"n1":true}`) || !strings.Contains(taskFilters, `"desired-state":{"running":true}`) {
+		t.Errorf("task list filters = %s, want node=n1 and desired-state=running", taskFilters)
+	}
+}
+
+func TestHandleNodeDetail_TaskListError(t *testing.T) {
+	node := swarm.Node{ID: "n1", Description: swarm.NodeDescription{Hostname: "node-a"}}
+	mux := g3NodeMux(node, http.StatusOK)
+	mux.HandleFunc("GET /tasks", func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "boom", http.StatusInternalServerError)
+	})
+	docker := newFakeDocker(t, mux)
+	s := newTestServer(t, docker)
+
+	r := withUser(httptest.NewRequest(http.MethodGet, "/nodes/n1", nil), testAdmin)
+	r.SetPathValue("id", "n1")
+	w := httptest.NewRecorder()
+	s.handleNodeDetail(w, r)
+
+	if w.Code != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502; body: %s", w.Code, w.Body.String())
 	}
 }
 

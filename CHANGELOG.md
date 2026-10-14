@@ -5,6 +5,16 @@ Notable changes to swarmdash are tracked here, following
 does not yet follow strict semantic versioning across releases — see the
 README's "Known gaps" section for what's still evolving.
 
+## [1.2.4] - 2026-10-14
+
+### Added
+
+- **Tasks on each node.** A node's page lists the tasks scheduled on it
+  (like `docker node ps`): service and slot, state, image, container,
+  last update and error message, with Console and Logs buttons for
+  running tasks. The Nodes list gets a Tasks column with the running-task
+  count for each node, linking to that list.
+
 ## [1.2.3] - 2026-10-06
 
 ### Added

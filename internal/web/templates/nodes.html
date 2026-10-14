@@ -3,7 +3,7 @@
 <div class="table-wrap">
 <input type="text" class="table-search" data-table-search placeholder="Filter nodes...">
 <table data-enhance>
-	<thead><tr><th>Hostname</th><th>Role</th><th>Status</th><th>Availability</th><th>Address</th><th>CPUs</th><th>CPU used</th><th>Memory</th><th>Mem used</th><th>Disk used</th><th>Engine</th><th data-no-sort></th></tr></thead>
+	<thead><tr><th>Hostname</th><th>Role</th><th>Status</th><th>Availability</th><th>Tasks</th><th>Address</th><th>CPUs</th><th>CPU used</th><th>Memory</th><th>Mem used</th><th>Disk used</th><th>Engine</th><th data-no-sort></th></tr></thead>
 	<tbody>
 	{{range .Nodes}}
 		<tr>
@@ -11,6 +11,7 @@
 			<td>{{.Spec.Role}}</td>
 			<td><span class="badge state-{{.Status.State}}">{{.Status.State}}</span></td>
 			<td><span class="badge state-{{.Spec.Availability}}">{{.Spec.Availability}}</span></td>
+			<td>{{if $.TasksOK}}<a href="/nodes/{{.ID}}#tasks">{{index $.RunningTasks .ID}} running</a>{{else}}<span class="muted">&mdash;</span>{{end}}</td>
 			<td class="muted mono">{{.Status.Addr}}</td>
 			<td>{{cpus .Description.Resources.NanoCPUs}}</td>
 			<td id="cpu-used-{{.ID}}" class="muted node-stat-loading">&hellip;</td>
