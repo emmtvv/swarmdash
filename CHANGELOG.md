@@ -5,6 +5,17 @@ Notable changes to swarmdash are tracked here, following
 does not yet follow strict semantic versioning across releases — see the
 README's "Known gaps" section for what's still evolving.
 
+## [1.2.6] - 2026-10-18
+
+### Fixed
+
+- **Wrong version on the dashboard.** The version shown in the update
+  banner was a hand-maintained constant that wasn't bumped for 1.2.4 and
+  1.2.5, so those releases reported themselves as 1.2.3 and the banner
+  offered an "update" to the version already running. The version is now
+  read from the latest release entry in CHANGELOG.md, which is embedded
+  into the binary, so it no longer needs to be bumped separately.
+
 ## [1.2.5] - 2026-10-18
 
 ### Fixed
