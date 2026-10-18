@@ -5,6 +5,18 @@ Notable changes to swarmdash are tracked here, following
 does not yet follow strict semantic versioning across releases — see the
 README's "Known gaps" section for what's still evolving.
 
+## [1.2.5] - 2026-10-18
+
+### Fixed
+
+- **Missing resource usage on the leader node.** Docker can report a
+  manager's address as `0.0.0.0` (typically the leader, when the swarm was
+  created without `--advertise-addr`), so admin couldn't reach that node's
+  agent: CPU/memory/disk usage stayed empty and console/logs for tasks there
+  failed. The node's address now falls back to its manager address
+  (`ManagerStatus.Addr`), which also fixes the Address column on the Nodes
+  and node pages and the `docker swarm join` hint on the Swarm page.
+
 ## [1.2.4] - 2026-10-14
 
 ### Added

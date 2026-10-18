@@ -3,11 +3,29 @@ package web
 import (
 	"fmt"
 	"html/template"
+	"net"
 	"strings"
 	"time"
+
+	"github.com/docker/docker/api/types/swarm"
 )
 
+// NodeAddr returns a node's reachable IP. Docker sometimes reports a
+// manager's Status.Addr as "0.0.0.0" (notably the leader, when the swarm was
+// initialised without an explicit --advertise-addr); in that case the real
+// address is only available in ManagerStatus.Addr ("ip:2377").
+func NodeAddr(n swarm.Node) string {
+	addr := n.Status.Addr
+	if (addr == "" || addr == "0.0.0.0") && n.ManagerStatus != nil && n.ManagerStatus.Addr != "" {
+		if host, _, err := net.SplitHostPort(n.ManagerStatus.Addr); err == nil && host != "" {
+			return host
+		}
+	}
+	return addr
+}
+
 var FuncMap = template.FuncMap{
+	"nodeAddr": NodeAddr,
 	// dict builds a map from alternating key/value arguments, for passing
 	// more than one value to a {{template}} call.
 	"dict": func(kv ...any) (map[string]any, error) {

@@ -12,7 +12,7 @@
 			<td><span class="badge state-{{.Status.State}}">{{.Status.State}}</span></td>
 			<td><span class="badge state-{{.Spec.Availability}}">{{.Spec.Availability}}</span></td>
 			<td>{{if $.TasksOK}}<a href="/nodes/{{.ID}}#tasks">{{index $.RunningTasks .ID}} running</a>{{else}}<span class="muted">&mdash;</span>{{end}}</td>
-			<td class="muted mono">{{.Status.Addr}}</td>
+			<td class="muted mono">{{nodeAddr .Node}}</td>
 			<td>{{cpus .Description.Resources.NanoCPUs}}</td>
 			<td id="cpu-used-{{.ID}}" class="muted node-stat-loading">&hellip;</td>
 			<td>{{bytesHuman .Description.Resources.MemoryBytes}}</td>

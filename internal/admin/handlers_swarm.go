@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/swarm"
+
+	"swarmdash/internal/web"
 )
 
 func (s *Server) handleSwarmPage(w http.ResponseWriter, r *http.Request) {
@@ -25,7 +27,7 @@ func (s *Server) handleSwarmPage(w http.ResponseWriter, r *http.Request) {
 	managerAddr := ""
 	for _, n := range nodes {
 		if n.ManagerStatus != nil && n.ManagerStatus.Leader {
-			managerAddr = n.Status.Addr
+			managerAddr = web.NodeAddr(n)
 		}
 	}
 

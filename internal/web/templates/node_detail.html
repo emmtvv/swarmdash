@@ -7,7 +7,7 @@
 		<div class="field"><div class="muted">Role</div><div>{{.Node.Spec.Role}}</div></div>
 		<div class="field"><div class="muted">Status</div><div><span class="badge state-{{.Node.Status.State}}">{{.Node.Status.State}}</span></div></div>
 		<div class="field"><div class="muted">Availability</div><div><span class="badge state-{{.Node.Spec.Availability}}">{{.Node.Spec.Availability}}</span></div></div>
-		<div class="field"><div class="muted">Address</div><div class="mono">{{.Node.Status.Addr}}</div></div>
+		<div class="field"><div class="muted">Address</div><div class="mono">{{nodeAddr .Node.Node}}</div></div>
 		<div class="field"><div class="muted">CPUs</div><div>{{cpus .Node.Description.Resources.NanoCPUs}}</div></div>
 		<div class="field"><div class="muted">Memory</div><div>{{bytesHuman .Node.Description.Resources.MemoryBytes}}</div></div>
 		<div class="field"><div class="muted">Engine</div><div>{{.Node.Description.Engine.EngineVersion}}</div></div>

@@ -12,21 +12,25 @@ import (
 
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/gorilla/websocket"
+
+	"swarmdash/internal/web"
 )
 
 // nodeAgentAddr resolves the reachable IP for a node's agent. It reuses the
 // node's swarm advertise address (Status.Addr) - the same address the
 // manager already uses to reach that node for cluster control traffic - so
-// no extra overlay network or service discovery is required.
+// no extra overlay network or service discovery is required. Falls back to
+// ManagerStatus.Addr when Status.Addr is "0.0.0.0" (see web.NodeAddr).
 func (s *Server) nodeAgentAddr(ctx context.Context, nodeID string) (string, error) {
 	node, _, err := s.docker.NodeInspectWithRaw(ctx, nodeID)
 	if err != nil {
 		return "", fmt.Errorf("inspect node %s: %w", nodeID, err)
 	}
-	if node.Status.Addr == "" {
+	addr := web.NodeAddr(node)
+	if addr == "" || addr == "0.0.0.0" {
 		return "", fmt.Errorf("node %s has no advertised address", nodeID)
 	}
-	return node.Status.Addr, nil
+	return addr, nil
 }
 
 func (s *Server) agentBaseURL(ctx context.Context, nodeID string) (string, error) {
