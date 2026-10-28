@@ -96,7 +96,7 @@ func (s *Server) serviceLogLines(ctx context.Context, idx int, svc swarm.Service
 	out := make(chan logLine, 256)
 	go func() {
 		defer close(out)
-		defer pr.Close()
+		defer func() { _ = pr.Close() }()
 		sc := bufio.NewScanner(pr)
 		sc.Buffer(make([]byte, 64*1024), 1024*1024)
 		for sc.Scan() {
