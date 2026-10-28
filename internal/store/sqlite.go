@@ -602,18 +602,19 @@ func (s *SQLiteStore) PutSSOConfig(c SSOConfig) error {
 
 func (s *SQLiteStore) GetAppSettings() (AppSettings, error) {
 	var a AppSettings
-	err := s.db.QueryRow(`SELECT id, update_check_disabled FROM app_settings WHERE id = ?`, AppSettingsID).
-		Scan(&a.ID, &a.UpdateCheckDisabled)
+	err := s.db.QueryRow(`SELECT id, update_check_disabled, image_auto_update FROM app_settings WHERE id = ?`, AppSettingsID).
+		Scan(&a.ID, &a.UpdateCheckDisabled, &a.ImageAutoUpdate)
 	return a, notFoundSQL(err)
 }
 
 func (s *SQLiteStore) PutAppSettings(a AppSettings) error {
 	a.ID = AppSettingsID
 	_, err := s.db.Exec(`
-		INSERT INTO app_settings (id, update_check_disabled)
-		VALUES (?, ?)
-		ON CONFLICT(id) DO UPDATE SET update_check_disabled = excluded.update_check_disabled`,
-		a.ID, a.UpdateCheckDisabled)
+		INSERT INTO app_settings (id, update_check_disabled, image_auto_update)
+		VALUES (?, ?, ?)
+		ON CONFLICT(id) DO UPDATE SET update_check_disabled = excluded.update_check_disabled,
+			image_auto_update = excluded.image_auto_update`,
+		a.ID, a.UpdateCheckDisabled, a.ImageAutoUpdate)
 	return err
 }
 

@@ -38,6 +38,7 @@
 			<button type="submit" class="btn">Update image</button>
 		</form>
 	</div>
+	<div id="image-updates"><div class="muted small" style="margin-top:16px;">Checking for newer versions...</div></div>
 
 	{{if not .IsGlobal}}
 	<div class="card-row" style="margin-top:16px;">
@@ -121,6 +122,13 @@
 </div>
 
 <script nonce="{{cspNonce}}">
+(function() {
+	const box = document.getElementById("image-updates");
+	fetch("/services/" + encodeURIComponent({{.Service.Spec.Name}}) + "/image-updates")
+		.then(r => r.ok ? r.text() : Promise.reject(r.statusText))
+		.then(html => { box.innerHTML = html; })
+		.catch(() => { box.innerHTML = ""; });
+})();
 (function() {
 	const src = new EventSource("/services/{{.Service.Spec.Name}}/events");
 	const banner = document.getElementById("rollout-banner");

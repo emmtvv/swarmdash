@@ -520,6 +520,8 @@ var wantAdminOnlyByRoute = map[string]bool{
 	"POST /services/{name}/rollback":                 true,
 	"POST /services/{name}/restart":                  true,
 	"POST /services/{name}/update-latest":            true,
+	"GET /services/{name}/image-updates":             false,
+	"POST /services/{name}/autoupdate":               true,
 	"POST /services/{name}/delete":                   true,
 	"POST /services/bulk":                            true,
 	"POST /services/{name}/deploy-hooks":             true,
@@ -609,6 +611,9 @@ var wantAdminOnlyByRoute = map[string]bool{
 	"GET /services/{name}/logs":          false,
 	"GET /ws/services/{name}/logs":       false,
 	"GET /services/{name}/logs/download": false,
+	"GET /stacks/{name}/logs":            false,
+	"GET /ws/stacks/{name}/logs":         false,
+	"GET /stacks/{name}/logs/download":   false,
 }
 
 // TestRequireRole_AllRoutesHaveExplicitRBACDecision walks every route

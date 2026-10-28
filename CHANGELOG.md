@@ -5,6 +5,34 @@ Notable changes to swarmdash are tracked here, following
 does not yet follow strict semantic versioning across releases — see the
 README's "Known gaps" section for what's still evolving.
 
+## [1.3.0] - 2026-10-28
+
+### Added
+
+- **Image updates.** A service's page shows the newest patch (same major
+  and minor version), minor (same major version) and major version of its image tag available in the registry,
+  with a button to update to each. Automatic updates run hourly, set per
+  service on its page or with the `swarmdash.autoupdate` label
+  (`off`/`patch`/`minor`/`major`), or for every service at once in Settings →
+  General. Only tags of the same form as the deployed one are considered
+  (`1.27.1-alpine` → `1.28.0-alpine`, never `-rc` builds or `latest`); a
+  version Swarm rolled back from isn't retried. Updates are audited and
+  sent to webhooks as `service_image_updated`.
+- **Stack logs.** A stack's page gets a Logs button: every service's logs
+  merged into one stream ordered by time, each line tagged with its
+  service, with a per-service selector, a text filter, follow and
+  download.
+
+### Changed
+
+- **Registry logins are checked when saved** (Settings → Registries), so a
+  wrong password shows up right away instead of on the next deploy or
+  automatic image update; "Save without checking" covers a registry the
+  nodes can reach but admin can't. The address is normalized
+  (`https://ghcr.io/` → `ghcr.io`, `index.docker.io` → `docker.io`) - it
+  used to have to match the image's registry exactly, or the login was
+  silently not used. Logins saved earlier in another form still match.
+
 ## [1.2.6] - 2026-10-18
 
 ### Fixed

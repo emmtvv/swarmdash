@@ -1,15 +1,28 @@
 {{define "settings_general.html"}}
 <h1>General settings</h1>
 
+<form method="post" action="/settings/general">
 <div class="card">
 	<h2 style="margin-top:0;">Update check</h2>
 	<p class="muted">The dashboard shows a banner when a newer swarmdash release is available. Checking it has your browser ask <span class="mono">api.github.com</span> for the latest release directly - the admin server itself never talks to GitHub. Turning this off stops that request entirely, not just the banner.</p>
-	<form method="post" action="/settings/general">
-		<label style="display:flex; align-items:center; gap:0.5em;">
-			<input type="checkbox" name="update_check_disabled" value="1" {{if .UpdateCheckDisabled}}checked{{end}}>
-			Disable the update-available check
-		</label>
-		<button type="submit" class="btn" style="margin-top:0.75em;">Save</button>
-	</form>
+	<label style="display:flex; align-items:center; gap:0.5em;">
+		<input type="checkbox" name="update_check_disabled" value="1" {{if .UpdateCheckDisabled}}checked{{end}}>
+		Disable the update-available check
+	</label>
 </div>
+
+<div class="card">
+	<h2 style="margin-top:0;">Automatic image updates</h2>
+	<p class="muted">Once an hour, move every service whose image has a version tag (<span class="mono">1.27.1</span>, <span class="mono">v2.3</span>, <span class="mono">8.0.1-jdk17</span>) to the newest tag of the same form in its registry. <strong>Patch</strong> stays within the current minor version (1.27.1 &rarr; 1.27.4), <strong>minor</strong> within the current major version (1.27.1 &rarr; 1.29.0), <strong>major</strong> takes any newer version (1.27.1 &rarr; 2.0.1). Tags like <span class="mono">latest</span> are never touched. A service can override this on its page or with the <span class="mono">swarmdash.autoupdate</span> label (<span class="mono">off</span>, <span class="mono">patch</span>, <span class="mono">minor</span>, <span class="mono">major</span>) under <span class="mono">deploy.labels</span> in compose. Each update is recorded in the audit log and sent to webhooks as <span class="mono">service_image_updated</span>.</p>
+	<label for="image_auto_update">Default for all services</label>
+	<select id="image_auto_update" name="image_auto_update" style="width:220px;">
+		<option value="off" {{if eq .ImageAutoUpdate "off"}}selected{{end}}>Off</option>
+		<option value="patch" {{if eq .ImageAutoUpdate "patch"}}selected{{end}}>Patch versions</option>
+		<option value="minor" {{if eq .ImageAutoUpdate "minor"}}selected{{end}}>Minor versions</option>
+		<option value="major" {{if eq .ImageAutoUpdate "major"}}selected{{end}}>Major versions</option>
+	</select>
+</div>
+
+<button type="submit" class="btn">Save</button>
+</form>
 {{end}}

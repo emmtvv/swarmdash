@@ -66,6 +66,8 @@ func protectedRoutes(s *Server) []route {
 		{"POST /services/{name}/rollback", s.handleServiceRollback, false},
 		{"POST /services/{name}/restart", s.handleServiceRestart, false},
 		{"POST /services/{name}/update-latest", s.handleServiceUpdateLatest, false},
+		{"GET /services/{name}/image-updates", s.handleServiceImageUpdates, true},
+		{"POST /services/{name}/autoupdate", s.handleServiceAutoUpdate, false},
 		{"POST /services/{name}/delete", s.handleServiceDelete, false},
 		{"POST /services/bulk", s.handleServicesBulk, false},
 		{"POST /services/{name}/deploy-hooks", s.handleDeployHookCreate, false},
@@ -159,6 +161,10 @@ func protectedRoutes(s *Server) []route {
 		{"GET /services/{name}/logs", s.handleServiceLogsPage, true},
 		{"GET /ws/services/{name}/logs", s.handleServiceLogsProxy, true},
 		{"GET /services/{name}/logs/download", s.handleServiceLogsDownload, true},
+
+		{"GET /stacks/{name}/logs", s.handleStackLogsPage, true},
+		{"GET /ws/stacks/{name}/logs", s.handleStackLogsProxy, true},
+		{"GET /stacks/{name}/logs/download", s.handleStackLogsDownload, true},
 	}
 }
 

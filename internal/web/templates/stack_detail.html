@@ -5,6 +5,7 @@
 	<div class="actions">
 		<a href="/stacks/deploy?stack={{.Name}}" class="btn">Edit</a>
 		<a href="/stacks/{{.Name}}/export.yml" class="btn secondary">Export compose</a>
+		<a href="/stacks/{{.Name}}/logs" class="btn secondary">Logs</a>
 		<form method="post" action="/stacks/{{.Name}}/restart" data-confirm="Restart every service in stack {{.Name}}?">
 			<button type="submit" class="btn secondary">Restart all</button>
 		</form>

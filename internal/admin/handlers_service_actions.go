@@ -66,23 +66,30 @@ func (s *Server) handleServiceUpdateImage(w http.ResponseWriter, r *http.Request
 		http.Error(w, "get service: "+err.Error(), http.StatusNotFound)
 		return
 	}
-	svc.Spec.TaskTemplate.ContainerSpec.Image = image
-
-	updateOpts := swarm.ServiceUpdateOptions{QueryRegistry: true}
-	auth, err := s.encodedRegistryAuthFor(image)
-	if err != nil {
-		http.Error(w, "registry credential: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	updateOpts.EncodedRegistryAuth = auth
-
-	if _, err := s.docker.ServiceUpdate(ctx, svc.ID, svc.Version, svc.Spec, updateOpts); err != nil {
+	if err := s.setServiceImage(ctx, svc, image); err != nil {
 		http.Error(w, "update service: "+err.Error(), http.StatusBadGateway)
 		return
 	}
 	s.log.Info("service image updated", "service", svc.Spec.Name, "image", image, "by", userFromContext(r).Username)
 	s.audit(r, "service.update_image", svc.Spec.Name, "image="+image, nil)
 	redirect(w, r, "/services/"+name)
+}
+
+// setServiceImage points svc at image and rolls it out, resolving the tag
+// against the registry (with a stored credential, if there is one) so every
+// node pulls the same digest. Shared by the image form and image updates
+// (image_updates.go).
+func (s *Server) setServiceImage(ctx context.Context, svc swarm.Service, image string) error {
+	svc.Spec.TaskTemplate.ContainerSpec.Image = image
+	auth, err := s.encodedRegistryAuthFor(image)
+	if err != nil {
+		return fmt.Errorf("registry credential: %w", err)
+	}
+	_, err = s.docker.ServiceUpdate(ctx, svc.ID, svc.Version, svc.Spec, swarm.ServiceUpdateOptions{
+		QueryRegistry:       true,
+		EncodedRegistryAuth: auth,
+	})
+	return err
 }
 
 func (s *Server) handleServiceRollback(w http.ResponseWriter, r *http.Request) {

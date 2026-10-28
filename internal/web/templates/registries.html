@@ -1,6 +1,6 @@
 {{define "registries.html"}}
 <h1>Registry credentials</h1>
-<p class="muted">Used automatically when the image on a service update/create belongs to one of these registries. Passwords are encrypted at rest (keyed off the cluster secret) and never shown again after saving.</p>
+<p class="muted">Used automatically whenever an image from one of these registries is pulled - creating or updating a service, deploying a stack, deploy webhooks - and to look up newer tags for image updates, so private images can be updated automatically too. The login is checked against the registry when you save it. Passwords are encrypted at rest (keyed off the cluster secret) and never shown again after saving.</p>
 
 <div class="card">
 	<h2 style="margin-top:0;">Add registry</h2>
@@ -8,7 +8,7 @@
 		<div class="card-row">
 			<div>
 				<label for="server">Server</label>
-				<input type="text" id="server" name="server" placeholder="docker.io / registry.example.com:5000" required style="width:260px;">
+				<input type="text" id="server" name="server" placeholder="docker.io / ghcr.io / registry.example.com:5000" required style="width:260px;">
 			</div>
 			<div>
 				<label for="username">Username</label>
@@ -16,13 +16,17 @@
 			</div>
 			<div>
 				<label for="password">Password</label>
-				<input type="password" id="password" name="password" required>
+				<input type="password" id="password" name="password" required placeholder="password or access token">
 			</div>
 			<div>
 				<label>&nbsp;</label>
 				<button type="submit" class="btn">Save</button>
 			</div>
 		</div>
+		<label class="muted small" style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:8px;">
+			<input type="checkbox" name="skip_check" value="1" style="width:auto;">
+			Save without checking (admin can't reach this registry, but the nodes can)
+		</label>
 	</form>
 </div>
 

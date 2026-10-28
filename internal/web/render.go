@@ -57,9 +57,17 @@ func (r *Renderer) Render(w http.ResponseWriter, page string, data any, csrfToke
 
 // RenderFragment renders a template with no layout wrapper - used for
 // htmx partial responses (e.g. the live task table refreshed in place).
+// Like Render it executes a clone: once r.tmpl itself has executed,
+// html/template refuses to Clone it, which would break every later Render.
 func (r *Renderer) RenderFragment(w http.ResponseWriter, name string, data any) {
+	tmpl, err := r.tmpl.Clone()
+	if err != nil {
+		slog.Error("template clone failed", "err", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := r.tmpl.ExecuteTemplate(w, name, data); err != nil {
+	if err := tmpl.ExecuteTemplate(w, name, data); err != nil {
 		slog.Error("fragment render failed", "template", name, "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 	}

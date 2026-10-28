@@ -245,6 +245,11 @@ type AppSettings struct {
 	// internal/admin/handlers_settings_general.go) rather than looked up
 	// on every request.
 	UpdateCheckDisabled bool `bson:"update_check_disabled" json:"update_check_disabled"`
+	// ImageAutoUpdate is the cluster-wide automatic image update policy
+	// ("off", "patch", "minor" or "major"; empty means off), applied to every
+	// service without its own swarmdash.autoupdate label - see
+	// internal/admin/image_updates.go.
+	ImageAutoUpdate string `bson:"image_auto_update" json:"image_auto_update"`
 }
 
 // AppSettingsID is the fixed document ID for the singleton AppSettings.

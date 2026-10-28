@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"swarmdash/internal/imageupdate"
 	"swarmdash/internal/store"
 )
 
@@ -32,7 +33,7 @@ func TestHandleRegistryCreate(t *testing.T) {
 	s := newTestServer(t, nil)
 	s.cfg.ClusterSecret = "test-secret"
 
-	form := url.Values{"server": {"registry.example.com"}, "username": {"bob"}, "password": {"hunter2"}}
+	form := url.Values{"server": {"registry.example.com"}, "username": {"bob"}, "password": {"hunter2"}, "skip_check": {"1"}}
 	r := withUser(httptest.NewRequest(http.MethodPost, "/settings/registries", strings.NewReader(form.Encode())), testAdmin)
 	r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
@@ -149,5 +150,80 @@ func TestEncodedRegistryAuthFor(t *testing.T) {
 	}
 	if auth != "" {
 		t.Errorf("expected empty auth for unconfigured registry, got %q", auth)
+	}
+}
+
+// fakeLoginRegistry is a TLS registry that answers /v2/ with a basic-auth
+// challenge and accepts only bob/hunter2.
+func fakeLoginRegistry(t *testing.T, s *Server) string {
+	t.Helper()
+	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if user, pass, _ := r.BasicAuth(); user != "bob" || pass != "hunter2" {
+			w.Header().Set("WWW-Authenticate", `Basic realm="reg"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(ts.Close)
+	s.registryClient = &imageupdate.Client{HTTP: ts.Client()}
+	return strings.TrimPrefix(ts.URL, "https://")
+}
+
+func TestHandleRegistryCreate_ChecksLogin(t *testing.T) {
+	s := newTestServer(t, nil)
+	s.cfg.ClusterSecret = "test-secret"
+	host := fakeLoginRegistry(t, s)
+
+	w := httptest.NewRecorder()
+	s.handleRegistryCreate(w, postForm("/settings/registries", url.Values{"server": {host}, "username": {"bob"}, "password": {"wrong"}}))
+	if w.Code != http.StatusBadRequest || !strings.Contains(w.Body.String(), "login check failed") {
+		t.Fatalf("wrong password: status = %d, body = %s", w.Code, w.Body.String())
+	}
+	if creds, _ := s.store.ListRegistryCredentials(); len(creds) != 0 {
+		t.Fatalf("a rejected login was saved: %+v", creds)
+	}
+
+	w = httptest.NewRecorder()
+	s.handleRegistryCreate(w, postForm("/settings/registries", url.Values{"server": {"https://" + host + "/"}, "username": {"bob"}, "password": {"hunter2"}}))
+	if w.Code != http.StatusSeeOther {
+		t.Fatalf("right password: status = %d, body = %s", w.Code, w.Body.String())
+	}
+	creds, _ := s.store.ListRegistryCredentials()
+	if len(creds) != 1 || creds[0].Server != host {
+		t.Fatalf("saved %+v, want server normalized to %q", creds, host)
+	}
+}
+
+func TestNormalizeRegistryServer(t *testing.T) {
+	cases := map[string]string{
+		" https://GHCR.io/ ":            "ghcr.io",
+		"http://registry.local:5000/v2": "registry.local:5000",
+		"index.docker.io":               "docker.io",
+		"https://registry-1.docker.io":  "docker.io",
+		"docker.io":                     "docker.io",
+	}
+	for in, want := range cases {
+		if got := normalizeRegistryServer(in); got != want {
+			t.Errorf("normalizeRegistryServer(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// TestStoredRegistryLogin_MatchesUnnormalizedServer covers credentials
+// saved before addresses were normalized on save.
+func TestStoredRegistryLogin_MatchesUnnormalizedServer(t *testing.T) {
+	s := newTestServer(t, nil)
+	s.cfg.ClusterSecret = "test-secret"
+	enc, err := s.encryptSecret("hunter2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.store.PutRegistryCredential(store.RegistryCredential{Server: "https://ghcr.io/", Username: "bob", PasswordEnc: enc}); err != nil {
+		t.Fatal(err)
+	}
+	cred := s.registryCredential("ghcr.io/org/app:1.0")
+	if cred.Username != "bob" || cred.Password != "hunter2" {
+		t.Errorf("credential = %+v, want bob/hunter2", cred)
 	}
 }

@@ -1,0 +1,83 @@
+{{define "stack_logs.html"}}
+<div class="breadcrumb"><a href="/stacks">Stacks</a> / <a href="/stacks/{{.StackName}}">{{.StackName}}</a> / logs</div>
+<div class="page-header">
+	<h1>Logs <span class="muted mono" style="font-size:14px;">{{.StackName}}</span> <span id="status" class="badge state-active">connected</span></h1>
+	<div class="actions">
+		<select id="service" style="width:auto;">
+			<option value="">All services</option>
+			{{range .Services}}<option value="{{.}}">{{.}}</option>{{end}}
+		</select>
+		<input type="text" id="filter" placeholder="Filter lines..." style="width:200px;">
+		<label class="muted small"><input type="checkbox" id="follow" checked> Follow</label>
+		<a href="/stacks/{{.StackName}}/logs/download" id="download" class="btn secondary small">Download</a>
+	</div>
+</div>
+<div class="muted" style="margin-bottom:8px;">Merged output from every service of this stack, ordered by time (UTC).</div>
+
+<pre id="logs-out" class="card mono" style="height:75vh;overflow:auto;white-space:pre-wrap;"></pre>
+
+<script nonce="{{cspNonce}}">
+(function() {
+	const stackName = {{.StackName}};
+	const wsProto = location.protocol === "https:" ? "wss://" : "ws://";
+	const statusEl = document.getElementById("status");
+	const out = document.getElementById("logs-out");
+	const followCheckbox = document.getElementById("follow");
+	const serviceSelect = document.getElementById("service");
+	const filterInput = document.getElementById("filter");
+	const downloadLink = document.getElementById("download");
+	const maxLines = 20000;
+
+	// Lines are kept so the filter can be changed without reconnecting;
+	// partial holds a line split across websocket messages.
+	let lines = [], partial = "";
+
+	function setStatus(s) { statusEl.textContent = s; statusEl.className = "badge state-" + (s === "connected" ? "active" : "pending"); }
+	function matches(line) { const f = filterInput.value.toLowerCase(); return !f || line.toLowerCase().includes(f); }
+	function render() { out.textContent = lines.filter(matches).join("\n") + (lines.length ? "\n" : ""); out.scrollTop = out.scrollHeight; }
+
+	function append(text) {
+		const parts = (partial + text).split("\n");
+		partial = parts.pop();
+		if (!parts.length) return;
+		lines.push(...parts);
+		if (lines.length > maxLines) { lines = lines.slice(-maxLines); render(); return; }
+		const shown = parts.filter(matches);
+		if (shown.length) out.textContent += shown.join("\n") + "\n";
+		out.scrollTop = out.scrollHeight;
+	}
+
+	let socket, timer, attempt = 0, closed = false;
+	function connect() {
+		const svc = serviceSelect.value;
+		const qs = "?tail=200&follow=" + followCheckbox.checked + (svc ? "&service=" + encodeURIComponent(svc) : "");
+		socket = new WebSocket(wsProto + location.host + "/ws/stacks/" + encodeURIComponent(stackName) + "/logs" + qs);
+		socket.onopen = () => { attempt = 0; setStatus("connected"); };
+		socket.onmessage = (ev) => append(ev.data);
+		socket.onclose = () => {
+			if (closed) return;
+			if (!followCheckbox.checked) { setStatus("done"); return; }
+			setStatus("reconnecting");
+			attempt++;
+			timer = setTimeout(() => { reset(); connect(); }, Math.min(1000 * attempt, 5000));
+		};
+		socket.onerror = () => socket.close();
+	}
+	function reset() { lines = []; partial = ""; out.textContent = ""; }
+	function reconnect() {
+		reset();
+		clearTimeout(timer);
+		if (socket) { socket.onclose = null; socket.close(); }
+		closed = false;
+		const svc = serviceSelect.value;
+		downloadLink.href = "/stacks/" + encodeURIComponent(stackName) + "/logs/download" + (svc ? "?service=" + encodeURIComponent(svc) : "");
+		connect();
+	}
+	followCheckbox.addEventListener("change", reconnect);
+	serviceSelect.addEventListener("change", reconnect);
+	filterInput.addEventListener("input", render);
+	connect();
+	window.addEventListener("beforeunload", () => { closed = true; clearTimeout(timer); if (socket) socket.close(); });
+})();
+</script>
+{{end}}

@@ -20,6 +20,7 @@ import (
 	"github.com/docker/docker/client"
 	"golang.org/x/time/rate"
 
+	"swarmdash/internal/imageupdate"
 	"swarmdash/internal/store"
 	"swarmdash/internal/web"
 )
@@ -105,6 +106,11 @@ type Server struct {
 	// in Settings -> General.
 	updateCheckLoaded   sync.Once
 	updateCheckDisabled atomic.Bool
+
+	// registryClient lists image tags for image updates (image_updates.go);
+	// nil means imageupdate.DefaultClient. tagCache caches its results.
+	registryClient *imageupdate.Client
+	tagCache       tagCache
 }
 
 func New(cfg Config, docker *client.Client, st store.Interface) (*Server, error) {
@@ -208,6 +214,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 
 	go s.runPoller(ctx)
 	go s.runGitOpsPoller(ctx)
+	go s.runImageUpdater(ctx)
 
 	srv := &http.Server{
 		Addr:              s.cfg.ListenAddr,

@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"swarmdash/internal/imageupdate"
 	"swarmdash/internal/store"
 )
 
@@ -11,6 +12,7 @@ func (s *Server) handleGeneralSettingsPage(w http.ResponseWriter, r *http.Reques
 	s.render(w, r, "settings_general.html", map[string]any{
 		"User":                userFromContext(r),
 		"UpdateCheckDisabled": s.isUpdateCheckDisabled(),
+		"ImageAutoUpdate":     string(s.defaultImagePolicy()),
 	})
 }
 
@@ -20,14 +22,18 @@ func (s *Server) handleGeneralSettingsSave(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	disabled := r.FormValue("update_check_disabled") != ""
+	policy, ok := imageupdate.ParsePolicy(r.FormValue("image_auto_update"))
+	if !ok {
+		policy = imageupdate.PolicyOff
+	}
 
-	if err := s.store.PutAppSettings(store.AppSettings{UpdateCheckDisabled: disabled}); err != nil {
+	if err := s.store.PutAppSettings(store.AppSettings{UpdateCheckDisabled: disabled, ImageAutoUpdate: string(policy)}); err != nil {
 		http.Error(w, "save settings: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	s.setUpdateCheckDisabled(disabled)
 
-	s.audit(r, "settings.general.save", "", "update_check_disabled="+strconv.FormatBool(disabled), nil)
+	s.audit(r, "settings.general.save", "", "update_check_disabled="+strconv.FormatBool(disabled)+" image_auto_update="+string(policy), nil)
 	redirect(w, r, "/settings/general")
 }
 

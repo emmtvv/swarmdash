@@ -20,7 +20,11 @@
 - **Secrets & configs**: see which services use each one, and rotate them
   (new version, every service switched over, old one deleted) in one step.
 - **Web-based console** per task — exec shell (full TTY), live logs, live
-  `docker stats`, a file browser, all proxied to the right node.
+  `docker stats`, a file browser, all proxied to the right node. Logs are
+  also merged per service and per whole stack.
+- **Image updates**: one-click update to the newest patch, minor or major version
+  of a service's image tag, or automatically - per service or for the
+  whole cluster.
 - **Live rollout view**, cluster topology graph, dashboard history, and a
   public unauthenticated `/status` page for uptime monitors.
 - **Users & roles, SSO (OIDC)**, API tokens, audit log of every mutating
@@ -40,6 +44,25 @@
   (parallelism/delay/order/failure-action).
 - Stack delete (removes every service with that stack label — Docker has
   no atomic stack-delete API) and stack-wide force-restart.
+- **Stack logs** (a stack's page → Logs): every service's tasks merged
+  into one stream ordered by timestamp, each line tagged with its service;
+  narrow it to one service or filter lines by text, follow live, or
+  download the whole log.
+- **Image updates**: a service's page lists the newest tag in its registry
+  that's a *patch* (same major and minor version: 1.27.1 → 1.27.4), *minor*
+  (same major version: 1.27.1 → 1.29.0) or *major*
+  (any newer version: → 2.0.1) upgrade of the deployed tag, with a button
+  to switch to each. Only tags of the same form are considered - same
+  `v` prefix, number of components and suffix, so `1.27.1-alpine` only
+  moves to other `-alpine` tags and never to a `-rc` - and tags like
+  `latest` are left to "Update to latest". **Automatic updates** run hourly
+  with the policy set on the service page or by its `swarmdash.autoupdate`
+  label (`off`/`patch`/`minor`/`major`, can be set under `deploy.labels` in
+  compose so it survives redeploys), falling back to the cluster-wide
+  default in Settings → General (off unless changed). A service mid-rollout
+  is skipped, and a version Swarm already rolled back from isn't retried.
+  Each update is audited and sent to webhooks as `service_image_updated`.
+  Private registries use the credentials from Settings → Registries.
 - **Create a service from a form** (Services → New service): name,
   optional stack, image, mode/replicas, plus every field of the advanced
   editor (env, entrypoint/command, ports, mounts, networks, secrets/configs,
