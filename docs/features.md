@@ -264,8 +264,9 @@
   lives in a cookie. The browser's `Accept-Language` is not used: until
   someone picks a language, the UI is in English. Catalogs live in
   `internal/i18n/locales/*.json` (including `en.json`, the reference list
-  of every message), keyed by the English source text; anything missing
-  falls back to that text. Server-side technical errors (from Docker or an
+  of every message). Templates and code refer to messages by key
+  (`{{t "common.services"}}`, `<namespace>.<slug>`) and each catalog maps
+  keys to its text; anything missing falls back to English. Server-side technical errors (from Docker or an
   agent) stay in English.
 
 ### Observability

@@ -4,21 +4,21 @@
 		<div class="login-brand">
 			<span class="brand-mark">{{template "brand-svg"}}</span>
 			<h1>swarmdash</h1>
-			<p>{{t "Sign in to manage your cluster"}}</p>
+			<p>{{t "login.sign_in_to_manage_your"}}</p>
 		</div>
 		{{if .Error}}<div class="error-box">{{t .Error}}</div>{{end}}
 		{{if not .LocalLoginDisabled}}
 		<form method="post" action="/login">
-			<label for="username">{{t "Username"}}</label>
+			<label for="username">{{t "common.username"}}</label>
 			<input type="text" id="username" name="username" autofocus required>
-			<label for="password">{{t "Password"}}</label>
+			<label for="password">{{t "common.password"}}</label>
 			<input type="password" id="password" name="password" required>
-			<button type="submit" class="btn" style="width:100%;margin-top:22px;">{{t "Log in"}}</button>
+			<button type="submit" class="btn" style="width:100%;margin-top:22px;">{{t "login.log_in"}}</button>
 		</form>
 		{{end}}
 		{{if .SSOActive}}
-		{{if not .LocalLoginDisabled}}<div class="login-divider"><span>{{t "or"}}</span></div>{{end}}
-		<a href="/sso/login" class="btn secondary" style="width:100%;display:block;text-align:center;box-sizing:border-box;{{if .LocalLoginDisabled}}margin-top:22px;{{end}}">{{t "Sign in with %v" .SSOLabel}}</a>
+		{{if not .LocalLoginDisabled}}<div class="login-divider"><span>{{t "login.or"}}</span></div>{{end}}
+		<a href="/sso/login" class="btn secondary" style="width:100%;display:block;text-align:center;box-sizing:border-box;{{if .LocalLoginDisabled}}margin-top:22px;{{end}}">{{t "login.sign_in_with" .SSOLabel}}</a>
 		{{end}}
 		{{template "lang-picker" "/login"}}
 	</div>
@@ -30,7 +30,7 @@
 {{define "lang-picker"}}
 <form method="post" action="/language" class="lang-picker">
 	{{if .}}<input type="hidden" name="return" value="{{.}}">{{end}}
-	<select name="lang" aria-label="{{t "Language"}}" data-auto-submit>
+	<select name="lang" aria-label="{{t "common.language"}}" data-auto-submit>
 		{{$cur := lang}}
 		{{range languages}}<option value="{{.Tag}}" {{if eq .Tag $cur}}selected{{end}}>{{.Name}}</option>{{end}}
 	</select>

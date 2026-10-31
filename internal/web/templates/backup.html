@@ -1,51 +1,51 @@
 {{define "backup.html"}}
-<h1>{{t "Backup & restore"}}</h1>
-<p class="muted">{{t "Exports users, roles, API tokens, webhooks, registry credentials, GitOps stacks, stack compose history, saved templates and SSO settings as a single JSON file. Audit log and metrics history are intentionally left out - this is a configuration snapshot, not a full database dump."}}</p>
+<h1>{{t "backup.backup_restore"}}</h1>
+<p class="muted">{{t "backup.exports_users_roles_api_tokens"}}</p>
 
 {{if .Restored}}
 <div class="card" style="border-color:var(--green);">
-	<h2 style="margin-top:0;">{{t "Restore complete"}}</h2>
-	<p>{{t "Merged %v user(s) and %v API token(s), plus webhooks/registries/GitOps stacks/stack history/templates/SSO config from the uploaded file. Existing records not present in the file were left untouched." .RestoredUsers .RestoredTokens}}</p>
+	<h2 style="margin-top:0;">{{t "backup.restore_complete"}}</h2>
+	<p>{{t "backup.merged_user_s_and_api" .RestoredUsers .RestoredTokens}}</p>
 	{{if .Warnings}}
 	<div class="error-box">
-		<strong>{{t "Some encrypted fields could not be decrypted:"}}</strong>
+		<strong>{{t "backup.some_encrypted_fields_could_not"}}</strong>
 		<ul style="margin:8px 0 0 18px;">
 		{{range .Warnings}}<li>{{.}}</li>{{end}}
 		</ul>
-		<p style="margin:8px 0 0;">{{tHTML "This happens when the backup was taken on an admin instance with a different <span class=\"mono\">--cluster-secret</span>. The records were still restored - just re-enter the affected password/secret by hand."}}</p>
+		<p style="margin:8px 0 0;">{{tHTML "backup.this_happens_when_the_backup"}}</p>
 	</div>
 	{{end}}
 </div>
 {{end}}
 
 <div class="card">
-	<h2 style="margin-top:0;">{{t "Current configuration"}}</h2>
+	<h2 style="margin-top:0;">{{t "backup.current_configuration"}}</h2>
 	<table>
 		<tbody>
-			<tr><td>{{t "Users"}}</td><td class="mono">{{.UserCount}}</td></tr>
-			<tr><td>{{t "API tokens"}}</td><td class="mono">{{.TokenCount}}</td></tr>
-			<tr><td>{{t "Webhooks"}}</td><td class="mono">{{.WebhookCount}}</td></tr>
-			<tr><td>{{t "Registry credentials"}}</td><td class="mono">{{.RegistryCount}}</td></tr>
-			<tr><td>{{t "GitOps stacks"}}</td><td class="mono">{{.GitStackCount}}</td></tr>
-			<tr><td>{{t "Deploy hooks"}}</td><td class="mono">{{.DeployHookCount}}</td></tr>
-			<tr><td>{{t "Stack compose versions"}}</td><td class="mono">{{.StackVersionCount}}</td></tr>
-			<tr><td>{{t "Saved templates"}}</td><td class="mono">{{.StackTemplateCount}}</td></tr>
-			<tr><td>{{t "SSO configured"}}</td><td class="mono">{{if .HasSSO}}{{t "yes"}}{{else}}{{t "no"}}{{end}}</td></tr>
+			<tr><td>{{t "common.users"}}</td><td class="mono">{{.UserCount}}</td></tr>
+			<tr><td>{{t "common.api_tokens"}}</td><td class="mono">{{.TokenCount}}</td></tr>
+			<tr><td>{{t "common.webhooks"}}</td><td class="mono">{{.WebhookCount}}</td></tr>
+			<tr><td>{{t "common.registry_credentials"}}</td><td class="mono">{{.RegistryCount}}</td></tr>
+			<tr><td>{{t "backup.gitops_stacks"}}</td><td class="mono">{{.GitStackCount}}</td></tr>
+			<tr><td>{{t "backup.deploy_hooks"}}</td><td class="mono">{{.DeployHookCount}}</td></tr>
+			<tr><td>{{t "backup.stack_compose_versions"}}</td><td class="mono">{{.StackVersionCount}}</td></tr>
+			<tr><td>{{t "backup.saved_templates"}}</td><td class="mono">{{.StackTemplateCount}}</td></tr>
+			<tr><td>{{t "backup.sso_configured"}}</td><td class="mono">{{if .HasSSO}}{{t "backup.yes"}}{{else}}{{t "backup.no"}}{{end}}</td></tr>
 		</tbody>
 	</table>
-	<a href="/settings/backup/export" class="btn" style="margin-top:16px;display:inline-block;">{{t "Download backup (.json)"}}</a>
+	<a href="/settings/backup/export" class="btn" style="margin-top:16px;display:inline-block;">{{t "backup.download_backup_json"}}</a>
 </div>
 
 <div class="card">
-	<h2 style="margin-top:0;">{{t "Restore from backup"}}</h2>
-	<p class="muted">{{tHTML "Merges the uploaded file into the current store: records are created or overwritten by ID, nothing already present is deleted. Encrypted fields (registry passwords, GitOps access tokens, stack deploy variables, the SSO client secret, two-factor secrets) only decrypt successfully if this instance uses the same <span class=\"mono\">--cluster-secret</span> the backup was taken with."}}</p>
-	<form method="post" action="/settings/backup/restore" enctype="multipart/form-data" data-confirm="{{t "Restore users and settings from this backup file? Existing records with the same ID will be overwritten."}}">
+	<h2 style="margin-top:0;">{{t "backup.restore_from_backup"}}</h2>
+	<p class="muted">{{tHTML "backup.merges_the_uploaded_file_into"}}</p>
+	<form method="post" action="/settings/backup/restore" enctype="multipart/form-data" data-confirm="{{t "backup.restore_users_and_settings_from"}}">
 		<div class="file-picker">
 			<input type="file" name="file" id="restore-file" accept="application/json" required>
-			<label for="restore-file" class="btn secondary">{{t "Choose file"}}</label>
-			<span class="file-picker-name">{{t "No file chosen"}}</span>
+			<label for="restore-file" class="btn secondary">{{t "common.choose_file"}}</label>
+			<span class="file-picker-name">{{t "common.no_file_chosen"}}</span>
 		</div>
-		<button type="submit" class="btn" style="margin-top:16px;">{{t "Restore"}}</button>
+		<button type="submit" class="btn" style="margin-top:16px;">{{t "common.restore"}}</button>
 	</form>
 </div>
 {{end}}

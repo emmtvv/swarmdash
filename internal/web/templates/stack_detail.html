@@ -1,31 +1,31 @@
 {{define "stack_detail.html"}}
-<div class="breadcrumb"><a href="/stacks">{{t "Stacks"}}</a> / {{.Name}}</div>
+<div class="breadcrumb"><a href="/stacks">{{t "common.stacks"}}</a> / {{.Name}}</div>
 <div class="page-header">
 	<h1>{{.Name}} {{template "fav-star" (dict "User" .User "Kind" "stack" "Name" .Name)}}</h1>
 	<div class="actions">
-		<a href="/stacks/deploy?stack={{.Name}}" class="btn">{{t "Edit"}}</a>
-		<a href="/stacks/{{.Name}}/export.yml" class="btn secondary">{{t "Export compose"}}</a>
-		<a href="/stacks/{{.Name}}/logs" class="btn secondary">{{t "Logs"}}</a>
-		<form method="post" action="/stacks/{{.Name}}/restart" data-confirm="{{t "Restart every service in stack %v?" .Name}}">
-			<button type="submit" class="btn secondary">{{t "Restart all"}}</button>
+		<a href="/stacks/deploy?stack={{.Name}}" class="btn">{{t "common.edit"}}</a>
+		<a href="/stacks/{{.Name}}/export.yml" class="btn secondary">{{t "common.export_compose"}}</a>
+		<a href="/stacks/{{.Name}}/logs" class="btn secondary">{{t "common.logs"}}</a>
+		<form method="post" action="/stacks/{{.Name}}/restart" data-confirm="{{t "stack_detail.restart_every_service_in_stack" .Name}}">
+			<button type="submit" class="btn secondary">{{t "stack_detail.restart_all"}}</button>
 		</form>
-		<form method="post" action="/stacks/{{.Name}}/delete" data-confirm="{{t "Remove all services in stack %v?" .Name}}">
-			<button type="submit" class="btn danger">{{t "Delete stack"}}</button>
+		<form method="post" action="/stacks/{{.Name}}/delete" data-confirm="{{t "stack_detail.remove_all_services_in_stack" .Name}}">
+			<button type="submit" class="btn danger">{{t "stack_detail.delete_stack"}}</button>
 		</form>
 	</div>
 </div>
 
 {{if .GitOps}}
-<div class="notice-box">{{tHTML "Deployed by GitOps from <span class=\"mono\">%v</span> (%v:%v) - edit the file in git; a manual edit here is overwritten by the next sync that finds a new commit." .GitOps.RepoURL .GitOps.Ref .GitOps.ComposePath}} <a href="/stacks/gitops">{{t "GitOps settings"}}</a></div>
+<div class="notice-box">{{tHTML "stack_detail.deployed_by_gitops_from_edit" .GitOps.RepoURL .GitOps.Ref .GitOps.ComposePath}} <a href="/stacks/gitops">{{t "stack_detail.gitops_settings"}}</a></div>
 {{end}}
 
 <table>
-	<thead><tr><th>{{t "Service"}}</th><th>{{t "Mode"}}</th><th>{{t "Replicas"}}</th><th>{{t "Image"}}</th></tr></thead>
+	<thead><tr><th>{{t "common.service"}}</th><th>{{t "common.mode"}}</th><th>{{t "common.replicas"}}</th><th>{{t "common.image"}}</th></tr></thead>
 	<tbody>
 	{{range .Services}}
 		<tr>
 			<td><a href="/services/{{.Spec.Name}}">{{.Spec.Name}}</a></td>
-			<td>{{if .Spec.Mode.Replicated}}{{t "replicated"}}{{else}}{{t "global"}}{{end}}</td>
+			<td>{{if .Spec.Mode.Replicated}}{{t "common.replicated"}}{{else}}{{t "common.global"}}{{end}}</td>
 			<td>{{if .ServiceStatus}}{{.ServiceStatus.RunningTasks}}/{{.ServiceStatus.DesiredTasks}}{{else}}-{{end}}</td>
 			<td class="muted mono">{{imageName .Spec.TaskTemplate.ContainerSpec.Image}}</td>
 		</tr>
@@ -33,23 +33,23 @@
 	</tbody>
 </table>
 
-<h2>{{t "History"}}</h2>
+<h2>{{t "stack_detail.history"}}</h2>
 {{if .Versions}}
 <table>
-	<thead><tr><th>{{t "Version"}}</th><th>{{t "Deployed"}}</th><th>{{t "By"}}</th><th>{{t "Source"}}</th><th></th></tr></thead>
+	<thead><tr><th>{{t "stack_detail.version"}}</th><th>{{t "stack_detail.deployed"}}</th><th>{{t "stack_detail.by"}}</th><th>{{t "common.source"}}</th><th></th></tr></thead>
 	<tbody>
 	{{range $i, $v := .Versions}}
 		<tr>
-			<td class="mono">v{{$v.Version}}{{if eq $i 0}} <span class="badge state-active">{{t "current"}}</span>{{end}}</td>
+			<td class="mono">v{{$v.Version}}{{if eq $i 0}} <span class="badge state-active">{{t "stack_detail.current"}}</span>{{end}}</td>
 			<td class="muted">{{ago $v.CreatedAt}}</td>
 			<td class="muted">{{$v.CreatedBy}}</td>
 			<td class="muted">{{$v.Source}}{{if $v.Note}} &middot; {{$v.Note}}{{end}}</td>
 			<td>
-				<a href="/stacks/deploy?stack={{$.Name}}&amp;version={{$v.ID}}" class="btn small secondary">{{t "Open in editor"}}</a>
-				<a href="/stacks/{{$.Name}}/versions/{{$v.ID}}/compose.yml" class="btn small secondary">{{t "Download"}}</a>
+				<a href="/stacks/deploy?stack={{$.Name}}&amp;version={{$v.ID}}" class="btn small secondary">{{t "stack_detail.open_in_editor"}}</a>
+				<a href="/stacks/{{$.Name}}/versions/{{$v.ID}}/compose.yml" class="btn small secondary">{{t "common.download"}}</a>
 				{{if ne $i 0}}
-				<form class="inline" method="post" action="/stacks/{{$.Name}}/versions/{{$v.ID}}/rollback" data-confirm="{{t "Redeploy v%v of %v? Services that version doesn't define are removed (their volumes are kept)." $v.Version $.Name}}">
-					<button type="submit" class="btn small secondary">{{t "Roll back"}}</button>
+				<form class="inline" method="post" action="/stacks/{{$.Name}}/versions/{{$v.ID}}/rollback" data-confirm="{{t "stack_detail.redeploy_v_of_services_that" $v.Version $.Name}}">
+					<button type="submit" class="btn small secondary">{{t "stack_detail.roll_back"}}</button>
 				</form>
 				{{end}}
 			</td>
@@ -58,6 +58,6 @@
 	</tbody>
 </table>
 {{else}}
-<p class="muted">{{t "No compose file stored for this stack yet - it was deployed before swarmdash kept stack history, or outside swarmdash. \"Edit\" starts from a compose file generated from its running services; the first deploy from there starts the history."}}</p>
+<p class="muted">{{t "stack_detail.no_compose_file_stored_for"}}</p>
 {{end}}
 {{end}}

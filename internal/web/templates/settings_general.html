@@ -1,37 +1,37 @@
 {{define "settings_general.html"}}
-<h1>{{t "General settings"}}</h1>
+<h1>{{t "settings_general.general_settings"}}</h1>
 
 <form method="post" action="/settings/general">
 <div class="card">
-	<h2 style="margin-top:0;">{{t "Update check"}}</h2>
-	<p class="muted">{{tHTML "The dashboard shows a banner when a newer swarmdash release is available. Checking it has your browser ask <span class=\"mono\">api.github.com</span> for the latest release directly - the admin server itself never talks to GitHub. Turning this off stops that request entirely, not just the banner."}}</p>
+	<h2 style="margin-top:0;">{{t "settings_general.update_check"}}</h2>
+	<p class="muted">{{tHTML "settings_general.dashboard_shows_a_banner_when"}}</p>
 	<label style="display:flex; align-items:center; gap:0.5em;">
 		<input type="checkbox" name="update_check_disabled" value="1" {{if .UpdateCheckDisabled}}checked{{end}}>
-		{{t "Disable the update-available check"}}
+		{{t "settings_general.disable_the_update_available_check"}}
 	</label>
 </div>
 
 <div class="card">
-	<h2 style="margin-top:0;">{{t "Automatic image updates"}}</h2>
-	<p class="muted">{{tHTML "Once an hour, move every service whose image has a version tag (<span class=\"mono\">1.27.1</span>, <span class=\"mono\">v2.3</span>, <span class=\"mono\">8.0.1-jdk17</span>) to the newest tag of the same form in its registry. <strong>Patch</strong> stays within the current minor version (1.27.1 → 1.27.4), <strong>minor</strong> within the current major version (1.27.1 → 1.29.0), <strong>major</strong> takes any newer version (1.27.1 → 2.0.1). Tags like <span class=\"mono\">latest</span> are never touched. A service can override this on its page or with the <span class=\"mono\">swarmdash.autoupdate</span> label (<span class=\"mono\">off</span>, <span class=\"mono\">patch</span>, <span class=\"mono\">minor</span>, <span class=\"mono\">major</span>) under <span class=\"mono\">deploy.labels</span> in compose. Each update is recorded in the audit log and sent to webhooks as <span class=\"mono\">service_image_updated</span>."}}</p>
-	<label for="image_auto_update">{{t "Default for all services"}}</label>
+	<h2 style="margin-top:0;">{{t "settings_general.automatic_image_updates"}}</h2>
+	<p class="muted">{{tHTML "settings_general.once_an_hour_move_every"}}</p>
+	<label for="image_auto_update">{{t "settings_general.default_for_all_services"}}</label>
 	<select id="image_auto_update" name="image_auto_update" style="width:220px;">
-		<option value="off" {{if eq .ImageAutoUpdate "off"}}selected{{end}}>{{t "Off"}}</option>
-		<option value="patch" {{if eq .ImageAutoUpdate "patch"}}selected{{end}}>{{t "Patch versions"}}</option>
-		<option value="minor" {{if eq .ImageAutoUpdate "minor"}}selected{{end}}>{{t "Minor versions"}}</option>
-		<option value="major" {{if eq .ImageAutoUpdate "major"}}selected{{end}}>{{t "Major versions"}}</option>
+		<option value="off" {{if eq .ImageAutoUpdate "off"}}selected{{end}}>{{t "common.off"}}</option>
+		<option value="patch" {{if eq .ImageAutoUpdate "patch"}}selected{{end}}>{{t "common.patch_versions"}}</option>
+		<option value="minor" {{if eq .ImageAutoUpdate "minor"}}selected{{end}}>{{t "common.minor_versions"}}</option>
+		<option value="major" {{if eq .ImageAutoUpdate "major"}}selected{{end}}>{{t "common.major_versions"}}</option>
 	</select>
 </div>
 
 <div class="card">
-	<h2 style="margin-top:0;">{{t "Two-factor authentication"}}</h2>
-	<p class="muted">{{t "Make every local-password account set up an authenticator app before it can use swarmdash. SSO accounts and API tokens are not affected. Admins can reset a user's two-factor from Settings → Users."}}</p>
+	<h2 style="margin-top:0;">{{t "common.two_factor_authentication"}}</h2>
+	<p class="muted">{{t "settings_general.make_every_local_password_account"}}</p>
 	<label style="display:flex; align-items:center; gap:0.5em;">
 		<input type="checkbox" name="require_2fa" value="1" {{if .Require2FA}}checked{{end}}>
-		{{t "Require two-factor authentication for local accounts"}}
+		{{t "settings_general.require_two_factor_authentication_for"}}
 	</label>
 </div>
 
-<button type="submit" class="btn">{{t "Save"}}</button>
+<button type="submit" class="btn">{{t "common.save"}}</button>
 </form>
 {{end}}

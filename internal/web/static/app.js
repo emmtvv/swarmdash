@@ -99,7 +99,7 @@
 (function () {
 	document.querySelectorAll("form[data-prompt-password]").forEach((form) => {
 		form.addEventListener("submit", (e) => {
-			const p = prompt(t("New password for %s:", form.dataset.promptPassword));
+			const p = prompt(t("ui.new_password_for", form.dataset.promptPassword));
 			if (!p) { e.preventDefault(); return; }
 			form.password.value = p;
 		});
@@ -145,7 +145,7 @@
 		Array.from(table.tHead.rows[0].cells).forEach((th, idx) => {
 			if (th.dataset.noSort !== undefined) return;
 			th.style.cursor = "pointer";
-			th.title = t("Click to sort");
+			th.title = t("ui.click_to_sort");
 			let asc = true;
 			th.addEventListener("click", () => {
 				const rows = Array.from(tbody.rows);
@@ -314,7 +314,7 @@
 		if (!items.length) {
 			const empty = document.createElement("div");
 			empty.className = "cmdk-empty";
-			empty.textContent = searching ? t("Searching...") : (q ? t("No results.") : t("No matching pages."));
+			empty.textContent = searching ? t("ui.searching") : (q ? t("ui.no_results") : t("ui.no_matching_pages"));
 			list.appendChild(empty);
 		}
 		setActive(0);
@@ -409,7 +409,7 @@
 			.then((data) => {
 				btn.classList.toggle("on", data.favorite);
 				btn.setAttribute("aria-pressed", data.favorite ? "true" : "false");
-				const label = data.favorite ? t("Remove from favorites") : t("Add to favorites");
+				const label = data.favorite ? t("common.remove_from_favorites") : t("common.add_to_favorites");
 				btn.title = label;
 				btn.setAttribute("aria-label", label);
 			})
@@ -424,7 +424,7 @@
 		if (!btn || !navigator.clipboard) return;
 		navigator.clipboard.writeText(btn.dataset.copyText.trim()).then(() => {
 			const prev = btn.textContent;
-			btn.textContent = t("Copied");
+			btn.textContent = t("ui.copied");
 			setTimeout(() => { btn.textContent = prev; }, 1500);
 		});
 	});
@@ -632,8 +632,8 @@
 		// KEY=VALUE per row: env vars, labels.
 		kv: {
 			fields: [
-				{ key: "key", placeholder: t("KEY"), flex: "1" },
-				{ key: "value", placeholder: t("value"), flex: "2" },
+				{ key: "key", placeholder: t("ui.key"), flex: "1" },
+				{ key: "value", placeholder: t("ui.value"), flex: "2" },
 			],
 			parse: (line) => {
 				const i = line.indexOf("=");
@@ -644,8 +644,8 @@
 		// name[:target-filename] per row: secrets, configs.
 		ref: {
 			fields: [
-				{ key: "name", placeholder: t("name"), flex: "1" },
-				{ key: "target", placeholder: t("target filename (optional)"), flex: "1" },
+				{ key: "name", placeholder: t("common.name_2"), flex: "1" },
+				{ key: "target", placeholder: t("ui.target_filename_optional"), flex: "1" },
 			],
 			parse: (line) => {
 				const i = line.indexOf(":");
@@ -656,9 +656,9 @@
 		// source:target[:ro] per row: mounts.
 		mount: {
 			fields: [
-				{ key: "source", placeholder: t("/host/path or volume name"), flex: "2" },
-				{ key: "target", placeholder: t("/container/path"), flex: "2" },
-				{ key: "ro", type: "checkbox", label: t("Read-only") },
+				{ key: "source", placeholder: t("ui.host_path_or_volume_name"), flex: "2" },
+				{ key: "target", placeholder: t("ui.container_path"), flex: "2" },
+				{ key: "ro", type: "checkbox", label: t("ui.read_only") },
 			],
 			parse: (line) => {
 				const parts = line.split(":");
@@ -730,7 +730,7 @@
 		const removeBtn = document.createElement("button");
 		removeBtn.type = "button";
 		removeBtn.className = "list-row-remove";
-		removeBtn.setAttribute("aria-label", t("Remove"));
+		removeBtn.setAttribute("aria-label", t("common.remove"));
 		removeBtn.textContent = "✕";
 		removeBtn.addEventListener("click", () => { row.remove(); onChange(); });
 		row.appendChild(removeBtn);
@@ -758,7 +758,7 @@
 		const addBtn = document.createElement("button");
 		addBtn.type = "button";
 		addBtn.className = "btn secondary small list-row-add";
-		addBtn.textContent = "+ " + t("Add");
+		addBtn.textContent = "+ " + t("common.add");
 		wrap.appendChild(addBtn);
 
 		function sync() {

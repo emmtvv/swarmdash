@@ -4,7 +4,7 @@
 
 // UI translations for strings built in JS: layout.html embeds the current
 // language's catalog (see web.JSMessages) as JSON; t() falls back to the
-// English key, and formats %d/%s placeholders from extra arguments.
+// key itself, and formats %d/%s placeholders from extra arguments.
 var t = (function () {
 	let catalog = {};
 	const el = document.getElementById("sd-i18n");

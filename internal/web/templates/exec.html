@@ -3,23 +3,23 @@
 <script src="/static/vendor/xterm.js"></script>
 <script src="/static/vendor/xterm-addon-fit.js"></script>
 
-<div class="breadcrumb"><a href="/services">{{t "Services"}}</a> {{t "/ console"}}</div>
+<div class="breadcrumb"><a href="/services">{{t "common.services"}}</a> {{t "exec.console"}}</div>
 <div class="page-header">
-	<h1>{{t "Console"}} <span class="muted mono" style="font-size:14px;">{{shortID .TaskID}}</span> <span id="status" class="badge state-active">{{t "connected"}}</span> <span id="shell-status" class="muted mono" style="font-size:12px;"></span></h1>
+	<h1>{{t "common.console"}} <span class="muted mono" style="font-size:14px;">{{shortID .TaskID}}</span> <span id="status" class="badge state-active">{{t "ws.connected"}}</span> <span id="shell-status" class="muted mono" style="font-size:12px;"></span></h1>
 	<div class="actions">
 		<select id="shell-select" class="btn secondary small">
-			<option value="auto" selected>{{t "Shell: auto"}}</option>
-			<option value="/bin/bash">{{t "bash"}}</option>
-			<option value="/bin/sh">{{t "sh"}}</option>
-			<option value="/bin/ash">{{t "ash"}}</option>
-			<option value="/bin/dash">{{t "dash"}}</option>
-			<option value="/bin/zsh">{{t "zsh"}}</option>
+			<option value="auto" selected>{{t "exec.shell_auto"}}</option>
+			<option value="/bin/bash">bash</option>
+			<option value="/bin/sh">sh</option>
+			<option value="/bin/ash">ash</option>
+			<option value="/bin/dash">dash</option>
+			<option value="/bin/zsh">zsh</option>
 		</select>
-		<button class="btn secondary small" data-tab="term">{{t "Terminal"}}</button>
-		<button class="btn secondary small" data-tab="logs">{{t "Logs"}}</button>
-		<button class="btn secondary small" data-tab="stats">{{t "Stats"}}</button>
-		<button class="btn secondary small" data-tab="files">{{t "Files"}}</button>
-		<a href="/logs/{{.TaskID}}/download" class="btn secondary small">{{t "Download logs"}}</a>
+		<button class="btn secondary small" data-tab="term">{{t "exec.terminal"}}</button>
+		<button class="btn secondary small" data-tab="logs">{{t "common.logs"}}</button>
+		<button class="btn secondary small" data-tab="stats">{{t "exec.stats"}}</button>
+		<button class="btn secondary small" data-tab="files">{{t "exec.files"}}</button>
+		<a href="/logs/{{.TaskID}}/download" class="btn secondary small">{{t "exec.download_logs"}}</a>
 	</div>
 </div>
 
@@ -32,11 +32,11 @@
 <div id="panel-stats" style="display:none;">
 	<div class="card-row">
 		<div class="card" style="flex:1;">
-			<div class="muted">{{t "CPU"}} <span id="cpu-pct" class="mono"></span></div>
+			<div class="muted">{{t "common.cpu"}} <span id="cpu-pct" class="mono"></span></div>
 			<canvas id="cpu-chart" width="600" height="80" style="width:100%;height:80px;"></canvas>
 		</div>
 		<div class="card" style="flex:1;">
-			<div class="muted">{{t "Memory"}} <span id="mem-pct" class="mono"></span></div>
+			<div class="muted">{{t "common.memory"}} <span id="mem-pct" class="mono"></span></div>
 			<canvas id="mem-chart" width="600" height="80" style="width:100%;height:80px;"></canvas>
 		</div>
 	</div>
@@ -45,10 +45,10 @@
 <div id="panel-files" style="display:none;">
 	<div class="card-row" style="margin-bottom:8px;justify-content:space-between;">
 		<span id="files-path" class="mono muted"></span>
-		<button id="files-up" class="btn small secondary">{{t "Up"}}</button>
+		<button id="files-up" class="btn small secondary">{{t "exec.up"}}</button>
 	</div>
 	<table>
-		<thead><tr><th>{{t "Name"}}</th><th>{{t "Size"}}</th><th></th></tr></thead>
+		<thead><tr><th>{{t "common.name"}}</th><th>{{t "common.size"}}</th><th></th></tr></thead>
 		<tbody id="files-body"></tbody>
 	</table>
 </div>
@@ -81,7 +81,7 @@
 	// caller swap the URL (via urlFn) to try the next candidate shell first.
 	function autoConnect(urlFn, { binary, onOpen, onMessage, onFailedAttempt } = {}) {
 		let closed = false, socket, attempt = 0, timer, openedThisAttempt;
-		function setStatus(s) { if (statusEl) { statusEl.textContent = t(s); statusEl.className = "badge state-" + (s === "connected" ? "active" : "pending"); } }
+		function setStatus(s) { if (statusEl) { statusEl.textContent = t("ws." + s); statusEl.className = "badge state-" + (s === "connected" ? "active" : "pending"); } }
 		function connect() {
 			openedThisAttempt = false;
 			socket = new WebSocket(urlFn());
@@ -266,7 +266,7 @@
 						const dl = document.createElement("a");
 						dl.href = "/files/" + taskID + "/download?path=" + encodeURIComponent(e.path);
 						dl.className = "btn small secondary";
-						dl.textContent = t("Download");
+						dl.textContent = t("common.download");
 						actionTd.appendChild(dl);
 					}
 					tr.append(nameTd, sizeTd, actionTd);

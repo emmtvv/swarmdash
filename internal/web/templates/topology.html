@@ -1,38 +1,38 @@
 {{define "topology.html"}}
-<h1>{{t "Cluster topology"}}</h1>
-<p class="muted">{{t "Services connected by a shared overlay network. Drag nodes to rearrange, scroll to zoom, click a node to trace its connections."}}</p>
+<h1>{{t "topology.cluster_topology"}}</h1>
+<p class="muted">{{t "topology.services_connected_by_a_shared"}}</p>
 
 {{if .HasGraph}}
 <div class="card" style="padding:0;overflow:hidden;">
 	<div class="topology-toolbar">
-		<input type="text" id="topo-search" class="table-search" placeholder="{{t "Filter by name…"}}" style="margin-bottom:0;">
-		<button type="button" class="btn secondary small" id="topo-reset">{{t "Reset view"}}</button>
+		<input type="text" id="topo-search" class="table-search" placeholder="{{t "topology.filter_by_name"}}" style="margin-bottom:0;">
+		<button type="button" class="btn secondary small" id="topo-reset">{{t "topology.reset_view"}}</button>
 		<div class="topology-legend">
-			<span><span class="legend-dot"></span>{{t "Service (colored by stack)"}}</span>
-			<span><span class="legend-diamond"></span>{{t "Overlay network"}}</span>
-			<span><span class="legend-ring ok"></span>{{t "Healthy"}}</span>
-			<span><span class="legend-ring warn"></span>{{t "Degraded"}}</span>
-			<span><span class="legend-ring crit"></span>{{t "Down"}}</span>
+			<span><span class="legend-dot"></span>{{t "topology.service_colored_by_stack"}}</span>
+			<span><span class="legend-diamond"></span>{{t "topology.overlay_network"}}</span>
+			<span><span class="legend-ring ok"></span>{{t "topology.healthy"}}</span>
+			<span><span class="legend-ring warn"></span>{{t "common.degraded"}}</span>
+			<span><span class="legend-ring crit"></span>{{t "topology.down"}}</span>
 		</div>
 	</div>
 	<svg id="topology-svg"></svg>
-	<div id="topo-info" class="muted" style="padding:10px 16px;border-top:1px solid var(--border);min-height:16px;">{{t "Click a node for details."}}</div>
+	<div id="topo-info" class="muted" style="padding:10px 16px;border-top:1px solid var(--border);min-height:16px;">{{t "topology.click_a_node_for_details"}}</div>
 </div>
 {{else}}
-<div class="card muted">{{t "No services are attached to an overlay network yet."}}</div>
+<div class="card muted">{{t "topology.no_services_are_attached_to"}}</div>
 {{end}}
 
 {{if .Isolated}}
-<h2>{{t "Not on an overlay network"}}</h2>
-<p class="muted">{{t "These services don't share an overlay network with anything else, so they don't appear on the map above."}}</p>
+<h2>{{t "topology.not_on_an_overlay_network"}}</h2>
+<p class="muted">{{t "topology.these_services_dont_share_an"}}</p>
 <table>
-	<thead><tr><th>{{t "Name"}}</th><th>{{t "Stack"}}</th><th>{{t "Mode"}}</th><th>{{t "Replicas"}}</th></tr></thead>
+	<thead><tr><th>{{t "common.name"}}</th><th>{{t "common.stack"}}</th><th>{{t "common.mode"}}</th><th>{{t "common.replicas"}}</th></tr></thead>
 	<tbody>
 	{{range .Isolated}}
 		<tr>
 			<td><a href="/services/{{.Spec.Name}}">{{.Spec.Name}}</a></td>
 			<td class="muted">{{index .Spec.Labels "com.docker.stack.namespace"}}</td>
-			<td>{{if .Spec.Mode.Replicated}}{{t "replicated"}}{{else}}{{t "global"}}{{end}}</td>
+			<td>{{if .Spec.Mode.Replicated}}{{t "common.replicated"}}{{else}}{{t "common.global"}}{{end}}</td>
 			<td>{{if .ServiceStatus}}{{.ServiceStatus.RunningTasks}}/{{.ServiceStatus.DesiredTasks}}{{else}}-{{end}}</td>
 		</tr>
 	{{end}}
@@ -55,7 +55,7 @@ document.addEventListener("DOMContentLoaded", function () {
 			document.getElementById("topo-search").addEventListener("input", (e) => fn(e.target.value));
 		},
 		onSelect: (node) => {
-			if (!node) { info.textContent = t("Click a node for details."); return; }
+			if (!node) { info.textContent = t("topology.click_a_node_for_details"); return; }
 			if (node.type === "network") {
 				info.innerHTML = `<strong>${node.label}</strong> <span class="muted">overlay network${node.ingress ? " · ingress" : ""}</span>`;
 			} else {

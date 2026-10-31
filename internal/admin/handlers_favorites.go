@@ -50,7 +50,7 @@ func (s *Server) handleFavoriteToggle(w http.ResponseWriter, r *http.Request) {
 	on := !slices.Contains(user.Favorites, key)
 	if on {
 		if len(user.Favorites) >= maxFavorites {
-			http.Error(w, s.t(r, "you can have at most %d favorites", maxFavorites), http.StatusBadRequest)
+			http.Error(w, s.t(r, "favorites.you_can_have_at_most", maxFavorites), http.StatusBadRequest)
 			return
 		}
 		user.Favorites = append(slices.Clone(user.Favorites), key)

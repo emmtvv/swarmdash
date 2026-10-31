@@ -1,145 +1,145 @@
 {{/* Service editor fields, shared by the advanced editor on a service's
      page and the New service form. Dot is an editorFormData. */}}
 {{define "service_fields"}}
-	<div class="section-label">{{t "Container"}}</div>
+	<div class="section-label">{{t "common.container"}}</div>
 	<div class="form-grid">
 		<div>
-			<label for="entrypoint">{{t "Entrypoint (overrides image ENTRYPOINT)"}}</label>
+			<label for="entrypoint">{{t "service_fields.entrypoint_overrides_image_entrypoint"}}</label>
 			<textarea id="entrypoint" name="entrypoint" hidden data-list-editor="line" data-placeholders="/bin/sh">{{.Entrypoint}}</textarea>
 		</div>
 		<div>
-			<label for="command">{{t "Command (overrides image CMD)"}}</label>
+			<label for="command">{{t "service_fields.command_overrides_image_cmd"}}</label>
 			<textarea id="command" name="command" hidden data-list-editor="line" data-placeholders="-c">{{.Command}}</textarea>
 		</div>
 		<div>
-			<label for="env">{{t "Environment variables"}}</label>
+			<label for="env">{{t "service_fields.environment_variables"}}</label>
 			<textarea id="env" name="env" hidden data-list-editor="kv">{{.Env}}</textarea>
 		</div>
 		<div>
-			<label for="labels">{{t "Labels"}}</label>
+			<label for="labels">{{t "common.labels"}}</label>
 			<textarea id="labels" name="labels" hidden data-list-editor="kv">{{.Labels}}</textarea>
 		</div>
 		<div>
-			<label for="mounts">{{t "Mounts"}}</label>
+			<label for="mounts">{{t "service_fields.mounts"}}</label>
 			<textarea id="mounts" name="mounts" hidden data-list-editor="mount">{{.Mounts}}</textarea>
 		</div>
 	</div>
 
-	<div class="section-label">{{t "Networking"}}</div>
+	<div class="section-label">{{t "service_fields.networking"}}</div>
 	<div class="form-grid">
 		<div>
-			<label for="ports">{{t "Published ports"}}</label>
+			<label for="ports">{{t "service_fields.published_ports"}}</label>
 			<textarea id="ports" name="ports" hidden data-list-editor="port">{{.Ports}}</textarea>
 		</div>
 		<div>
-			<label for="networks">{{t "Attached networks (must already exist)"}}</label>
+			<label for="networks">{{t "service_fields.attached_networks_must_already_exist"}}</label>
 			<textarea id="networks" name="networks" hidden data-list-editor="line" data-placeholders="network-name">{{.Networks}}</textarea>
 		</div>
 	</div>
 
-	<div class="section-label">{{t "Secrets & configs"}}</div>
+	<div class="section-label">{{t "service_fields.secrets_configs"}}</div>
 	<div class="form-grid">
 		<div>
-			<label for="secrets">{{t "Secrets"}}</label>
+			<label for="secrets">{{t "common.secrets"}}</label>
 			<textarea id="secrets" name="secrets" hidden data-list-editor="ref">{{.Secrets}}</textarea>
 		</div>
 		<div>
-			<label for="configs">{{t "Configs"}}</label>
+			<label for="configs">{{t "common.configs"}}</label>
 			<textarea id="configs" name="configs" hidden data-list-editor="ref">{{.Configs}}</textarea>
 		</div>
 	</div>
 
-	<div class="section-label">{{t "Placement"}}</div>
+	<div class="section-label">{{t "service_fields.placement"}}</div>
 	<div class="form-grid">
 		<div>
-			<label for="constraints">{{t "Placement constraints"}}</label>
+			<label for="constraints">{{t "service_fields.placement_constraints"}}</label>
 			<textarea id="constraints" name="constraints" hidden data-list-editor="line" data-placeholders="node.role==worker">{{.Constraints}}</textarea>
 		</div>
 		<div>
-			<label for="preferences">{{t "Spread preferences"}}</label>
+			<label for="preferences">{{t "service_fields.spread_preferences"}}</label>
 			<textarea id="preferences" name="preferences" hidden data-list-editor="line" data-placeholders="node.labels.zone">{{.Preferences}}</textarea>
 		</div>
 	</div>
 
-	<div class="section-label">{{t "Healthcheck"}}</div>
+	<div class="section-label">{{t "service_fields.healthcheck"}}</div>
 	<div class="card-row">
 		<div style="flex:1 1 260px;">
-			<label for="health_test">{{t "Test command (run via /bin/sh -c)"}}</label>
-			<input type="text" id="health_test" name="health_test" value="{{.HealthTest}}" placeholder="{{t "curl -f http://localhost/health || exit 1"}}" style="width:100%;font-family:ui-monospace,monospace;">
+			<label for="health_test">{{t "service_fields.test_command_run_via_bin"}}</label>
+			<input type="text" id="health_test" name="health_test" value="{{.HealthTest}}" placeholder="curl -f http://localhost/health || exit 1" style="width:100%;font-family:ui-monospace,monospace;">
 		</div>
 		<div>
-			<label for="health_interval">{{t "Interval"}}</label>
+			<label for="health_interval">{{t "service_fields.interval"}}</label>
 			<input type="text" id="health_interval" name="health_interval" value="{{.HealthInterval}}" placeholder="30s" style="width:90px;">
 		</div>
 		<div>
-			<label for="health_timeout">{{t "Timeout"}}</label>
+			<label for="health_timeout">{{t "service_fields.timeout"}}</label>
 			<input type="text" id="health_timeout" name="health_timeout" value="{{.HealthTimeout}}" placeholder="10s" style="width:90px;">
 		</div>
 		<div>
-			<label for="health_start_period">{{t "Start period"}}</label>
+			<label for="health_start_period">{{t "service_fields.start_period"}}</label>
 			<input type="text" id="health_start_period" name="health_start_period" value="{{.HealthStartPeriod}}" placeholder="0s" style="width:90px;">
 		</div>
 		<div>
-			<label for="health_retries">{{t "Retries"}}</label>
+			<label for="health_retries">{{t "service_fields.retries"}}</label>
 			<input type="number" id="health_retries" name="health_retries" value="{{.HealthRetries}}" min="0" style="width:80px;">
 		</div>
 		<div>
 			<label>&nbsp;</label>
-			<label><input type="checkbox" name="health_disabled" {{if .HealthDisabled}}checked{{end}}> {{t "Disable healthcheck"}}</label>
+			<label><input type="checkbox" name="health_disabled" {{if .HealthDisabled}}checked{{end}}> {{t "service_fields.disable_healthcheck"}}</label>
 		</div>
 	</div>
 
-	<div class="section-label">{{t "Resources & restart"}}</div>
+	<div class="section-label">{{t "service_fields.resources_restart"}}</div>
 	<div class="card-row">
 		<div>
-			<label for="cpu_limit">{{t "CPU limit"}}</label>
+			<label for="cpu_limit">{{t "service_fields.cpu_limit"}}</label>
 			<input type="text" id="cpu_limit" name="cpu_limit" value="{{.CPULimit}}" placeholder="0.5" style="width:100px;">
 		</div>
 		<div>
-			<label for="mem_limit">{{t "Memory limit"}}</label>
+			<label for="mem_limit">{{t "service_fields.memory_limit"}}</label>
 			<input type="text" id="mem_limit" name="mem_limit" value="{{.MemLimit}}" placeholder="256M" style="width:100px;">
 		</div>
 		<div>
-			<label for="cpu_reservation">{{t "CPU reservation"}}</label>
+			<label for="cpu_reservation">{{t "service_fields.cpu_reservation"}}</label>
 			<input type="text" id="cpu_reservation" name="cpu_reservation" value="{{.CPUReservation}}" placeholder="0.1" style="width:100px;">
 		</div>
 		<div>
-			<label for="mem_reservation">{{t "Memory reservation"}}</label>
+			<label for="mem_reservation">{{t "service_fields.memory_reservation"}}</label>
 			<input type="text" id="mem_reservation" name="mem_reservation" value="{{.MemReservation}}" placeholder="64M" style="width:100px;">
 		</div>
 		<div>
-			<label for="restart_condition">{{t "Restart policy"}}</label>
+			<label for="restart_condition">{{t "service_fields.restart_policy"}}</label>
 			<select id="restart_condition" name="restart_condition" style="width:120px;">
-				<option value="any" {{if eq .RestartCondition "any"}}selected{{end}}>{{t "any"}}</option>
-				<option value="on-failure" {{if eq .RestartCondition "on-failure"}}selected{{end}}>{{t "on-failure"}}</option>
-				<option value="none" {{if eq .RestartCondition "none"}}selected{{end}}>{{t "none"}}</option>
+				<option value="any" {{if eq .RestartCondition "any"}}selected{{end}}>{{t "service_fields.any"}}</option>
+				<option value="on-failure" {{if eq .RestartCondition "on-failure"}}selected{{end}}>{{t "service_fields.on_failure"}}</option>
+				<option value="none" {{if eq .RestartCondition "none"}}selected{{end}}>{{t "common.none"}}</option>
 			</select>
 		</div>
 	</div>
 
-	<div class="section-label">{{t "Rolling update"}}</div>
+	<div class="section-label">{{t "service_fields.rolling_update"}}</div>
 	<div class="card-row">
 		<div>
-			<label for="update_parallelism">{{t "Update parallelism"}}</label>
+			<label for="update_parallelism">{{t "service_fields.update_parallelism"}}</label>
 			<input type="number" id="update_parallelism" name="update_parallelism" value="{{.UpdateParallelism}}" min="0" style="width:100px;">
 		</div>
 		<div>
-			<label for="update_delay">{{t "Update delay"}}</label>
+			<label for="update_delay">{{t "service_fields.update_delay"}}</label>
 			<input type="text" id="update_delay" name="update_delay" value="{{.UpdateDelay}}" placeholder="10s" style="width:100px;">
 		</div>
 		<div>
-			<label for="update_order">{{t "Update order"}}</label>
+			<label for="update_order">{{t "service_fields.update_order"}}</label>
 			<select id="update_order" name="update_order" style="width:130px;">
-				<option value="stop-first" {{if eq .UpdateOrder "stop-first"}}selected{{end}}>{{t "stop-first"}}</option>
-				<option value="start-first" {{if eq .UpdateOrder "start-first"}}selected{{end}}>{{t "start-first"}}</option>
+				<option value="stop-first" {{if eq .UpdateOrder "stop-first"}}selected{{end}}>{{t "service_fields.stop_first"}}</option>
+				<option value="start-first" {{if eq .UpdateOrder "start-first"}}selected{{end}}>{{t "service_fields.start_first"}}</option>
 			</select>
 		</div>
 		<div>
-			<label for="update_failure_action">{{t "On update failure"}}</label>
+			<label for="update_failure_action">{{t "service_fields.on_update_failure"}}</label>
 			<select id="update_failure_action" name="update_failure_action" style="width:130px;">
-				<option value="pause" {{if eq .UpdateFailure "pause"}}selected{{end}}>{{t "pause"}}</option>
-				<option value="continue" {{if eq .UpdateFailure "continue"}}selected{{end}}>{{t "continue"}}</option>
-				<option value="rollback" {{if eq .UpdateFailure "rollback"}}selected{{end}}>{{t "rollback"}}</option>
+				<option value="pause" {{if eq .UpdateFailure "pause"}}selected{{end}}>{{t "service_fields.pause"}}</option>
+				<option value="continue" {{if eq .UpdateFailure "continue"}}selected{{end}}>{{t "service_fields.continue"}}</option>
+				<option value="rollback" {{if eq .UpdateFailure "rollback"}}selected{{end}}>{{t "service_fields.rollback"}}</option>
 			</select>
 		</div>
 	</div>

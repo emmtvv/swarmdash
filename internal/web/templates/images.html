@@ -1,9 +1,9 @@
 {{define "images.html"}}
-<h1>{{t "Images"}}</h1>
+<h1>{{t "common.images"}}</h1>
 
 <div class="card-row" style="justify-content:space-between;">
 	<form class="inline" method="get" action="/images">
-		<label for="node" style="margin:0;">{{t "Node"}}</label>
+		<label for="node" style="margin:0;">{{t "common.node"}}</label>
 		<select name="node" id="node" data-auto-submit>
 			{{$sel := .SelectedID}}
 			{{range .Nodes}}
@@ -11,26 +11,26 @@
 			{{end}}
 		</select>
 	</form>
-	<form class="inline" method="post" action="/images/prune" data-confirm="{{t "Prune images on this node?"}}">
+	<form class="inline" method="post" action="/images/prune" data-confirm="{{t "images.prune_images_on_this_node"}}">
 		<input type="hidden" name="node" value="{{.SelectedID}}">
-		<label><input type="checkbox" name="all"> {{t "Remove all unused (not just dangling)"}}</label>
-		<button type="submit" class="btn secondary">{{t "Prune"}}</button>
+		<label><input type="checkbox" name="all"> {{t "images.remove_all_unused_not_just"}}</label>
+		<button type="submit" class="btn secondary">{{t "images.prune"}}</button>
 	</form>
 </div>
 
 <table>
-	<thead><tr><th>{{t "Repository:Tag"}}</th><th>{{t "ID"}}</th><th>{{t "Size"}}</th><th>{{t "Containers"}}</th><th>{{t "Created"}}</th></tr></thead>
+	<thead><tr><th>{{t "images.repository_tag"}}</th><th>{{t "common.id"}}</th><th>{{t "common.size"}}</th><th>{{t "images.containers"}}</th><th>{{t "common.created"}}</th></tr></thead>
 	<tbody>
 	{{range .Images}}
 		<tr>
-			<td class="mono">{{if .RepoTags}}{{range .RepoTags}}{{.}}<br>{{end}}{{else}}<span class="muted">{{t "<none>"}}</span>{{end}}</td>
+			<td class="mono">{{if .RepoTags}}{{range .RepoTags}}{{.}}<br>{{end}}{{else}}<span class="muted">{{t "images.msg"}}</span>{{end}}</td>
 			<td class="mono muted">{{shortID .ID}}</td>
 			<td>{{bytesHuman .Size}}</td>
 			<td>{{if ge .Containers 0}}{{.Containers}}{{else}}-{{end}}</td>
 			<td class="muted">{{unixAgo .Created}}</td>
 		</tr>
 	{{else}}
-		<tr><td colspan="5" class="muted">{{t "No images on this node."}}</td></tr>
+		<tr><td colspan="5" class="muted">{{t "images.no_images_on_this_node"}}</td></tr>
 	{{end}}
 	</tbody>
 </table>

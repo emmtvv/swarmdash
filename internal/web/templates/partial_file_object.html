@@ -2,19 +2,19 @@
 {{define "rotation_result"}}
 {{if .}}
 <div class="ok-box">
-	{{tHTML "Created this version to replace <span class=\"mono\">%v</span>." .OldName}}
-	{{if .Updated}}{{tn "Switched %v service over:" "Switched %v services over:" (len .Updated)}} {{range $i, $s := .Updated}}{{if $i}}, {{end}}<a href="/services/{{$s}}">{{$s}}</a>{{end}} {{t "- their tasks are rolling now."}}{{else}}{{t "No service was using it."}}{{end}}
-	{{if .Deleted}}{{tHTML "Deleted <span class=\"mono\">%v</span>." .OldName}}{{end}}
+	{{tHTML "file_object.created_this_version_to_replace" .OldName}}
+	{{if .Updated}}{{tn "file_object.switched_services_over" (len .Updated)}} {{range $i, $s := .Updated}}{{if $i}}, {{end}}<a href="/services/{{$s}}">{{$s}}</a>{{end}} {{t "file_object.their_tasks_are_rolling_now"}}{{else}}{{t "file_object.no_service_was_using_it"}}{{end}}
+	{{if .Deleted}}{{tHTML "file_object.deleted" .OldName}}{{end}}
 </div>
-{{if .DeleteErr}}<div class="error-box">{{tHTML "Could not delete <span class=\"mono\">%v</span>: %v" .OldName .DeleteErr}}</div>{{end}}
+{{if .DeleteErr}}<div class="error-box">{{tHTML "file_object.could_not_delete" .OldName .DeleteErr}}</div>{{end}}
 {{end}}
 {{end}}
 
 {{/* Dot: map with Uses ([]fileUse), ComposeStacks ([]string), Kind ("secret"/"config"). */}}
 {{define "file_uses"}}
-<h2>{{t "Used by"}}</h2>
+<h2>{{t "common.used_by"}}</h2>
 <table>
-	<thead><tr><th>{{t "Service"}}</th><th>{{t "Stack"}}</th><th>{{t "Mounted at"}}</th></tr></thead>
+	<thead><tr><th>{{t "common.service"}}</th><th>{{t "common.stack"}}</th><th>{{t "file_object.mounted_at"}}</th></tr></thead>
 	<tbody>
 	{{range .Uses}}
 		<tr>
@@ -23,7 +23,7 @@
 			<td class="mono muted">{{.Target}}</td>
 		</tr>
 	{{else}}
-		<tr><td colspan="3" class="muted">{{t "No service uses this %v." .Kind}}</td></tr>
+		<tr><td colspan="3" class="muted">{{t "file_object.no_service_uses_this" .Kind}}</td></tr>
 	{{end}}
 	</tbody>
 </table>
@@ -33,7 +33,7 @@
 {{if .ComposeStacks}}
 <div class="warn-box">
 	{{range $i, $s := .ComposeStacks}}{{if $i}}, {{end}}<a href="/stacks/{{$s}}">{{$s}}</a>{{end}}
-	{{if gt (len .ComposeStacks) 1}}{{tHTML "are deployed from compose files that reference this %v by name. After rotating, set <span class=\"mono\">name: &lt;new name&gt;</span> on its entry under the top-level <span class=\"mono\">%vs:</span> (keep the key, so the file path in the container stays the same) - otherwise the next deploy of those stacks switches back to the old %v, or fails if it was deleted." .Kind .Kind .Kind}}{{else}}{{tHTML "is deployed from a compose file that references this %v by name. After rotating, set <span class=\"mono\">name: &lt;new name&gt;</span> on its entry under the top-level <span class=\"mono\">%vs:</span> (keep the key, so the file path in the container stays the same) - otherwise the next deploy of that stack switches back to the old %v, or fails if it was deleted." .Kind .Kind .Kind}}{{end}}
+	{{if gt (len .ComposeStacks) 1}}{{tHTML "file_object.are_deployed_from_compose_files" .Kind .Kind .Kind}}{{else}}{{tHTML "file_object.is_deployed_from_a_compose" .Kind .Kind .Kind}}{{end}}
 </div>
 {{end}}
 {{end}}

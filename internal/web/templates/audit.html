@@ -1,7 +1,7 @@
 {{define "audit.html"}}
-<h1>{{t "Audit log"}}</h1>
+<h1>{{t "common.audit_log"}}</h1>
 <table>
-	<thead><tr><th>{{t "Time"}}</th><th>{{t "User"}}</th><th>{{t "IP"}}</th><th>{{t "Action"}}</th><th>{{t "Target"}}</th><th>{{t "Detail"}}</th><th>{{t "Result"}}</th></tr></thead>
+	<thead><tr><th>{{t "common.time"}}</th><th>{{t "audit.user"}}</th><th>{{t "audit.ip"}}</th><th>{{t "common.action"}}</th><th>{{t "audit.target"}}</th><th>{{t "audit.detail"}}</th><th>{{t "audit.result"}}</th></tr></thead>
 	<tbody>
 	{{range .Entries}}
 		<tr>
@@ -11,10 +11,10 @@
 			<td class="mono">{{.Action}}</td>
 			<td class="mono">{{.Target}}</td>
 			<td class="muted">{{.Detail}}</td>
-			<td>{{if .Success}}<span class="badge state-active">{{t "ok"}}</span>{{else}}<span class="badge state-failed" title="{{.Error}}">{{t "failed"}}</span>{{end}}</td>
+			<td>{{if .Success}}<span class="badge state-active">{{t "common.ok"}}</span>{{else}}<span class="badge state-failed" title="{{.Error}}">{{t "common.failed"}}</span>{{end}}</td>
 		</tr>
 	{{else}}
-		<tr><td colspan="7" class="muted">{{t "No audit entries yet."}}</td></tr>
+		<tr><td colspan="7" class="muted">{{t "audit.no_audit_entries_yet"}}</td></tr>
 	{{end}}
 	</tbody>
 </table>

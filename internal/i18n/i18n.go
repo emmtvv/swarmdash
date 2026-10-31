@@ -1,10 +1,12 @@
-// Package i18n translates the admin UI. Messages are keyed by their English
-// source text (gettext-style), so templates read naturally -
-// {{t "Services"}}. Catalogs live in locales/<tag>.json as flat
-// {"key": "translation"} objects, embedded into the binary - English
-// included: en.json is the reference catalog listing every message (and
-// its plural forms), and can reword a message without touching the
-// templates. A key missing from a catalog falls back to the key itself.
+// Package i18n translates the admin UI. Templates and code refer to
+// messages by key - {{t "common.services"}} - and catalogs map keys to
+// text. Keys are "<namespace>.<slug>": the namespace is the template the
+// message belongs to ("common" when several share it, "ui" for the static
+// scripts, "errors"/"flash" for server-side notices), the slug a short
+// snake_case form of the English text. Catalogs live in locales/<tag>.json
+// as flat {"key": "text"} objects, embedded into the binary: en.json is
+// the reference catalog holding every key, the others translate it. A key
+// missing from a catalog falls back to English, then to the key itself.
 package i18n
 
 import (
@@ -17,8 +19,8 @@ import (
 //go:embed locales/*.json
 var localeFS embed.FS
 
-// Default is the language used until a user picks one, and the language
-// message keys are written in.
+// Default is the language used until a user picks one, and the one
+// missing translations fall back to.
 const Default = "en"
 
 // Language is one selectable UI language.
@@ -69,41 +71,48 @@ func Supported(tag string) bool {
 	return false
 }
 
-// T translates msg into lang, falling back to msg itself, then formats it
-// with args (fmt verbs) if any are given.
-func T(lang, msg string, args ...any) string {
-	if m, ok := catalogs[lang]; ok {
-		if tr, ok := m[msg]; ok && tr != "" {
-			msg = tr
-		}
+// lookup returns key's text in lang, or in Default when lang lacks it, and
+// the language the text came from (for picking plural forms).
+func lookup(lang, key string) (string, string, bool) {
+	if tr := catalogs[lang][key]; tr != "" {
+		return tr, lang, true
 	}
+	if tr := catalogs[Default][key]; tr != "" {
+		return tr, Default, true
+	}
+	return key, lang, false
+}
+
+// Has reports whether key is in the reference (English) catalog.
+func Has(key string) bool {
+	_, ok := catalogs[Default][key]
+	return ok
+}
+
+// T translates key into lang (falling back to English, then to key
+// itself, so untranslatable text such as an error string passes through),
+// then formats it with args (fmt verbs) if any are given.
+func T(lang, key string, args ...any) string {
+	msg, _, _ := lookup(lang, key)
 	if len(args) > 0 {
 		return fmt.Sprintf(msg, args...)
 	}
 	return msg
 }
 
-// N translates a message with a count, picking the plural form for n.
-// The source forms are given as one (n == 1) and other; a catalog entry is
-// keyed by other and lists its language's forms separated by "|", in the
-// order pluralForm numbers them (en.json: "one|other"). n is the first format argument, followed
-// by args.
-func N(lang, one, other string, n int, args ...any) string {
+// N translates a message with a count, picking the plural form for n. The
+// catalog entry lists its language's forms separated by "|", in the order
+// pluralForm numbers them (en.json: "one|other"). n is the first format
+// argument, followed by args.
+func N(lang, key string, n int, args ...any) string {
 	fargs := append([]any{n}, args...)
-	if m, ok := catalogs[lang]; ok {
-		if tr, ok := m[other]; ok && tr != "" {
-			forms := strings.Split(tr, "|")
-			i := pluralForm(lang, n)
-			if i >= len(forms) {
-				i = len(forms) - 1
-			}
-			return fmt.Sprintf(forms[i], fargs...)
-		}
+	msg, from, _ := lookup(lang, key)
+	forms := strings.Split(msg, "|")
+	i := pluralForm(from, n)
+	if i >= len(forms) {
+		i = len(forms) - 1
 	}
-	if n == 1 {
-		return fmt.Sprintf(one, fargs...)
-	}
-	return fmt.Sprintf(other, fargs...)
+	return fmt.Sprintf(forms[i], fargs...)
 }
 
 // pluralForm is the index of the plural form lang uses for n (CLDR

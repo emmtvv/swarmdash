@@ -117,13 +117,13 @@ func (s *Server) handleSSOSettingsDisable(w http.ResponseWriter, r *http.Request
 func (s *Server) handleSSOLogin(w http.ResponseWriter, r *http.Request) {
 	cfg, err := s.store.GetSSOConfig()
 	if err != nil || !cfg.Enabled {
-		http.Redirect(w, r, "/login?error=sso+is+not+configured", http.StatusSeeOther)
+		http.Redirect(w, r, "/login?error=errors.sso_is_not_configured", http.StatusSeeOther)
 		return
 	}
 	doc, err := fetchOIDCDiscovery(r.Context(), cfg.Issuer)
 	if err != nil {
 		s.log.Error("sso discovery", "err", err)
-		http.Redirect(w, r, "/login?error=sso+provider+unreachable", http.StatusSeeOther)
+		http.Redirect(w, r, "/login?error=errors.sso_provider_unreachable", http.StatusSeeOther)
 		return
 	}
 
@@ -150,19 +150,19 @@ func (s *Server) handleSSOCallback(w http.ResponseWriter, r *http.Request) {
 
 	cfg, err := s.store.GetSSOConfig()
 	if err != nil || !cfg.Enabled {
-		fail("sso is not configured")
+		fail("errors.sso_is_not_configured")
 		return
 	}
 
 	stateCookie, err := r.Cookie(ssoStateCookieName)
 	if err != nil {
-		fail("sso session expired, please try again")
+		fail("errors.sso_session_expired_please_try_again")
 		return
 	}
 	http.SetCookie(w, &http.Cookie{Name: ssoStateCookieName, Value: "", Path: "/sso/callback", Secure: s.isSecureRequest(r), MaxAge: -1})
 	parts := strings.SplitN(stateCookie.Value, ":", 2)
 	if len(parts) != 2 || parts[0] != r.URL.Query().Get("state") {
-		fail("sso state mismatch, please try again")
+		fail("errors.sso_state_mismatch_please_try_again")
 		return
 	}
 	verifier := parts[1]
@@ -173,37 +173,37 @@ func (s *Server) handleSSOCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		fail("sso callback missing authorization code")
+		fail("errors.sso_callback_missing_authorization_code")
 		return
 	}
 
 	doc, err := fetchOIDCDiscovery(r.Context(), cfg.Issuer)
 	if err != nil {
-		fail("sso provider unreachable")
+		fail("errors.sso_provider_unreachable")
 		return
 	}
 	clientSecret, err := s.decryptSecret(cfg.ClientSecretEnc)
 	if err != nil {
 		s.log.Error("sso decrypt client secret", "err", err)
-		fail("sso is misconfigured")
+		fail("errors.sso_is_misconfigured")
 		return
 	}
 	tok, err := exchangeOIDCCode(r.Context(), doc, cfg.ClientID, clientSecret, ssoRedirectURI(cfg, r), code, verifier)
 	if err != nil {
 		s.log.Error("sso token exchange", "err", err)
-		fail("sso login failed")
+		fail("errors.sso_login_failed")
 		return
 	}
 	claims, err := fetchOIDCUserinfo(r.Context(), doc, tok.AccessToken)
 	if err != nil {
 		s.log.Error("sso userinfo", "err", err)
-		fail("sso login failed")
+		fail("errors.sso_login_failed")
 		return
 	}
 
 	subject, username, email, emailVerified := ssoIdentityFromClaims(claims)
 	if subject == "" {
-		fail("identity provider did not return a stable subject (sub) claim")
+		fail("errors.identity_provider_did_not_return_a")
 		return
 	}
 	if username == "" {
@@ -211,11 +211,11 @@ func (s *Server) handleSSOCallback(w http.ResponseWriter, r *http.Request) {
 	}
 	if cfg.AllowedDomains != "" {
 		if !emailVerified {
-			fail("this identity's email is not verified, so its domain cannot be checked against the allowlist")
+			fail("errors.this_identitys_email_is_not_verified")
 			return
 		}
 		if !emailDomainAllowed(email, cfg.AllowedDomains) {
-			fail("this account's email domain is not allowed to sign in")
+			fail("errors.this_accounts_email_domain_is_not")
 			return
 		}
 	}
@@ -239,7 +239,7 @@ func (s *Server) handleSSOCallback(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case lookupErr == nil:
 			if existing.AuthSource != "sso" {
-				fail("a local account with this username already exists")
+				fail("errors.local_account_with_this_username_already")
 				return
 			}
 			if existing.SSOSubject != "" {
@@ -247,7 +247,7 @@ func (s *Server) handleSSOCallback(w http.ResponseWriter, r *http.Request) {
 				// likely someone changed their preferred_username/email at
 				// the IdP to collide with another account. Reject rather
 				// than silently signing into the existing user's session.
-				fail("this identity's username is already in use by a different account")
+				fail("errors.this_identitys_username_is_already_in")
 				return
 			}
 			// Pre-migration SSO account with no subject bound yet: claim it
@@ -256,13 +256,13 @@ func (s *Server) handleSSOCallback(w http.ResponseWriter, r *http.Request) {
 			existing.SSOSubject = subject
 			if err := s.store.PutUser(existing); err != nil {
 				s.log.Error("sso backfill subject", "err", err)
-				fail("internal error")
+				fail("errors.internal_error")
 				return
 			}
 			user = existing
 		case errors.Is(lookupErr, store.ErrNotFound):
 			if !cfg.AutoCreateUsers {
-				fail("no local account exists for this identity; ask an admin to create one")
+				fail("errors.no_local_account_exists_for_this")
 				return
 			}
 			user = store.User{
@@ -275,23 +275,23 @@ func (s *Server) handleSSOCallback(w http.ResponseWriter, r *http.Request) {
 			}
 			if err := s.store.PutUser(user); err != nil {
 				s.log.Error("sso auto-create user", "err", err)
-				fail("could not create local account")
+				fail("errors.could_not_create_local_account")
 				return
 			}
 			s.auditAs(r, user.Username, "user.sso_provision", user.Username, "role="+user.Role, nil)
 		default:
 			s.log.Error("sso lookup user", "err", lookupErr)
-			fail("internal error")
+			fail("errors.internal_error")
 			return
 		}
 	default:
 		s.log.Error("sso lookup user by subject", "err", err)
-		fail("internal error")
+		fail("errors.internal_error")
 		return
 	}
 
 	if err := s.startSession(w, r, user.Username); err != nil {
-		fail("internal error")
+		fail("errors.internal_error")
 		return
 	}
 	s.auditAs(r, user.Username, "user.sso_login", user.Username, "", nil)

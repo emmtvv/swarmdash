@@ -1,36 +1,36 @@
 {{define "networks.html"}}
-<h1>{{t "Networks"}}</h1>
+<h1>{{t "common.networks"}}</h1>
 
 <div class="card">
-	<h2 style="margin-top:0;">{{t "Create network"}}</h2>
+	<h2 style="margin-top:0;">{{t "networks.create_network"}}</h2>
 	<form method="post" action="/networks">
 		<div class="card-row">
 			<div>
-				<label for="name">{{t "Name"}}</label>
+				<label for="name">{{t "common.name"}}</label>
 				<input type="text" id="name" name="name" required>
 			</div>
 			<div>
-				<label for="driver">{{t "Driver"}}</label>
+				<label for="driver">{{t "common.driver"}}</label>
 				<input type="text" id="driver" name="driver" value="overlay">
 			</div>
 			<div>
 				<label>&nbsp;</label>
-				<label><input type="checkbox" name="attachable" checked> {{t "Attachable"}}</label>
+				<label><input type="checkbox" name="attachable" checked> {{t "networks.attachable"}}</label>
 			</div>
 			<div>
 				<label>&nbsp;</label>
-				<label><input type="checkbox" name="internal"> {{t "Internal"}}</label>
+				<label><input type="checkbox" name="internal"> {{t "networks.internal"}}</label>
 			</div>
 			<div>
 				<label>&nbsp;</label>
-				<button type="submit" class="btn">{{t "Create"}}</button>
+				<button type="submit" class="btn">{{t "common.create"}}</button>
 			</div>
 		</div>
 	</form>
 </div>
 
 <table>
-	<thead><tr><th>{{t "Name"}}</th><th>{{t "Driver"}}</th><th>{{t "Scope"}}</th><th>{{t "Attachable"}}</th><th>{{t "Ingress"}}</th><th></th></tr></thead>
+	<thead><tr><th>{{t "common.name"}}</th><th>{{t "common.driver"}}</th><th>{{t "networks.scope"}}</th><th>{{t "networks.attachable"}}</th><th>{{t "networks.ingress"}}</th><th></th></tr></thead>
 	<tbody>
 	{{range .Networks}}
 		<tr>
@@ -40,13 +40,13 @@
 			<td>{{.Attachable}}</td>
 			<td>{{.Ingress}}</td>
 			<td>
-				<form class="inline" method="post" action="/networks/{{.ID}}/delete" data-confirm="{{t "Delete network %v?" .Name}}">
-					<button type="submit" class="btn danger small">{{t "Delete"}}</button>
+				<form class="inline" method="post" action="/networks/{{.ID}}/delete" data-confirm="{{t "networks.delete_network" .Name}}">
+					<button type="submit" class="btn danger small">{{t "common.delete"}}</button>
 				</form>
 			</td>
 		</tr>
 	{{else}}
-		<tr><td colspan="6" class="muted">{{t "No swarm-scoped networks."}}</td></tr>
+		<tr><td colspan="6" class="muted">{{t "networks.no_swarm_scoped_networks"}}</td></tr>
 	{{end}}
 	</tbody>
 </table>

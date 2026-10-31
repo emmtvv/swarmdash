@@ -116,8 +116,8 @@ var FuncMap = template.FuncMap{
 	// standalone.
 	"t":     func(msg string, args ...any) string { return i18n.T(i18n.Default, msg, args...) },
 	"tHTML": func(msg string, args ...any) template.HTML { return tHTML(i18n.Default, msg, args...) },
-	"tn": func(one, other string, n int, args ...any) string {
-		return i18n.N(i18n.Default, one, other, n, args...)
+	"tn": func(key string, n int, args ...any) string {
+		return i18n.N(i18n.Default, key, n, args...)
 	},
 	"lang":      func() string { return i18n.Default },
 	"jsCatalog": func() map[string]string { return nil },
@@ -135,7 +135,7 @@ func LangFuncs(lang string) template.FuncMap {
 	return template.FuncMap{
 		"t":         func(msg string, args ...any) string { return i18n.T(lang, msg, args...) },
 		"tHTML":     func(msg string, args ...any) template.HTML { return tHTML(lang, msg, args...) },
-		"tn":        func(one, other string, n int, args ...any) string { return i18n.N(lang, one, other, n, args...) },
+		"tn":        func(key string, n int, args ...any) string { return i18n.N(lang, key, n, args...) },
 		"lang":      func() string { return lang },
 		"jsCatalog": func() map[string]string { return i18n.Catalog(lang, JSMessages) },
 		"ago":       func(t time.Time) string { return relativeTime(lang, t) },
@@ -143,11 +143,11 @@ func LangFuncs(lang string) template.FuncMap {
 	}
 }
 
-// tHTML translates a message whose English key itself contains markup
-// (help paragraphs with inline <strong>/<span class="mono">), returning it
-// unescaped. Safe because both the key and every translation are embedded
-// in the binary at build time - never user input - while args, which can
-// be, are escaped before being formatted in.
+// tHTML translates a message whose text contains markup (help paragraphs
+// with inline <strong>/<span class="mono">), returning it unescaped. Safe
+// because the key and every catalog entry are embedded in the binary at
+// build time - never user input - while args, which can be, are escaped
+// before being formatted in.
 func tHTML(lang, msg string, args ...any) template.HTML {
 	escaped := make([]any, len(args))
 	for i, a := range args {
@@ -163,13 +163,13 @@ func relativeTime(lang string, t time.Time) string {
 	d := time.Since(t)
 	switch {
 	case d < time.Minute:
-		return i18n.T(lang, "just now")
+		return i18n.T(lang, "time.just_now")
 	case d < time.Hour:
-		return i18n.T(lang, "%dm ago", int(d.Minutes()))
+		return i18n.T(lang, "time.m_ago", int(d.Minutes()))
 	case d < 24*time.Hour:
-		return i18n.T(lang, "%dh ago", int(d.Hours()))
+		return i18n.T(lang, "time.h_ago", int(d.Hours()))
 	default:
-		return i18n.T(lang, "%dd ago", int(d.Hours()/24))
+		return i18n.T(lang, "time.d_ago", int(d.Hours()/24))
 	}
 }
 
@@ -180,44 +180,44 @@ func unixRelative(lang string, sec int64) string {
 	return relativeTime(lang, time.Unix(sec, 0))
 }
 
-// JSMessages lists the strings core.js/app.js and inline page scripts pass
-// to t(), so layout.html can hand the current language's translations of
+// JSMessages lists the message keys core.js/app.js and inline page scripts
+// pass to t(), so layout.html can hand the current language's translations of
 // exactly these to the browser as a JSON catalog (read by t in core.js).
 // TestJSMessagesCoverScripts keeps it in sync with the scripts.
 var JSMessages = []string{
-	"Not enough history yet - check back in a few minutes.",
-	"Running",
-	"Desired",
-	"CPU",
-	"Memory",
-	"Download",
-	"Now",
-	"Console",
-	"Logs",
-	"%d selected",
-	"Click a node for details.",
-	"Backup uploaded",
-	"Upload failed:",
-	"network error",
-	"New password for %s:",
-	"Click to sort",
-	"Searching...",
-	"No results.",
-	"No matching pages.",
-	"Remove from favorites",
-	"Add to favorites",
-	"Copied",
-	"KEY",
-	"value",
-	"name",
-	"target filename (optional)",
-	"/host/path or volume name",
-	"/container/path",
-	"Read-only",
-	"Remove",
-	"Add",
-	// Passed to t() as a variable (the websocket status badges).
-	"connected",
-	"reconnecting",
-	"done",
+	"common.not_enough_history_yet_check",
+	"dashboard.running",
+	"common.desired",
+	"common.cpu",
+	"common.memory",
+	"common.download",
+	"service_detail.now",
+	"common.console",
+	"common.logs",
+	"services.selected",
+	"topology.click_a_node_for_details",
+	"volume_backups.backup_uploaded",
+	"volume_backups.upload_failed",
+	"volume_backups.network_error",
+	"ui.new_password_for",
+	"ui.click_to_sort",
+	"ui.searching",
+	"ui.no_results",
+	"ui.no_matching_pages",
+	"common.remove_from_favorites",
+	"common.add_to_favorites",
+	"ui.copied",
+	"ui.key",
+	"ui.value",
+	"common.name_2",
+	"ui.target_filename_optional",
+	"ui.host_path_or_volume_name",
+	"ui.container_path",
+	"ui.read_only",
+	"common.remove",
+	"common.add",
+	// Built at runtime as t("ws." + status) by the websocket status badges.
+	"ws.connected",
+	"ws.reconnecting",
+	"ws.done",
 }

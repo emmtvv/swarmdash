@@ -1,37 +1,37 @@
 {{define "registries.html"}}
-<h1>{{t "Registry credentials"}}</h1>
-<p class="muted">{{t "Used automatically whenever an image from one of these registries is pulled - creating or updating a service, deploying a stack, deploy webhooks - and to look up newer tags for image updates, so private images can be updated automatically too. The login is checked against the registry when you save it. Passwords are encrypted at rest (keyed off the cluster secret) and never shown again after saving."}}</p>
+<h1>{{t "common.registry_credentials"}}</h1>
+<p class="muted">{{t "registries.used_automatically_whenever_an_image"}}</p>
 
 <div class="card">
-	<h2 style="margin-top:0;">{{t "Add registry"}}</h2>
+	<h2 style="margin-top:0;">{{t "registries.add_registry"}}</h2>
 	<form method="post" action="/settings/registries">
 		<div class="card-row">
 			<div>
-				<label for="server">{{t "Server"}}</label>
-				<input type="text" id="server" name="server" placeholder="{{t "docker.io / ghcr.io / registry.example.com:5000"}}" required style="width:260px;">
+				<label for="server">{{t "registries.server"}}</label>
+				<input type="text" id="server" name="server" placeholder="docker.io / ghcr.io / registry.example.com:5000" required style="width:260px;">
 			</div>
 			<div>
-				<label for="username">{{t "Username"}}</label>
+				<label for="username">{{t "common.username"}}</label>
 				<input type="text" id="username" name="username" required>
 			</div>
 			<div>
-				<label for="password">{{t "Password"}}</label>
-				<input type="password" id="password" name="password" required placeholder="{{t "password or access token"}}">
+				<label for="password">{{t "common.password"}}</label>
+				<input type="password" id="password" name="password" required placeholder="{{t "registries.password_or_access_token"}}">
 			</div>
 			<div>
 				<label>&nbsp;</label>
-				<button type="submit" class="btn">{{t "Save"}}</button>
+				<button type="submit" class="btn">{{t "common.save"}}</button>
 			</div>
 		</div>
 		<label class="muted small" style="display:flex;align-items:center;gap:8px;font-weight:400;margin-top:8px;">
 			<input type="checkbox" name="skip_check" value="1" style="width:auto;">
-			{{t "Save without checking (admin can't reach this registry, but the nodes can)"}}
+			{{t "registries.save_without_checking_admin_cant"}}
 		</label>
 	</form>
 </div>
 
 <table>
-	<thead><tr><th>{{t "Server"}}</th><th>{{t "Username"}}</th><th>{{t "Added"}}</th><th></th></tr></thead>
+	<thead><tr><th>{{t "registries.server"}}</th><th>{{t "common.username"}}</th><th>{{t "common.added"}}</th><th></th></tr></thead>
 	<tbody>
 	{{range .Registries}}
 		<tr>
@@ -39,13 +39,13 @@
 			<td>{{.Username}}</td>
 			<td class="muted">{{ago .CreatedAt}}</td>
 			<td>
-				<form class="inline" method="post" action="/settings/registries/{{.Server}}/delete" data-confirm="{{t "Remove credential for %v?" .Server}}">
-					<button type="submit" class="btn danger small">{{t "Delete"}}</button>
+				<form class="inline" method="post" action="/settings/registries/{{.Server}}/delete" data-confirm="{{t "registries.remove_credential_for" .Server}}">
+					<button type="submit" class="btn danger small">{{t "common.delete"}}</button>
 				</form>
 			</td>
 		</tr>
 	{{else}}
-		<tr><td colspan="4" class="muted">{{t "No registry credentials configured."}}</td></tr>
+		<tr><td colspan="4" class="muted">{{t "registries.no_registry_credentials_configured"}}</td></tr>
 	{{end}}
 	</tbody>
 </table>

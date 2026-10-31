@@ -1,36 +1,36 @@
 {{define "dashboard.html"}}
 {{if and .CurrentVersion (ne .CurrentVersion "dev")}}
 <div class="update-banner" id="update-banner" hidden data-current-version="{{.CurrentVersion}}">
-	<span>{{tHTML "A new version of swarmdash is available: <strong data-update-latest></strong> (you're on %v)." .CurrentVersion}}</span>
-	<a data-update-link href="#" target="_blank" rel="noopener noreferrer">{{t "View release"}}</a>
-	<button type="button" class="update-banner-dismiss" id="update-banner-dismiss" aria-label="{{t "Dismiss"}}">&times;</button>
+	<span>{{tHTML "dashboard.new_version_of_swarmdash_is" .CurrentVersion}}</span>
+	<a data-update-link href="#" target="_blank" rel="noopener noreferrer">{{t "dashboard.view_release"}}</a>
+	<button type="button" class="update-banner-dismiss" id="update-banner-dismiss" aria-label="{{t "dashboard.dismiss"}}">&times;</button>
 </div>
 {{end}}
-<h1>{{t "Dashboard"}}</h1>
+<h1>{{t "common.dashboard"}}</h1>
 
 <div class="hero-card {{if .DegradedCount}}crit{{else}}ok{{end}}">
 	<div class="hero-status">
 		<span class="hero-dot"></span>
 		<div>
-			<div class="hero-title">{{if .DegradedCount}}{{t "Cluster degraded"}}{{else}}{{t "Cluster healthy"}}{{end}}</div>
-			<div class="hero-sub">{{t "%v nodes · %v services · %v/%v tasks running" .NodeCount .ServiceCount .RunningTasks .DesiredTasks}}{{if .FailedTasks}} {{t "· %v failed in history" .FailedTasks}}{{end}}</div>
+			<div class="hero-title">{{if .DegradedCount}}{{t "dashboard.cluster_degraded"}}{{else}}{{t "dashboard.cluster_healthy"}}{{end}}</div>
+			<div class="hero-sub">{{t "dashboard.nodes_services_tasks_running" .NodeCount .ServiceCount .RunningTasks .DesiredTasks}}{{if .FailedTasks}} {{t "dashboard.failed_in_history" .FailedTasks}}{{end}}</div>
 		</div>
 	</div>
 	<div class="hero-metrics">
-		<div><span class="hero-metric-n">{{round .CPUPct}}%</span><span class="hero-metric-l">{{t "CPU"}}</span></div>
-		<div><span class="hero-metric-n">{{round .MemPct}}%</span><span class="hero-metric-l">{{t "Memory"}}</span></div>
+		<div><span class="hero-metric-n">{{round .CPUPct}}%</span><span class="hero-metric-l">{{t "common.cpu"}}</span></div>
+		<div><span class="hero-metric-n">{{round .MemPct}}%</span><span class="hero-metric-l">{{t "common.memory"}}</span></div>
 	</div>
 </div>
 
 {{if .Favorites}}
-<div class="section-label">{{t "Favorites"}}</div>
+<div class="section-label">{{t "common.favorites"}}</div>
 <div class="fav-grid">
 	{{range .Favorites}}
 	<a class="fav-card fav-{{.Status}}" href="{{.Href}}">
 		<span class="fav-dot"></span>
 		<span class="fav-body">
 			<span class="fav-label">{{.Label}}</span>
-			<span class="fav-meta">{{t .Kind}}{{if .Detail}} &middot; {{.Detail}}{{end}}{{if eq .Status "gone"}} &middot; {{t "not found"}}{{end}}</span>
+			<span class="fav-meta">{{t (print "kind." .Kind)}}{{if .Detail}} &middot; {{.Detail}}{{end}}{{if eq .Status "gone"}} &middot; {{t "dashboard.not_found"}}{{end}}</span>
 		</span>
 	</a>
 	{{end}}
@@ -40,30 +40,30 @@
 <div class="grid">
 	<div class="stat-card">
 		<div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><circle cx="7" cy="7" r=".6" fill="currentColor" stroke="none"/><circle cx="7" cy="17" r=".6" fill="currentColor" stroke="none"/></svg></div>
-		<div class="n">{{.NodeCount}}</div><div class="l">{{t "Nodes"}}</div>
+		<div class="n">{{.NodeCount}}</div><div class="l">{{t "common.nodes"}}</div>
 	</div>
 	<div class="stat-card">
 		<div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 L21 8 L12 13 L3 8 Z"/><path d="M3 14 L12 19 L21 14"/></svg></div>
-		<div class="n">{{.StackCount}}</div><div class="l">{{t "Stacks"}}</div>
+		<div class="n">{{.StackCount}}</div><div class="l">{{t "common.stacks"}}</div>
 	</div>
 	<div class="stat-card">
 		<div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 L12 3 L3 8 V16 L12 21 L21 16 Z"/><path d="M3 8 L12 13 L21 8"/><path d="M12 13 V21"/></svg></div>
-		<div class="n">{{.ServiceCount}}</div><div class="l">{{t "Services"}}</div>
+		<div class="n">{{.ServiceCount}}</div><div class="l">{{t "common.services"}}</div>
 	</div>
 	<div class="stat-card">
 		<div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,13 8,13 10,7 14,19 16,13 21,13"/></svg></div>
-		<div class="n">{{.RunningTasks}}/{{.DesiredTasks}}</div><div class="l">{{t "Tasks running"}}</div>
+		<div class="n">{{.RunningTasks}}/{{.DesiredTasks}}</div><div class="l">{{t "dashboard.tasks_running"}}</div>
 	</div>
 	{{if .FailedTasks}}
 	<div class="stat-card crit">
 		<div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="13"/><circle cx="12" cy="16.2" r=".6" fill="currentColor" stroke="none"/></svg></div>
-		<div class="n" style="color:var(--red)">{{.FailedTasks}}</div><div class="l">{{t "Failed tasks"}}</div>
+		<div class="n" style="color:var(--red)">{{.FailedTasks}}</div><div class="l">{{t "dashboard.failed_tasks"}}</div>
 	</div>
 	{{end}}
 	{{if .DegradedCount}}
 	<div class="stat-card warn">
 		<div class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 L22 20 H2 Z"/><line x1="12" y1="9.5" x2="12" y2="14.5"/><circle cx="12" cy="17.3" r=".6" fill="currentColor" stroke="none"/></svg></div>
-		<div class="n" style="color:var(--yellow)">{{.DegradedCount}}</div><div class="l">{{t "Degraded services"}}</div>
+		<div class="n" style="color:var(--yellow)">{{.DegradedCount}}</div><div class="l">{{t "common.degraded_services"}}</div>
 	</div>
 	{{end}}
 </div>
@@ -74,8 +74,8 @@
 			<div class="ring-pct">{{round .CPUPct}}%</div>
 		</div>
 		<div class="ring-info">
-			<div class="l">{{t "CPU reserved"}}</div>
-			<div class="n">{{cpus .CPUReserved}} <span class="muted">{{t "of %v vCPU" (cpus .CPUCapacity)}}</span></div>
+			<div class="l">{{t "dashboard.cpu_reserved"}}</div>
+			<div class="n">{{cpus .CPUReserved}} <span class="muted">{{t "dashboard.of_vcpu" (cpus .CPUCapacity)}}</span></div>
 		</div>
 	</div>
 	<div class="ring-card">
@@ -83,21 +83,21 @@
 			<div class="ring-pct">{{round .MemPct}}%</div>
 		</div>
 		<div class="ring-info">
-			<div class="l">{{t "Memory used"}}</div>
-			<div class="n">{{bytesHuman .MemUsed}} <span class="muted">{{t "of %v" (bytesHuman .MemCapacity)}}</span></div>
+			<div class="l">{{t "common.memory_used"}}</div>
+			<div class="n">{{bytesHuman .MemUsed}} <span class="muted">{{t "dashboard.of" (bytesHuman .MemCapacity)}}</span></div>
 		</div>
 	</div>
 </div>
 
-<h2>{{t "Last 24h"}}</h2>
+<h2>{{t "dashboard.last_24h"}}</h2>
 <div class="card-row">
 	<div class="card" style="flex:1;">
-		<div class="muted">{{t "Tasks running / desired"}}</div>
+		<div class="muted">{{t "dashboard.tasks_running_desired"}}</div>
 		<canvas id="tasks-history-chart" width="900" height="90" style="width:100%;height:90px;"></canvas>
 		<div id="tasks-history-legend" class="muted" style="font-size:12px;margin-top:6px;"></div>
 	</div>
 	<div class="card" style="flex:1;">
-		<div class="muted">{{t "CPU reserved / memory used %"}}</div>
+		<div class="muted">{{t "dashboard.cpu_reserved_memory_used"}}</div>
 		<canvas id="resources-history-chart" width="900" height="90" style="width:100%;height:90px;"></canvas>
 		<div id="resources-history-legend" class="muted" style="font-size:12px;margin-top:6px;"></div>
 	</div>
@@ -108,7 +108,7 @@
 	const samples = {{.HistoryJSON}};
 
 	if (samples.length < 2) {
-		const msg = t("Not enough history yet - check back in a few minutes.");
+		const msg = t("common.not_enough_history_yet_check");
 		document.getElementById("tasks-history-legend").textContent = msg;
 		document.getElementById("resources-history-legend").textContent = msg;
 		return;
@@ -125,8 +125,8 @@
 		{ values: samples.map(s => s.run), color: accent },
 	]);
 	sdChart.legend("tasks-history-legend", [
-		{ color: accent, label: t("Running"), value: last.run },
-		{ color: gray, dash: true, label: t("Desired"), value: last.des },
+		{ color: accent, label: t("dashboard.running"), value: last.run },
+		{ color: gray, dash: true, label: t("common.desired"), value: last.des },
 	]);
 
 	sdChart.draw("resources-history-chart", [
@@ -134,20 +134,20 @@
 		{ values: samples.map(s => s.mem), color: yellow, dash: true },
 	], 100);
 	sdChart.legend("resources-history-legend", [
-		{ color: accent, label: t("CPU"), value: last.cpu.toFixed(1) + "%" },
-		{ color: yellow, dash: true, label: t("Memory"), value: last.mem.toFixed(1) + "%" },
+		{ color: accent, label: t("common.cpu"), value: last.cpu.toFixed(1) + "%" },
+		{ color: yellow, dash: true, label: t("common.memory"), value: last.mem.toFixed(1) + "%" },
 	]);
 })();
 </script>
 
-<h2>{{t "Nodes"}}</h2>
+<h2>{{t "common.nodes"}}</h2>
 <table>
-	<thead><tr><th>{{t "Hostname"}}</th><th>{{t "Role"}}</th><th>{{t "Status"}}</th><th>{{t "Availability"}}</th><th>{{t "Engine"}}</th></tr></thead>
+	<thead><tr><th>{{t "common.hostname"}}</th><th>{{t "common.role"}}</th><th>{{t "common.status"}}</th><th>{{t "common.availability"}}</th><th>{{t "common.engine"}}</th></tr></thead>
 	<tbody>
 	{{range .Nodes}}
 		<tr>
 			<td><a href="/nodes">{{.Description.Hostname}}</a></td>
-			<td>{{.Spec.Role}}{{if .ManagerStatus}}{{if .ManagerStatus.Leader}} {{t "(leader)"}}{{end}}{{end}}</td>
+			<td>{{.Spec.Role}}{{if .ManagerStatus}}{{if .ManagerStatus.Leader}} {{t "dashboard.leader"}}{{end}}{{end}}</td>
 			<td><span class="badge state-{{.Status.State}}">{{.Status.State}}</span></td>
 			<td>{{.Spec.Availability}}</td>
 			<td class="muted">{{.Description.Engine.EngineVersion}}</td>
@@ -156,15 +156,15 @@
 	</tbody>
 </table>
 
-<h2>{{t "Services"}}</h2>
+<h2>{{t "common.services"}}</h2>
 <table>
-	<thead><tr><th>{{t "Name"}}</th><th>{{t "Stack"}}</th><th>{{t "Mode"}}</th><th>{{t "Replicas"}}</th><th>{{t "Image"}}</th></tr></thead>
+	<thead><tr><th>{{t "common.name"}}</th><th>{{t "common.stack"}}</th><th>{{t "common.mode"}}</th><th>{{t "common.replicas"}}</th><th>{{t "common.image"}}</th></tr></thead>
 	<tbody>
 	{{range .Services}}
 		<tr>
 			<td><a href="/services/{{.Spec.Name}}">{{.Spec.Name}}</a></td>
 			<td class="muted">{{index .Spec.Labels "com.docker.stack.namespace"}}</td>
-			<td>{{if .Spec.Mode.Replicated}}{{t "replicated"}}{{else}}{{t "global"}}{{end}}</td>
+			<td>{{if .Spec.Mode.Replicated}}{{t "common.replicated"}}{{else}}{{t "common.global"}}{{end}}</td>
 			<td>{{if .ServiceStatus}}{{.ServiceStatus.RunningTasks}}/{{.ServiceStatus.DesiredTasks}}{{else}}-{{end}}</td>
 			<td class="muted mono">{{imageName .Spec.TaskTemplate.ContainerSpec.Image}}</td>
 		</tr>

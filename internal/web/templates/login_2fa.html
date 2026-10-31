@@ -4,16 +4,16 @@
 		<div class="login-brand">
 			<span class="brand-mark">{{template "brand-svg"}}</span>
 			<h1>swarmdash</h1>
-			<p>{{t "Two-factor authentication"}}</p>
+			<p>{{t "common.two_factor_authentication"}}</p>
 		</div>
 		{{if .Error}}<div class="error-box">{{t .Error}}</div>{{end}}
 		<form method="post" action="/login/2fa">
-			<label for="code">{{t "Code from your authenticator app"}}</label>
+			<label for="code">{{t "login_2fa.code_from_your_authenticator_app"}}</label>
 			<input type="text" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" autofocus required>
-			<p class="muted" style="font-size:12px;margin-top:8px;">{{t "Lost your phone? Enter one of your recovery codes instead."}}</p>
-			<button type="submit" class="btn" style="width:100%;margin-top:18px;">{{t "Verify"}}</button>
+			<p class="muted" style="font-size:12px;margin-top:8px;">{{t "login_2fa.lost_your_phone_enter_one"}}</p>
+			<button type="submit" class="btn" style="width:100%;margin-top:18px;">{{t "login_2fa.verify"}}</button>
 		</form>
-		<p style="text-align:center;margin-top:16px;"><a href="/login" class="muted">{{t "Back to sign in"}}</a></p>
+		<p style="text-align:center;margin-top:16px;"><a href="/login" class="muted">{{t "login_2fa.back_to_sign_in"}}</a></p>
 		{{template "lang-picker" "/login/2fa"}}
 	</div>
 </div>

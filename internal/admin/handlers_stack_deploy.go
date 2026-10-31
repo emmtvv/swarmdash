@@ -328,7 +328,7 @@ func (s *Server) handleTemplateSave(w http.ResponseWriter, r *http.Request) {
 	f := readDeployForm(r)
 	tplName := strings.TrimSpace(r.FormValue("template_name"))
 	if tplName == "" {
-		s.renderDeployForm(w, r, f, map[string]any{"Error": "template name is required"})
+		s.renderDeployForm(w, r, f, map[string]any{"Error": "errors.template_name_is_required"})
 		return
 	}
 	if _, err := compose.Parse([]byte(f.Compose)); err != nil {

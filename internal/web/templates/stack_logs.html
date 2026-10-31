@@ -1,18 +1,18 @@
 {{define "stack_logs.html"}}
-<div class="breadcrumb"><a href="/stacks">{{t "Stacks"}}</a> / <a href="/stacks/{{.StackName}}">{{.StackName}}</a> {{t "/ logs"}}</div>
+<div class="breadcrumb"><a href="/stacks">{{t "common.stacks"}}</a> / <a href="/stacks/{{.StackName}}">{{.StackName}}</a> {{t "common.logs_2"}}</div>
 <div class="page-header">
-	<h1>{{t "Logs"}} <span class="muted mono" style="font-size:14px;">{{.StackName}}</span> <span id="status" class="badge state-active">{{t "connected"}}</span></h1>
+	<h1>{{t "common.logs"}} <span class="muted mono" style="font-size:14px;">{{.StackName}}</span> <span id="status" class="badge state-active">{{t "ws.connected"}}</span></h1>
 	<div class="actions">
 		<select id="service" style="width:auto;">
-			<option value="">{{t "All services"}}</option>
+			<option value="">{{t "stack_logs.all_services"}}</option>
 			{{range .Services}}<option value="{{.}}">{{.}}</option>{{end}}
 		</select>
-		<input type="text" id="filter" placeholder="{{t "Filter lines..."}}" style="width:200px;">
-		<label class="muted small"><input type="checkbox" id="follow" checked> {{t "Follow"}}</label>
-		<a href="/stacks/{{.StackName}}/logs/download" id="download" class="btn secondary small">{{t "Download"}}</a>
+		<input type="text" id="filter" placeholder="{{t "stack_logs.filter_lines"}}" style="width:200px;">
+		<label class="muted small"><input type="checkbox" id="follow" checked> {{t "common.follow"}}</label>
+		<a href="/stacks/{{.StackName}}/logs/download" id="download" class="btn secondary small">{{t "common.download"}}</a>
 	</div>
 </div>
-<div class="muted" style="margin-bottom:8px;">{{t "Merged output from every service of this stack, ordered by time (UTC)."}}</div>
+<div class="muted" style="margin-bottom:8px;">{{t "stack_logs.merged_output_from_every_service"}}</div>
 
 <pre id="logs-out" class="card mono" style="height:75vh;overflow:auto;white-space:pre-wrap;"></pre>
 
@@ -32,7 +32,7 @@
 	// partial holds a line split across websocket messages.
 	let lines = [], partial = "";
 
-	function setStatus(s) { statusEl.textContent = t(s); statusEl.className = "badge state-" + (s === "connected" ? "active" : "pending"); }
+	function setStatus(s) { statusEl.textContent = t("ws." + s); statusEl.className = "badge state-" + (s === "connected" ? "active" : "pending"); }
 	function matches(line) { const f = filterInput.value.toLowerCase(); return !f || line.toLowerCase().includes(f); }
 	function render() { out.textContent = lines.filter(matches).join("\n") + (lines.length ? "\n" : ""); out.scrollTop = out.scrollHeight; }
 

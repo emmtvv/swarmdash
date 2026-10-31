@@ -48,7 +48,7 @@ func TestRenderNewPages(t *testing.T) {
 			"QR": template.HTML("<svg></svg>"), "Secret": "ABCD EFGH",
 		},
 		"account_recovery_codes.html": map[string]any{"User": user, "Codes": []string{"abcde-12345"}},
-		"login_2fa.html":              map[string]any{"Error": "invalid code"},
+		"login_2fa.html":              map[string]any{"Error": "errors.invalid_code"},
 		"volume_backups.html": map[string]any{
 			"User": user, "SelectedID": "n1",
 			"List": struct {
@@ -76,6 +76,27 @@ func TestRenderNewPages(t *testing.T) {
 			if w.Code != 200 || !strings.Contains(w.Body.String(), "</html>") {
 				t.Errorf("%s (%s): status %d, body %.300s", page, lang, w.Code, w.Body.String())
 			}
+		}
+	}
+}
+
+var tmplCallRE = regexp.MustCompile(`(?:^|[^\w.$])(?:t|tHTML|tn)\s+"((?:[^"\\]|\\.)*)"`)
+
+// TestMessageKeysExist fails when a template or script refers to a key
+// en.json lacks - the page would show the bare key.
+func TestMessageKeysExist(t *testing.T) {
+	entries, _ := templatesFS.ReadDir("templates")
+	for _, e := range entries {
+		b, _ := templatesFS.ReadFile("templates/" + e.Name())
+		for _, m := range tmplCallRE.FindAllStringSubmatch(string(b), -1) {
+			if !i18n.Has(m[1]) {
+				t.Errorf("%s: key %q is missing from en.json", e.Name(), m[1])
+			}
+		}
+	}
+	for _, k := range JSMessages {
+		if !i18n.Has(k) {
+			t.Errorf("JSMessages: key %q is missing from en.json", k)
 		}
 	}
 }
@@ -110,6 +131,9 @@ func TestJSMessagesCoverScripts(t *testing.T) {
 			var key string
 			if err := json.Unmarshal([]byte(`"`+m[1]+`"`), &key); err != nil {
 				t.Fatal(err)
+			}
+			if strings.HasSuffix(key, ".") {
+				continue // a key completed at runtime, e.g. t("ws." + s)
 			}
 			if !have[key] {
 				t.Errorf("t(%q) is used in a script but missing from JSMessages", key)

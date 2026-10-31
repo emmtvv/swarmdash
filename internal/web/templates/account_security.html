@@ -1,69 +1,69 @@
 {{define "account_security.html"}}
-<h1>{{t "Account"}}</h1>
+<h1>{{t "common.account"}}</h1>
 
 {{if .Required}}
-<div class="error-box">{{t "Two-factor authentication is required on this instance. Set it up below to continue."}}</div>
+<div class="error-box">{{t "account_security.two_factor_authentication_is_required"}}</div>
 {{end}}
 {{if .Error}}<div class="error-box">{{t .Error}}</div>{{end}}
 {{if .Flash}}<div class="ok-box">{{t .Flash}}</div>{{end}}
 
 <div class="card" style="max-width:640px;">
-	<h2 style="margin-top:0;">{{t "Language"}}</h2>
+	<h2 style="margin-top:0;">{{t "common.language"}}</h2>
 	<form method="post" action="/language" class="card-row">
 		<input type="hidden" name="return" value="/account/security">
-		<select name="lang" aria-label="{{t "Language"}}">
+		<select name="lang" aria-label="{{t "common.language"}}">
 			{{$cur := .CurrentTag}}
 			{{range .Languages}}<option value="{{.Tag}}" {{if eq .Tag $cur}}selected{{end}}>{{.Name}}</option>{{end}}
 		</select>
-		<button type="submit" class="btn secondary">{{t "Save"}}</button>
+		<button type="submit" class="btn secondary">{{t "common.save"}}</button>
 	</form>
 </div>
 
 <div class="card" style="max-width:640px;">
-	<h2 style="margin-top:0;">{{t "Two-factor authentication"}}</h2>
+	<h2 style="margin-top:0;">{{t "common.two_factor_authentication"}}</h2>
 	{{if .SSO}}
-		<p class="muted">{{t "This account signs in via SSO - two-factor is handled by your identity provider."}}</p>
+		<p class="muted">{{t "account_security.this_account_signs_in_via"}}</p>
 	{{else if .User.TOTPEnabled}}
-		<p><span class="badge state-running">{{t "Enabled"}}</span></p>
-		<p class="muted">{{t "Sign-in asks for a code from your authenticator app after your password."}} {{t "%d unused recovery codes left." .Remaining}}</p>
+		<p><span class="badge state-running">{{t "common.enabled"}}</span></p>
+		<p class="muted">{{t "account_security.sign_in_asks_for_a"}} {{t "account_security.unused_recovery_codes_left" .Remaining}}</p>
 		<form method="post" action="/account/2fa/recovery-codes" style="margin-top:16px;">
-			<h3>{{t "New recovery codes"}}</h3>
-			<p class="muted">{{t "Replaces all existing recovery codes."}}</p>
+			<h3>{{t "account_security.new_recovery_codes"}}</h3>
+			<p class="muted">{{t "account_security.replaces_all_existing_recovery_codes"}}</p>
 			<div class="card-row">
-				<input type="password" name="password" placeholder="{{t "Current password"}}" required autocomplete="current-password">
-				<input type="text" name="code" placeholder="{{t "Code"}}" inputmode="numeric" required autocomplete="one-time-code" style="width:120px;">
-				<button type="submit" class="btn secondary">{{t "Generate"}}</button>
+				<input type="password" name="password" placeholder="{{t "common.current_password"}}" required autocomplete="current-password">
+				<input type="text" name="code" placeholder="{{t "account_security.code"}}" inputmode="numeric" required autocomplete="one-time-code" style="width:120px;">
+				<button type="submit" class="btn secondary">{{t "account_security.generate"}}</button>
 			</div>
 		</form>
-		<form method="post" action="/account/2fa/disable" style="margin-top:16px;" data-confirm="{{t "Turn off two-factor authentication?"}}">
-			<h3>{{t "Disable two-factor"}}</h3>
+		<form method="post" action="/account/2fa/disable" style="margin-top:16px;" data-confirm="{{t "account_security.turn_off_two_factor_authentication"}}">
+			<h3>{{t "account_security.disable_two_factor"}}</h3>
 			<div class="card-row">
-				<input type="password" name="password" placeholder="{{t "Current password"}}" required autocomplete="current-password">
-				<input type="text" name="code" placeholder="{{t "Code"}}" inputmode="numeric" required autocomplete="one-time-code" style="width:120px;">
-				<button type="submit" class="btn danger">{{t "Disable"}}</button>
+				<input type="password" name="password" placeholder="{{t "common.current_password"}}" required autocomplete="current-password">
+				<input type="text" name="code" placeholder="{{t "account_security.code"}}" inputmode="numeric" required autocomplete="one-time-code" style="width:120px;">
+				<button type="submit" class="btn danger">{{t "common.disable"}}</button>
 			</div>
 		</form>
 	{{else if .Enrolling}}
-		<p>{{t "1. Scan this QR code with an authenticator app (Google Authenticator, Authy, 1Password, Bitwarden...)."}}</p>
+		<p>{{t "account_security.1_scan_this_qr_code"}}</p>
 		<div class="qr-box">{{.QR}}</div>
-		<p class="muted">{{t "Can't scan it? Enter this key manually:"}} <span class="mono">{{.Secret}}</span></p>
-		<p style="margin-top:16px;">{{t "2. Enter the 6-digit code the app shows to finish."}}</p>
+		<p class="muted">{{t "account_security.cant_scan_it_enter_this"}} <span class="mono">{{.Secret}}</span></p>
+		<p style="margin-top:16px;">{{t "account_security.2_enter_the_6_digit"}}</p>
 		<form method="post" action="/account/2fa/enable" class="card-row">
 			<input type="text" name="code" placeholder="123456" inputmode="numeric" autocomplete="one-time-code" required autofocus style="width:140px;">
-			<button type="submit" class="btn">{{t "Enable two-factor"}}</button>
+			<button type="submit" class="btn">{{t "account_security.enable_two_factor"}}</button>
 		</form>
 		<form method="post" action="/account/2fa/disable" style="margin-top:12px;">
-			<button type="submit" class="link-btn">{{t "Cancel setup"}}</button>
+			<button type="submit" class="link-btn">{{t "account_security.cancel_setup"}}</button>
 		</form>
 	{{else}}
-		<p class="muted">{{t "Protect this account with a second step at sign-in: a 6-digit code from an authenticator app on your phone."}}</p>
+		<p class="muted">{{t "account_security.protect_this_account_with_a"}}</p>
 		<form method="post" action="/account/2fa/setup">
-			<button type="submit" class="btn">{{t "Set up two-factor"}}</button>
+			<button type="submit" class="btn">{{t "account_security.set_up_two_factor"}}</button>
 		</form>
 	{{end}}
 </div>
 
 {{if not .SSO}}
-<p><a href="/account/password">{{t "Change password"}} &rarr;</a></p>
+<p><a href="/account/password">{{t "common.change_password"}} &rarr;</a></p>
 {{end}}
 {{end}}

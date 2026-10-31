@@ -67,7 +67,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	if q == "" {
 		// An empty query is the palette opening: show favorites first.
 		if favs := s.favoriteHits(ctx, user.Favorites); len(favs) > 0 {
-			groups = append(groups, searchGroup{Kind: "favorite", Label: s.t(r, "Favorites"), Hits: favs})
+			groups = append(groups, searchGroup{Kind: "favorite", Label: s.t(r, "common.favorites"), Hits: favs})
 		}
 		httpx.WriteJSON(w, map[string]any{"groups": groups})
 		return
@@ -160,13 +160,13 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		kind, label string
 		hits        []searchHit
 	}{
-		{"service", "Services", svcHits},
-		{"stack", "Stacks", stackHits},
-		{"node", "Nodes", nodeHits},
-		{"task", "Tasks", taskHits},
-		{"network", "Networks", netHits},
-		{"secret", "Secrets", secretHits},
-		{"config", "Configs", configHits},
+		{"service", "common.services", svcHits},
+		{"stack", "common.stacks", stackHits},
+		{"node", "common.nodes", nodeHits},
+		{"task", "common.tasks", taskHits},
+		{"network", "common.networks", netHits},
+		{"secret", "common.secrets", secretHits},
+		{"config", "common.configs", configHits},
 	} {
 		if len(g.hits) == 0 {
 			continue

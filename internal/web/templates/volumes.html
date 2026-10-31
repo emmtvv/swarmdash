@@ -1,12 +1,12 @@
 {{define "volumes.html"}}
 <div class="page-header">
-	<h1>{{t "Volumes"}}</h1>
-	{{if eq .User.Role "admin"}}<a href="/volumes/backups?node={{.SelectedID}}" class="btn secondary">{{t "Backups"}}</a>{{end}}
+	<h1>{{t "common.volumes"}}</h1>
+	{{if eq .User.Role "admin"}}<a href="/volumes/backups?node={{.SelectedID}}" class="btn secondary">{{t "common.backups"}}</a>{{end}}
 </div>
 
 <div class="card-row" style="justify-content:space-between;">
 	<form class="inline" method="get" action="/volumes">
-		<label for="node" style="margin:0;">{{t "Node"}}</label>
+		<label for="node" style="margin:0;">{{t "common.node"}}</label>
 		<select name="node" id="node" data-auto-submit>
 			{{$sel := .SelectedID}}
 			{{range .Nodes}}
@@ -16,14 +16,14 @@
 	</form>
 	<form class="inline" method="post" action="/volumes">
 		<input type="hidden" name="node" value="{{.SelectedID}}">
-		<input type="text" name="name" placeholder="{{t "volume name"}}" required>
-		<input type="text" name="driver" placeholder="{{t "local"}}" style="width:100px;">
-		<button type="submit" class="btn">{{t "Create"}}</button>
+		<input type="text" name="name" placeholder="{{t "common.volume_name"}}" required>
+		<input type="text" name="driver" placeholder="{{t "common.local"}}" style="width:100px;">
+		<button type="submit" class="btn">{{t "common.create"}}</button>
 	</form>
 </div>
 
 <table>
-	<thead><tr><th>{{t "Name"}}</th><th>{{t "Driver"}}</th><th>{{t "Mountpoint"}}</th><th>{{t "Created"}}</th><th></th></tr></thead>
+	<thead><tr><th>{{t "common.name"}}</th><th>{{t "common.driver"}}</th><th>{{t "volumes.mountpoint"}}</th><th>{{t "common.created"}}</th><th></th></tr></thead>
 	<tbody>
 	{{range .Volumes}}
 		<tr>
@@ -34,16 +34,16 @@
 			<td>
 				{{if eq $.User.Role "admin"}}
 				<form class="inline" method="post" action="/volumes/{{.Name}}/backup?node={{$.SelectedID}}">
-					<button type="submit" class="btn secondary small">{{t "Back up"}}</button>
+					<button type="submit" class="btn secondary small">{{t "volumes.back_up"}}</button>
 				</form>
 				{{end}}
-				<form class="inline" method="post" action="/volumes/{{.Name}}/delete?node={{$.SelectedID}}" data-confirm="{{t "Delete volume %v? Data will be lost." .Name}}">
-					<button type="submit" class="btn danger small">{{t "Delete"}}</button>
+				<form class="inline" method="post" action="/volumes/{{.Name}}/delete?node={{$.SelectedID}}" data-confirm="{{t "volumes.delete_volume_data_will_be" .Name}}">
+					<button type="submit" class="btn danger small">{{t "common.delete"}}</button>
 				</form>
 			</td>
 		</tr>
 	{{else}}
-		<tr><td colspan="5" class="muted">{{t "No volumes on this node."}}</td></tr>
+		<tr><td colspan="5" class="muted">{{t "volumes.no_volumes_on_this_node"}}</td></tr>
 	{{end}}
 	</tbody>
 </table>

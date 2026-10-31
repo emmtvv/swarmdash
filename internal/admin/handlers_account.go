@@ -22,13 +22,13 @@ func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Requ
 	}
 
 	if err := r.ParseForm(); err != nil {
-		fail("bad request")
+		fail("errors.bad_request")
 		return
 	}
 
 	user := userFromContext(r)
 	if user.AuthSource == "sso" {
-		fail("this account signs in via SSO and has no local password to change")
+		fail("errors.this_account_signs_in_via_sso_and")
 		return
 	}
 
@@ -37,19 +37,19 @@ func (s *Server) handleAccountPasswordChange(w http.ResponseWriter, r *http.Requ
 	confirm := r.FormValue("confirm_password")
 
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(current)) != nil {
-		fail("current password is incorrect")
+		fail("errors.current_password_is_incorrect")
 		return
 	}
 	if newPassword == "" {
-		fail("new password is required")
+		fail("errors.new_password_is_required")
 		return
 	}
 	if newPassword != confirm {
-		fail("new password and confirmation do not match")
+		fail("errors.new_password_and_confirmation_do_not")
 		return
 	}
 	if newPassword == current {
-		fail("new password must be different from the current password")
+		fail("errors.new_password_must_be_different_from")
 		return
 	}
 

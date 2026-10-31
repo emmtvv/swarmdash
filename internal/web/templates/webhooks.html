@@ -1,18 +1,18 @@
 {{define "webhooks.html"}}
-<h1>{{t "Alert webhooks"}}</h1>
-<p class="muted">{{tHTML "POSTed a JSON body <span class=\"mono\">{event, target, message, time}</span> when a service stays below its desired replica count for more than 2 minutes (and when it recovers), or when a node goes down/comes back."}}</p>
+<h1>{{t "webhooks.alert_webhooks"}}</h1>
+<p class="muted">{{tHTML "webhooks.posted_a_json_body_event"}}</p>
 
 <div class="card">
-	<h2 style="margin-top:0;">{{t "Add webhook"}}</h2>
+	<h2 style="margin-top:0;">{{t "webhooks.add_webhook"}}</h2>
 	<form class="inline" method="post" action="/settings/webhooks">
-		<input type="text" name="name" placeholder="{{t "name"}}" required>
-		<input type="text" name="url" placeholder="{{t "https://example.com/hook"}}" style="width:340px;" required>
-		<button type="submit" class="btn">{{t "Add"}}</button>
+		<input type="text" name="name" placeholder="{{t "common.name_2"}}" required>
+		<input type="text" name="url" placeholder="{{t "webhooks.https_example_com_hook"}}" style="width:340px;" required>
+		<button type="submit" class="btn">{{t "common.add"}}</button>
 	</form>
 </div>
 
 <table>
-	<thead><tr><th>{{t "Name"}}</th><th>{{t "URL"}}</th><th>{{t "Added"}}</th><th></th></tr></thead>
+	<thead><tr><th>{{t "common.name"}}</th><th>{{t "webhooks.url"}}</th><th>{{t "common.added"}}</th><th></th></tr></thead>
 	<tbody>
 	{{range .Webhooks}}
 		<tr>
@@ -21,12 +21,12 @@
 			<td class="muted">{{ago .CreatedAt}}</td>
 			<td>
 				<form class="inline" method="post" action="/settings/webhooks/{{.ID}}/delete">
-					<button type="submit" class="btn danger small">{{t "Delete"}}</button>
+					<button type="submit" class="btn danger small">{{t "common.delete"}}</button>
 				</form>
 			</td>
 		</tr>
 	{{else}}
-		<tr><td colspan="4" class="muted">{{t "No webhooks configured."}}</td></tr>
+		<tr><td colspan="4" class="muted">{{t "webhooks.no_webhooks_configured"}}</td></tr>
 	{{end}}
 	</tbody>
 </table>

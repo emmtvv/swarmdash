@@ -122,11 +122,11 @@ func (s *Server) handleLogin2FASubmit(w http.ResponseWriter, r *http.Request) {
 	username := s.mfaPendingUser(r)
 	if username == "" {
 		s.auditAs(r, "", "user.login.2fa", "", "", errMFAPendingStale)
-		http.Redirect(w, r, "/login?error="+url.QueryEscape("sign-in timed out - enter your password again"), http.StatusSeeOther)
+		http.Redirect(w, r, "/login?error=errors.sign_in_timed_out_enter_your", http.StatusSeeOther)
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, "/login/2fa?error=bad+request", http.StatusSeeOther)
+		http.Redirect(w, r, "/login/2fa?error=errors.bad_request", http.StatusSeeOther)
 		return
 	}
 	ip := s.clientIP(r)
@@ -139,7 +139,7 @@ func (s *Server) handleLogin2FASubmit(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if wait > 0 {
 		s.clearMFAPending(w, r)
-		http.Redirect(w, r, "/login?error="+url.QueryEscape(s.t(r, "too many failed attempts - try again in %dm", int(wait.Minutes())+1)), http.StatusSeeOther)
+		http.Redirect(w, r, "/login?error="+url.QueryEscape(s.t(r, "login.too_many_failed_attempts_try", int(wait.Minutes())+1)), http.StatusSeeOther)
 		return
 	}
 
@@ -154,7 +154,7 @@ func (s *Server) handleLogin2FASubmit(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		s.recordLoginFailure(username, ip)
 		s.auditAs(r, username, "user.login.2fa", username, "", errWrong2FACode)
-		http.Redirect(w, r, "/login/2fa?error="+url.QueryEscape("invalid code"), http.StatusSeeOther)
+		http.Redirect(w, r, "/login/2fa?error=errors.invalid_code", http.StatusSeeOther)
 		return
 	}
 	if err := s.store.PutUser(user); err != nil {
@@ -273,11 +273,11 @@ func accountSecurityRedirect(w http.ResponseWriter, r *http.Request, key, msg st
 func (s *Server) handle2FASetup(w http.ResponseWriter, r *http.Request) {
 	user := *userFromContext(r)
 	if user.AuthSource == "sso" {
-		accountSecurityRedirect(w, r, "error", "this account signs in via SSO - two-factor is handled by your identity provider")
+		accountSecurityRedirect(w, r, "error", "errors.this_account_signs_in_via_sso_two")
 		return
 	}
 	if user.TOTPEnabled {
-		accountSecurityRedirect(w, r, "error", "two-factor is already enabled - disable it first to enroll a new device")
+		accountSecurityRedirect(w, r, "error", "errors.two_factor_is_already_enabled_disable")
 		return
 	}
 	enc, err := s.encryptSecret(totp.GenerateSecret())
@@ -312,7 +312,7 @@ func (s *Server) handle2FAEnable(w http.ResponseWriter, r *http.Request) {
 	step, ok := totp.Validate(secret, r.FormValue("code"), time.Now(), 0)
 	if !ok {
 		s.audit(r, "user.2fa.enable", user.Username, "", errWrong2FACode)
-		accountSecurityRedirect(w, r, "error", "that code doesn't match - check the time on your phone and try the next code")
+		accountSecurityRedirect(w, r, "error", "errors.that_code_doesnt_match_check_the")
 		return
 	}
 	plain, hashes := newRecoveryCodes()
@@ -339,10 +339,10 @@ func (s *Server) renderRecoveryCodes(w http.ResponseWriter, r *http.Request, use
 // to strip the second factor off an account.
 func (s *Server) verifyPasswordAndCode(r *http.Request, user *store.User) error {
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(r.FormValue("password"))) != nil {
-		return errors.New("current password is incorrect")
+		return errors.New("errors.current_password_is_incorrect")
 	}
 	if _, ok := s.checkSecondFactor(user, r.FormValue("code")); !ok {
-		return errors.New("invalid two-factor code")
+		return errors.New("errors.invalid_two_factor_code")
 	}
 	return nil
 }
@@ -367,7 +367,7 @@ func (s *Server) handle2FADisable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.require2FA() {
-		accountSecurityRedirect(w, r, "error", "two-factor is required for every local account on this instance (Settings → General)")
+		accountSecurityRedirect(w, r, "error", "errors.two_factor_is_required_for_every")
 		return
 	}
 	user.TOTPEnabled, user.TOTPSecretEnc, user.TOTPLastStep, user.RecoveryCodeHashes = false, nil, 0, nil
@@ -376,7 +376,7 @@ func (s *Server) handle2FADisable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.audit(r, "user.2fa.disable", user.Username, "", nil)
-	accountSecurityRedirect(w, r, "flash", "two-factor authentication disabled")
+	accountSecurityRedirect(w, r, "flash", "flash.two_factor_authentication_disabled")
 }
 
 func (s *Server) handle2FARecoveryCodes(w http.ResponseWriter, r *http.Request) {

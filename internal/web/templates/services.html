@@ -1,31 +1,31 @@
 {{define "services.html"}}
 <div class="page-header">
-	<h1>{{t "Services"}}</h1>
-	<a href="/services/new" class="btn">{{t "New service"}}</a>
+	<h1>{{t "common.services"}}</h1>
+	<a href="/services/new" class="btn">{{t "common.new_service"}}</a>
 </div>
-<form method="post" action="/services/bulk" id="bulk-form" data-confirm="{{t "Apply {value} to the selected services?"}}" data-confirm-field="action">
+<form method="post" action="/services/bulk" id="bulk-form" data-confirm="{{t "services.apply_value_to_the_selected"}}" data-confirm-field="action">
 	<div class="card-row" style="margin-bottom:8px;">
 		<select name="action">
-			<option value="restart">{{t "Restart"}}</option>
-			<option value="latest">{{t "Update to latest"}}</option>
-			<option value="scale">{{t "Scale to..."}}</option>
-			<option value="delete">{{t "Delete"}}</option>
+			<option value="restart">{{t "common.restart"}}</option>
+			<option value="latest">{{t "common.update_to_latest"}}</option>
+			<option value="scale">{{t "services.scale_to"}}</option>
+			<option value="delete">{{t "common.delete"}}</option>
 		</select>
-		<input type="number" name="replicas" placeholder="{{t "replicas"}}" min="0" style="width:90px;">
-		<button type="submit" class="btn secondary">{{t "Apply to selected"}}</button>
+		<input type="number" name="replicas" placeholder="{{t "services.replicas"}}" min="0" style="width:90px;">
+		<button type="submit" class="btn secondary">{{t "services.apply_to_selected"}}</button>
 		<span id="bulk-count" class="muted"></span>
 	</div>
 	<div class="table-wrap">
-		<input type="text" class="table-search" data-table-search placeholder="{{t "Filter services..."}}">
+		<input type="text" class="table-search" data-table-search placeholder="{{t "services.filter_services"}}">
 		<table data-enhance>
-			<thead><tr><th data-no-sort><input type="checkbox" id="select-all"></th><th>{{t "Name"}}</th><th>{{t "Stack"}}</th><th>{{t "Mode"}}</th><th>{{t "Replicas"}}</th><th>{{t "CPU"}}</th><th>{{t "Memory"}}</th><th>{{t "Image"}}</th><th>{{t "Updated"}}</th></tr></thead>
+			<thead><tr><th data-no-sort><input type="checkbox" id="select-all"></th><th>{{t "common.name"}}</th><th>{{t "common.stack"}}</th><th>{{t "common.mode"}}</th><th>{{t "common.replicas"}}</th><th>{{t "common.cpu"}}</th><th>{{t "common.memory"}}</th><th>{{t "common.image"}}</th><th>{{t "common.updated"}}</th></tr></thead>
 			<tbody>
 			{{range .Services}}
 				<tr>
 					<td><input type="checkbox" name="ids" value="{{.Spec.Name}}" class="row-check"></td>
 					<td>{{template "fav-star" (dict "User" $.User "Kind" "service" "Name" .Spec.Name)}}<a href="/services/{{.Spec.Name}}">{{.Spec.Name}}</a></td>
 					<td class="muted">{{index .Spec.Labels "com.docker.stack.namespace"}}</td>
-					<td>{{if .Spec.Mode.Replicated}}{{t "replicated"}}{{else}}{{t "global"}}{{end}}</td>
+					<td>{{if .Spec.Mode.Replicated}}{{t "common.replicated"}}{{else}}{{t "common.global"}}{{end}}</td>
 					<td>{{if .ServiceStatus}}{{.ServiceStatus.RunningTasks}}/{{.ServiceStatus.DesiredTasks}}{{else}}-{{end}}</td>
 					{{with index $.Usage .Spec.Name}}
 					<td class="mono" data-sort="{{.CPUCores}}">{{cores .CPUCores}}</td>
@@ -49,7 +49,7 @@
 	function checks() { return Array.from(document.querySelectorAll(".row-check")); }
 	function updateCount() {
 		const n = checks().filter(c => c.checked).length;
-		count.textContent = n ? t("%d selected", n) : "";
+		count.textContent = n ? t("services.selected", n) : "";
 	}
 	selectAll.addEventListener("change", () => { checks().forEach(c => c.checked = selectAll.checked); updateCount(); });
 	document.getElementById("bulk-form").addEventListener("change", (e) => { if (e.target.classList.contains("row-check")) updateCount(); });

@@ -1,13 +1,13 @@
 {{define "service_logs.html"}}
-<div class="breadcrumb"><a href="/services">{{t "Services"}}</a> / <a href="/services/{{.ServiceName}}">{{.ServiceName}}</a> {{t "/ logs"}}</div>
+<div class="breadcrumb"><a href="/services">{{t "common.services"}}</a> / <a href="/services/{{.ServiceName}}">{{.ServiceName}}</a> {{t "common.logs_2"}}</div>
 <div class="page-header">
-	<h1>{{t "Logs"}} <span class="muted mono" style="font-size:14px;">{{.ServiceName}}</span> <span id="status" class="badge state-active">{{t "connected"}}</span></h1>
+	<h1>{{t "common.logs"}} <span class="muted mono" style="font-size:14px;">{{.ServiceName}}</span> <span id="status" class="badge state-active">{{t "ws.connected"}}</span></h1>
 	<div class="actions">
-		<label class="muted small"><input type="checkbox" id="follow" checked> {{t "Follow"}}</label>
-		<a href="/services/{{.ServiceName}}/logs/download" class="btn secondary small">{{t "Download"}}</a>
+		<label class="muted small"><input type="checkbox" id="follow" checked> {{t "common.follow"}}</label>
+		<a href="/services/{{.ServiceName}}/logs/download" class="btn secondary small">{{t "common.download"}}</a>
 	</div>
 </div>
-<div class="muted" style="margin-bottom:8px;">{{t "Merged output from every task/replica of this service."}}</div>
+<div class="muted" style="margin-bottom:8px;">{{t "service_logs.merged_output_from_every_task"}}</div>
 
 <pre id="logs-out" class="card mono" style="height:75vh;overflow:auto;white-space:pre-wrap;"></pre>
 
@@ -19,7 +19,7 @@
 	const out = document.getElementById("logs-out");
 	const followCheckbox = document.getElementById("follow");
 
-	function setStatus(s) { statusEl.textContent = t(s); statusEl.className = "badge state-" + (s === "connected" ? "active" : "pending"); }
+	function setStatus(s) { statusEl.textContent = t("ws." + s); statusEl.className = "badge state-" + (s === "connected" ? "active" : "pending"); }
 
 	let socket, timer, attempt = 0, closed = false;
 	function connect() {

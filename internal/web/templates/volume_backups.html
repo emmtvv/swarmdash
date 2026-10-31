@@ -1,13 +1,13 @@
 {{define "volume_backups.html"}}
-<div class="breadcrumb"><a href="/volumes?node={{.SelectedID}}">{{t "Volumes"}}</a> / {{t "Backups"}}</div>
-<h1>{{t "Volume backups"}}</h1>
-<p class="muted">{{t "Backups run in the background on the node that holds the volume and are stored there, in the agent's backup directory. To move a volume to another node, download its backup and upload it on the other node."}}</p>
+<div class="breadcrumb"><a href="/volumes?node={{.SelectedID}}">{{t "common.volumes"}}</a> / {{t "common.backups"}}</div>
+<h1>{{t "volume_backups.volume_backups"}}</h1>
+<p class="muted">{{t "volume_backups.backups_run_in_the_background"}}</p>
 
 {{if .Error}}<div class="error-box">{{.Error}}</div>{{end}}
 {{if .Flash}}<div class="ok-box">{{.Flash}}</div>{{end}}
 
 <form class="inline" method="get" action="/volumes/backups" style="margin-bottom:16px;">
-	<label for="node" style="margin:0;">{{t "Node"}}</label>
+	<label for="node" style="margin:0;">{{t "common.node"}}</label>
 	<select name="node" id="node" data-auto-submit>
 		{{$sel := .SelectedID}}
 		{{range .Nodes}}
@@ -17,40 +17,40 @@
 </form>
 
 {{if .AgentError}}
-<div class="error-box">{{t "Couldn't reach this node's agent:"}} {{.AgentError}}</div>
+<div class="error-box">{{t "volume_backups.couldnt_reach_this_nodes_agent"}} {{.AgentError}}</div>
 {{else if not .List.Enabled}}
-<div class="warn-box">{{tHTML "Volume backups are turned off on this node: its agent was started without a backup directory. Start it with <span class=\"mono\">--backup-dir</span> (or <span class=\"mono\">SWARMDASH_BACKUP_DIR</span>) pointing at a mounted host directory."}}</div>
+<div class="warn-box">{{tHTML "volume_backups.volume_backups_are_turned_off"}}</div>
 {{else}}
 <div class="card-row" style="align-items:stretch;">
 	<div class="card" style="flex:1;min-width:280px;">
-		<h2 style="margin-top:0;">{{t "Back up a volume"}}</h2>
+		<h2 style="margin-top:0;">{{t "volume_backups.back_up_a_volume"}}</h2>
 		<form method="post" id="backup-form" data-node="{{.SelectedID}}">
 			<div class="card-row">
 				<select name="volume" id="backup-volume" required style="min-width:200px;">
 					{{$pre := .Preselect}}
 					{{range .Volumes}}<option value="{{.Name}}" {{if eq .Name $pre}}selected{{end}}>{{.Name}}</option>{{end}}
 				</select>
-				<button type="submit" class="btn" {{if not .Volumes}}disabled{{end}}>{{t "Start backup"}}</button>
+				<button type="submit" class="btn" {{if not .Volumes}}disabled{{end}}>{{t "volume_backups.start_backup"}}</button>
 			</div>
 		</form>
-		<p class="muted small" style="margin-top:10px;">{{t "For a consistent copy of a database, scale its service to 0 first - files are read while the volume stays in use."}}</p>
+		<p class="muted small" style="margin-top:10px;">{{t "volume_backups.for_a_consistent_copy_of"}}</p>
 	</div>
 	<div class="card" style="flex:1;min-width:280px;">
-		<h2 style="margin-top:0;">{{t "Upload a backup"}}</h2>
+		<h2 style="margin-top:0;">{{t "volume_backups.upload_a_backup"}}</h2>
 		<form id="upload-form" data-node="{{.SelectedID}}">
 			<div class="card-row">
 				<label class="file-picker">
 					<input type="file" id="upload-file" accept=".tar.gz,.tgz,application/gzip" required>
-					<span class="btn secondary">{{t "Choose file"}}</span>
-					<span class="file-picker-name">{{t "No file chosen"}}</span>
+					<span class="btn secondary">{{t "common.choose_file"}}</span>
+					<span class="file-picker-name">{{t "common.no_file_chosen"}}</span>
 				</label>
-				<input type="text" id="upload-volume" placeholder="{{t "volume name"}}" required style="width:180px;">
-				<button type="submit" class="btn secondary">{{t "Upload"}}</button>
+				<input type="text" id="upload-volume" placeholder="{{t "common.volume_name"}}" required style="width:180px;">
+				<button type="submit" class="btn secondary">{{t "volume_backups.upload"}}</button>
 			</div>
 			<progress id="upload-progress" max="100" value="0" hidden style="width:100%;margin-top:10px;"></progress>
 			<div id="upload-status" class="muted small"></div>
 		</form>
-		<p class="muted small" style="margin-top:10px;">{{tHTML "A <span class=\"mono\">.tar.gz</span> of the volume's contents - one downloaded from here, or made with <span class=\"mono\">tar -czf backup.tar.gz -C /path/to/data .</span>"}}</p>
+		<p class="muted small" style="margin-top:10px;">{{tHTML "volume_backups.tar_gz_of_the_volumes"}}</p>
 	</div>
 </div>
 
@@ -99,13 +99,13 @@
 		};
 		xhr.onload = () => {
 			if (xhr.status === 200) {
-				window.location = "/volumes/backups?node=" + encodeURIComponent(form.dataset.node) + "&flash=" + encodeURIComponent(t("Backup uploaded"));
+				window.location = "/volumes/backups?node=" + encodeURIComponent(form.dataset.node) + "&flash=" + encodeURIComponent(t("volume_backups.backup_uploaded"));
 			} else {
 				bar.hidden = true;
-				status.textContent = t("Upload failed:") + " " + xhr.responseText;
+				status.textContent = t("volume_backups.upload_failed") + " " + xhr.responseText;
 			}
 		};
-		xhr.onerror = () => { bar.hidden = true; status.textContent = t("Upload failed:") + " " + t("network error"); };
+		xhr.onerror = () => { bar.hidden = true; status.textContent = t("volume_backups.upload_failed") + " " + t("volume_backups.network_error"); };
 		xhr.send(file.files[0]);
 	});
 })();
@@ -114,9 +114,9 @@
 
 {{define "volume_backup_jobs"}}
 <div id="backup-jobs" {{if .Active}}hx-get="/volumes/backups/jobs?node={{.SelectedID}}" hx-trigger="every 3s" hx-swap="outerHTML"{{end}}>
-<h2>{{t "Backups"}}</h2>
+<h2>{{t "common.backups"}}</h2>
 <table>
-	<thead><tr><th>{{t "Volume"}}</th><th>{{t "Status"}}</th><th>{{t "Size"}}</th><th>{{t "Created"}}</th><th>{{t "Source"}}</th><th></th></tr></thead>
+	<thead><tr><th>{{t "volume_backups.volume"}}</th><th>{{t "common.status"}}</th><th>{{t "common.size"}}</th><th>{{t "common.created"}}</th><th>{{t "common.source"}}</th><th></th></tr></thead>
 	<tbody>
 	{{range .List.Backups}}
 		<tr>
@@ -124,37 +124,37 @@
 			<td>{{template "job-status" .Status}}{{if .Error}}<div class="muted small">{{.Error}}</div>{{end}}</td>
 			<td>{{if eq .Status "done"}}{{bytesHuman .SizeBytes}}{{else}}<span class="muted">&mdash;</span>{{end}}</td>
 			<td class="muted">{{ago .CreatedAt}}</td>
-			<td class="muted">{{if eq .Source "upload"}}{{t "uploaded"}}{{else}}{{t "backup"}}{{end}}</td>
+			<td class="muted">{{if eq .Source "upload"}}{{t "volume_backups.uploaded"}}{{else}}{{t "volume_backups.backup"}}{{end}}</td>
 			<td>
 				{{if eq .Status "done"}}
 				<div class="card-row" style="gap:4px;">
-					<a class="btn small secondary" href="/volumes/backups/{{.ID}}/download?node={{$.SelectedID}}">{{t "Download"}}</a>
-					<form class="inline" method="post" action="/volumes/backups/{{.ID}}/restore?node={{$.SelectedID}}" data-confirm="{{t "Restore this backup into volume %s? Files in the backup overwrite files with the same name." .Volume}}">
-						<input type="text" name="volume" value="{{.Volume}}" aria-label="{{t "Target volume"}}" style="width:150px;">
-						<button type="submit" class="btn small">{{t "Restore"}}</button>
+					<a class="btn small secondary" href="/volumes/backups/{{.ID}}/download?node={{$.SelectedID}}">{{t "common.download"}}</a>
+					<form class="inline" method="post" action="/volumes/backups/{{.ID}}/restore?node={{$.SelectedID}}" data-confirm="{{t "volume_backups.restore_this_backup_into_volume" .Volume}}">
+						<input type="text" name="volume" value="{{.Volume}}" aria-label="{{t "volume_backups.target_volume"}}" style="width:150px;">
+						<button type="submit" class="btn small">{{t "common.restore"}}</button>
 					</form>
-					<form class="inline" method="post" action="/volumes/backups/{{.ID}}/delete?node={{$.SelectedID}}" data-confirm="{{t "Delete this backup?"}}">
-						<button type="submit" class="btn small danger">{{t "Delete"}}</button>
+					<form class="inline" method="post" action="/volumes/backups/{{.ID}}/delete?node={{$.SelectedID}}" data-confirm="{{t "volume_backups.delete_this_backup"}}">
+						<button type="submit" class="btn small danger">{{t "common.delete"}}</button>
 					</form>
 				</div>
 				{{else if eq .Status "failed"}}
 				<form class="inline" method="post" action="/volumes/backups/{{.ID}}/delete?node={{$.SelectedID}}">
-					<button type="submit" class="btn small secondary">{{t "Remove"}}</button>
+					<button type="submit" class="btn small secondary">{{t "common.remove"}}</button>
 				</form>
 				{{end}}
 			</td>
 		</tr>
 	{{else}}
-		<tr><td colspan="6" class="muted">{{t "No backups on this node yet."}}</td></tr>
+		<tr><td colspan="6" class="muted">{{t "volume_backups.no_backups_on_this_node"}}</td></tr>
 	{{end}}
 	</tbody>
 </table>
 
 {{if .List.Restores}}
-<h2>{{t "Restores"}}</h2>
-<p class="muted small">{{t "Restore history is kept until the node's agent restarts."}}</p>
+<h2>{{t "volume_backups.restores"}}</h2>
+<p class="muted small">{{t "volume_backups.restore_history_is_kept_until"}}</p>
 <table>
-	<thead><tr><th>{{t "Volume"}}</th><th>{{t "Status"}}</th><th>{{t "From backup"}}</th><th>{{t "Started"}}</th></tr></thead>
+	<thead><tr><th>{{t "volume_backups.volume"}}</th><th>{{t "common.status"}}</th><th>{{t "volume_backups.from_backup"}}</th><th>{{t "volume_backups.started"}}</th></tr></thead>
 	<tbody>
 	{{range .List.Restores}}
 		<tr>
@@ -170,4 +170,4 @@
 </div>
 {{end}}
 
-{{define "job-status"}}{{if eq . "done"}}<span class="badge state-running">{{t "done"}}</span>{{else if eq . "failed"}}<span class="badge state-failed">{{t "failed"}}</span>{{else if eq . "running"}}<span class="badge state-updating">{{t "running"}}</span>{{else}}<span class="badge state-pending">{{t "queued"}}</span>{{end}}{{end}}
+{{define "job-status"}}{{if eq . "done"}}<span class="badge state-running">{{t "ws.done"}}</span>{{else if eq . "failed"}}<span class="badge state-failed">{{t "common.failed"}}</span>{{else if eq . "running"}}<span class="badge state-updating">{{t "volume_backups.running"}}</span>{{else}}<span class="badge state-pending">{{t "volume_backups.queued"}}</span>{{end}}{{end}}

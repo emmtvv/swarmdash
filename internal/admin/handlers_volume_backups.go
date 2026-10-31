@@ -185,7 +185,7 @@ func (s *Server) handleVolumeBackupCreate(w http.ResponseWriter, r *http.Request
 		redirect(w, r, backupsPageURL(nodeID, "error", err.Error()))
 		return
 	}
-	redirect(w, r, backupsPageURL(nodeID, "flash", s.t(r, "Backup of %s started", name)))
+	redirect(w, r, backupsPageURL(nodeID, "flash", s.t(r, "volume_backups.backup_of_started", name)))
 }
 
 func (s *Server) handleVolumeBackupRestore(w http.ResponseWriter, r *http.Request) {
@@ -209,7 +209,7 @@ func (s *Server) handleVolumeBackupRestore(w http.ResponseWriter, r *http.Reques
 		redirect(w, r, backupsPageURL(nodeID, "error", err.Error()))
 		return
 	}
-	redirect(w, r, backupsPageURL(nodeID, "flash", s.t(r, "Restore started")))
+	redirect(w, r, backupsPageURL(nodeID, "flash", s.t(r, "volume_backups.restore_started")))
 }
 
 func (s *Server) handleVolumeBackupDelete(w http.ResponseWriter, r *http.Request) {
@@ -273,7 +273,7 @@ func (s *Server) handleVolumeBackupUpload(w http.ResponseWriter, r *http.Request
 	nodeID := r.URL.Query().Get("node")
 	vol := strings.TrimSpace(r.URL.Query().Get("volume"))
 	if vol == "" {
-		http.Error(w, s.t(r, "volume is required"), http.StatusBadRequest)
+		http.Error(w, s.t(r, "volume_backups.volume_is_required"), http.StatusBadRequest)
 		return
 	}
 	req, err := s.agentRequest(r.Context(), http.MethodPost, nodeID, "/v1/volume-backups/upload?volume="+url.QueryEscape(vol), r.Body)

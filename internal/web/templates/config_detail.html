@@ -1,10 +1,10 @@
 {{define "config_detail.html"}}
-<div class="breadcrumb"><a href="/configs">{{t "Configs"}}</a> / {{.Config.Spec.Name}}</div>
+<div class="breadcrumb"><a href="/configs">{{t "common.configs"}}</a> / {{.Config.Spec.Name}}</div>
 <div class="page-header">
 	<h1 class="mono">{{.Config.Spec.Name}}</h1>
 	<div class="actions">
-		<form class="inline" method="post" action="/configs/{{.Config.ID}}/delete" data-confirm="{{t "Delete config %v?" .Config.Spec.Name}}{{if .Uses}} {{t "%v service(s) still use it - Docker will refuse." (len .Uses)}}{{end}}">
-			<button type="submit" class="btn danger">{{t "Delete"}}</button>
+		<form class="inline" method="post" action="/configs/{{.Config.ID}}/delete" data-confirm="{{t "common.delete_config" .Config.Spec.Name}}{{if .Uses}} {{t "common.service_s_still_use_it" (len .Uses)}}{{end}}">
+			<button type="submit" class="btn danger">{{t "common.delete"}}</button>
 		</form>
 	</div>
 </div>
@@ -13,8 +13,8 @@
 
 <div class="card">
 	<div class="card-row">
-		<div class="field"><div class="muted">{{t "ID"}}</div><div class="mono">{{shortID .Config.ID}}</div></div>
-		<div class="field"><div class="muted">{{t "Created"}}</div><div>{{ago .Config.CreatedAt}}</div></div>
+		<div class="field"><div class="muted">{{t "common.id"}}</div><div class="mono">{{shortID .Config.ID}}</div></div>
+		<div class="field"><div class="muted">{{t "common.created"}}</div><div>{{ago .Config.CreatedAt}}</div></div>
 		{{range $k, $v := .Config.Spec.Labels}}<div class="field"><div class="muted">{{$k}}</div><div class="mono">{{$v}}</div></div>{{end}}
 	</div>
 </div>
@@ -22,23 +22,23 @@
 {{template "file_uses" (dict "Uses" .Uses "Kind" "config")}}
 
 <div class="card">
-	<h2 style="margin-top:0;">{{t "Edit"}}</h2>
-	<p class="muted" style="margin-top:0;">{{t "Swarm configs are immutable, so saving creates a new config with this content and switches every service above to it, keeping the path it's mounted at - their tasks restart with the new content."}}</p>
+	<h2 style="margin-top:0;">{{t "common.edit"}}</h2>
+	<p class="muted" style="margin-top:0;">{{t "config_detail.swarm_configs_are_immutable_so"}}</p>
 	{{template "compose_stacks_warning" (dict "ComposeStacks" .ComposeStacks "Kind" "config")}}
-	<form method="post" action="/configs/{{.Config.ID}}/rotate" data-confirm="{{t "Create a new config and restart the services using %v?" .Config.Spec.Name}}">
-		<label for="data">{{t "Content"}}</label>
+	<form method="post" action="/configs/{{.Config.ID}}/rotate" data-confirm="{{t "config_detail.create_a_new_config_and" .Config.Spec.Name}}">
+		<label for="data">{{t "common.content"}}</label>
 		<textarea id="data" name="data" rows="16" style="width:100%;font-family:ui-monospace,monospace;font-size:12px;" required>{{.Content}}</textarea>
 		<div class="card-row" style="margin-top:8px;">
 			<div>
-				<label for="new_name">{{t "New config name"}}</label>
+				<label for="new_name">{{t "config_detail.new_config_name"}}</label>
 				<input type="text" id="new_name" name="new_name" placeholder="{{.SuggestedName}}" style="width:280px;">
 			</div>
 			<div>
 				<label>&nbsp;</label>
-				<label style="display:flex;align-items:center;gap:8px;font-weight:400;"><input type="checkbox" name="delete_old" style="width:auto;" checked> {{t "Delete %v afterwards" .Config.Spec.Name}}</label>
+				<label style="display:flex;align-items:center;gap:8px;font-weight:400;"><input type="checkbox" name="delete_old" style="width:auto;" checked> {{t "common.delete_afterwards" .Config.Spec.Name}}</label>
 			</div>
 		</div>
-		<button type="submit" class="btn" style="margin-top:12px;">{{t "Save as new version"}}</button>
+		<button type="submit" class="btn" style="margin-top:12px;">{{t "config_detail.save_as_new_version"}}</button>
 	</form>
 </div>
 {{end}}

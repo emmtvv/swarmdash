@@ -106,7 +106,7 @@ func TestHandleAccountPasswordChange_WrongCurrentPassword(t *testing.T) {
 	s.handleAccountPasswordChange(w, r)
 
 	loc := w.Header().Get("Location")
-	if !strings.Contains(loc, "current+password+is+incorrect") {
+	if !strings.Contains(loc, "errors.current_password_is_incorrect") {
 		t.Errorf("Location = %q, want current-password-incorrect error", loc)
 	}
 	entries, _ := s.store.ListAudit(0, 10)
@@ -126,7 +126,7 @@ func TestHandleAccountPasswordChange_Mismatch(t *testing.T) {
 	s.handleAccountPasswordChange(w, r)
 
 	loc := w.Header().Get("Location")
-	if !strings.Contains(loc, "do+not+match") {
+	if !strings.Contains(loc, "errors.new_password_and_confirmation_do_not") {
 		t.Errorf("Location = %q, want mismatch error", loc)
 	}
 }
@@ -142,7 +142,7 @@ func TestHandleAccountPasswordChange_SameAsCurrent(t *testing.T) {
 	s.handleAccountPasswordChange(w, r)
 
 	loc := w.Header().Get("Location")
-	if !strings.Contains(loc, "must+be+different") {
+	if !strings.Contains(loc, "errors.new_password_must_be_different_from") {
 		t.Errorf("Location = %q, want same-as-current error", loc)
 	}
 }
@@ -158,7 +158,7 @@ func TestHandleAccountPasswordChange_EmptyNewPassword(t *testing.T) {
 	s.handleAccountPasswordChange(w, r)
 
 	loc := w.Header().Get("Location")
-	if !strings.Contains(loc, "new+password+is+required") {
+	if !strings.Contains(loc, "errors.new_password_is_required") {
 		t.Errorf("Location = %q, want required error", loc)
 	}
 }

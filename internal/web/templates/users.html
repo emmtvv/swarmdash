@@ -1,67 +1,67 @@
 {{define "users.html"}}
-<h1>{{t "Users"}}</h1>
-<p class="muted">{{t "Admins have full access. Viewers are read-only: no create/update/delete actions, no console access, and Settings pages are hidden."}}</p>
+<h1>{{t "common.users"}}</h1>
+<p class="muted">{{t "users.admins_have_full_access_viewers"}}</p>
 
 <div class="card">
-	<h2 style="margin-top:0;">{{t "Add user"}}</h2>
+	<h2 style="margin-top:0;">{{t "users.add_user"}}</h2>
 	<form method="post" action="/settings/users">
 		<div class="card-row">
 			<div>
-				<label for="username">{{t "Username"}}</label>
+				<label for="username">{{t "common.username"}}</label>
 				<input type="text" id="username" name="username" required>
 			</div>
 			<div>
-				<label for="password">{{t "Password"}}</label>
+				<label for="password">{{t "common.password"}}</label>
 				<input type="password" id="password" name="password">
 			</div>
 			<div>
-				<label for="role">{{t "Role"}}</label>
+				<label for="role">{{t "common.role"}}</label>
 				<select id="role" name="role">
-					<option value="viewer">{{t "viewer"}}</option>
-					<option value="admin">{{t "admin"}}</option>
+					<option value="viewer">{{t "common.viewer"}}</option>
+					<option value="admin">{{t "common.admin"}}</option>
 				</select>
 			</div>
 			<div>
 				<label>&nbsp;</label>
-				<button type="submit" class="btn">{{t "Create"}}</button>
+				<button type="submit" class="btn">{{t "common.create"}}</button>
 			</div>
 		</div>
 		<label style="margin-top:12px;display:flex;align-items:center;gap:8px;font-weight:400;">
 			<input type="checkbox" name="sso_account" style="width:auto;">
-			{{tHTML "SSO account (no local password - see <a href=\"/settings/sso\">Settings → SSO</a>)"}}
+			{{tHTML "users.sso_account_no_local_password"}}
 		</label>
 	</form>
 </div>
 
 <table>
-	<thead><tr><th>{{t "Username"}}</th><th>{{t "Role"}}</th><th>{{t "Auth"}}</th><th>{{t "2FA"}}</th><th>{{t "Created"}}</th><th></th></tr></thead>
+	<thead><tr><th>{{t "common.username"}}</th><th>{{t "common.role"}}</th><th>{{t "users.auth"}}</th><th>{{t "users.2fa"}}</th><th>{{t "common.created"}}</th><th></th></tr></thead>
 	<tbody>
 	{{range .Users}}
 		<tr>
 			<td>{{.Username}}</td>
 			<td><span class="mono">{{.Role}}</span></td>
-			<td>{{if eq .AuthSource "sso"}}<span class="mono">sso</span>{{else}}<span class="muted">{{t "local"}}</span>{{end}}</td>
-			<td>{{if .TOTPEnabled}}<span class="badge state-running">{{t "on"}}</span>{{else}}<span class="muted">-</span>{{end}}</td>
+			<td>{{if eq .AuthSource "sso"}}<span class="mono">sso</span>{{else}}<span class="muted">{{t "common.local"}}</span>{{end}}</td>
+			<td>{{if .TOTPEnabled}}<span class="badge state-running">{{t "users.on"}}</span>{{else}}<span class="muted">-</span>{{end}}</td>
 			<td class="muted">{{ago .CreatedAt}}</td>
 			<td>
 				{{if ne .AuthSource "sso"}}
 				<form class="inline" method="post" action="/settings/users/{{.Username}}/password" data-prompt-password="{{.Username}}">
 					<input type="hidden" name="password" value="">
-					<button type="submit" class="btn small">{{t "Reset password"}}</button>
+					<button type="submit" class="btn small">{{t "users.reset_password"}}</button>
 				</form>
 				{{end}}
 				{{if .TOTPEnabled}}
-				<form class="inline" method="post" action="/settings/users/{{.Username}}/2fa/reset" data-confirm="{{t "Reset two-factor for %v? They'll sign in with just their password until they set it up again." .Username}}">
-					<button type="submit" class="btn small secondary">{{t "Reset 2FA"}}</button>
+				<form class="inline" method="post" action="/settings/users/{{.Username}}/2fa/reset" data-confirm="{{t "users.reset_two_factor_for_theyll" .Username}}">
+					<button type="submit" class="btn small secondary">{{t "users.reset_2fa"}}</button>
 				</form>
 				{{end}}
-				<form class="inline" method="post" action="/settings/users/{{.Username}}/delete" data-confirm="{{t "Delete user %v?" .Username}}">
-					<button type="submit" class="btn danger small">{{t "Delete"}}</button>
+				<form class="inline" method="post" action="/settings/users/{{.Username}}/delete" data-confirm="{{t "users.delete_user" .Username}}">
+					<button type="submit" class="btn danger small">{{t "common.delete"}}</button>
 				</form>
 			</td>
 		</tr>
 	{{else}}
-		<tr><td colspan="6" class="muted">{{t "No users."}}</td></tr>
+		<tr><td colspan="6" class="muted">{{t "users.no_users"}}</td></tr>
 	{{end}}
 	</tbody>
 </table>

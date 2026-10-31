@@ -115,7 +115,7 @@ func (s *Server) handleLoginPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, "/login?error=bad+request", http.StatusSeeOther)
+		http.Redirect(w, r, "/login?error=errors.bad_request", http.StatusSeeOther)
 		return
 	}
 
@@ -123,7 +123,7 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 	// removed from login.html, POST /login would otherwise still work for
 	// anyone who knew a local password.
 	if sso, _ := s.store.GetSSOConfig(); sso.Enabled && sso.EnforceSSO {
-		http.Redirect(w, r, "/login?error=password+login+is+disabled+-+use+SSO", http.StatusSeeOther)
+		http.Redirect(w, r, "/login?error=errors.password_login_is_disabled_use_sso", http.StatusSeeOther)
 		return
 	}
 
@@ -139,7 +139,7 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	} else if wait > 0 {
-		http.Redirect(w, r, "/login?error="+url.QueryEscape(s.t(r, "too many failed attempts - try again in %dm", int(wait.Minutes())+1)), http.StatusSeeOther)
+		http.Redirect(w, r, "/login?error="+url.QueryEscape(s.t(r, "login.too_many_failed_attempts_try", int(wait.Minutes())+1)), http.StatusSeeOther)
 		return
 	}
 
@@ -154,18 +154,18 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		_ = bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(password))
 		s.recordLoginFailure(username, ip)
 		s.auditAs(r, username, "user.login", username, "", errUnknownUsername)
-		http.Redirect(w, r, "/login?error=invalid+credentials", http.StatusSeeOther)
+		http.Redirect(w, r, "/login?error=errors.invalid_credentials", http.StatusSeeOther)
 		return
 	}
 	if user.AuthSource == "sso" {
 		s.auditAs(r, username, "user.login", username, "", errSSOAccountUsedLocalLogin)
-		http.Redirect(w, r, "/login?error=this+account+signs+in+via+SSO", http.StatusSeeOther)
+		http.Redirect(w, r, "/login?error=errors.this_account_signs_in_via_sso", http.StatusSeeOther)
 		return
 	}
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
 		s.recordLoginFailure(username, ip)
 		s.auditAs(r, username, "user.login", username, "", errWrongPassword)
-		http.Redirect(w, r, "/login?error=invalid+credentials", http.StatusSeeOther)
+		http.Redirect(w, r, "/login?error=errors.invalid_credentials", http.StatusSeeOther)
 		return
 	}
 
