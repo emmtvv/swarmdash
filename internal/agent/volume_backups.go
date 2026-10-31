@@ -21,11 +21,11 @@ import (
 	"sync"
 	"time"
 
+	cerrdefs "github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/volume"
-	"github.com/docker/docker/errdefs"
 
 	"swarmdash/internal/httpx"
 )
@@ -634,7 +634,7 @@ func (s *Server) handleVolumeBackupRestore(w http.ResponseWriter, r *http.Reques
 
 func (s *Server) restoreVolume(ctx context.Context, archive, vol string) error {
 	if _, err := s.docker.VolumeInspect(ctx, vol); err != nil {
-		if !errdefs.IsNotFound(err) {
+		if !cerrdefs.IsNotFound(err) {
 			return fmt.Errorf("inspect volume: %w", err)
 		}
 		if _, err := s.docker.VolumeCreate(ctx, volume.CreateOptions{Name: vol}); err != nil {

@@ -136,7 +136,7 @@ func TestRequireAuth_Require2FARedirectsUnenrolledLocalUsers(t *testing.T) {
 			r.AddCookie(g4NewSessionCookie(t, s, user))
 			w := httptest.NewRecorder()
 			s.requireAuth(g4AuthOKHandler(&called)).ServeHTTP(w, r)
-			if want := !(wantRedirect && !exempt); called != want {
+			if want := !wantRedirect || exempt; called != want {
 				t.Errorf("user %s path %s: handler called = %v, want %v", user, path, called, want)
 			}
 		}
