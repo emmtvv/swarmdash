@@ -1,11 +1,11 @@
 {{define "task_logs.html"}}
-<div class="breadcrumb"><a href="/services">Services</a> / task logs</div>
+<div class="breadcrumb"><a href="/services">{{t "Services"}}</a> {{t "/ task logs"}}</div>
 <div class="page-header">
-	<h1>Logs <span class="muted mono" style="font-size:14px;">{{shortID .TaskID}}</span> <span id="status" class="badge state-active">connected</span></h1>
+	<h1>{{t "Logs"}} <span class="muted mono" style="font-size:14px;">{{shortID .TaskID}}</span> <span id="status" class="badge state-active">{{t "connected"}}</span></h1>
 	<div class="actions">
-		<label class="muted small"><input type="checkbox" id="follow" checked> Follow</label>
-		<a href="/exec/{{.TaskID}}" class="btn secondary small">Console</a>
-		<a href="/logs/{{.TaskID}}/download" class="btn secondary small">Download</a>
+		<label class="muted small"><input type="checkbox" id="follow" checked> {{t "Follow"}}</label>
+		<a href="/exec/{{.TaskID}}" class="btn secondary small">{{t "Console"}}</a>
+		<a href="/logs/{{.TaskID}}/download" class="btn secondary small">{{t "Download"}}</a>
 	</div>
 </div>
 
@@ -19,7 +19,7 @@
 	const out = document.getElementById("logs-out");
 	const followCheckbox = document.getElementById("follow");
 
-	function setStatus(s) { statusEl.textContent = s; statusEl.className = "badge state-" + (s === "connected" ? "active" : "pending"); }
+	function setStatus(s) { statusEl.textContent = t(s); statusEl.className = "badge state-" + (s === "connected" ? "active" : "pending"); }
 
 	let socket, timer, attempt = 0, closed = false;
 	function connect() {

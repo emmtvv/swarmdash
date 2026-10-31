@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
@@ -21,9 +22,12 @@ func (s *Server) handleServicesPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "list services: "+err.Error(), http.StatusBadGateway)
 		return
 	}
+	usage, _, at := s.currentServiceUsage()
 	s.render(w, r, "services.html", map[string]any{
 		"User":     userFromContext(r),
 		"Services": services,
+		"Usage":    usage,
+		"UsageAt":  at,
 	})
 }
 
@@ -89,7 +93,19 @@ func (s *Server) loadServiceDetailData(ctx context.Context, name string) (map[st
 		netNames[n.ID] = n.Name
 	}
 
+	usage, taskUsage, usageAt := s.currentServiceUsage()
+	history, err := s.store.ListServiceSamples(svc.Spec.Name, time.Now().Add(-24*time.Hour))
+	if err != nil {
+		s.log.Warn("list service samples", "service", svc.Spec.Name, "err", err)
+	}
+	_, hasUsage := usage[svc.Spec.Name]
+
 	return map[string]any{
+		"Usage":       usage[svc.Spec.Name],
+		"HasUsage":    hasUsage,
+		"UsageAt":     usageAt,
+		"TaskUsage":   taskUsage,
+		"UsageJSON":   serviceHistoryJSON(history),
 		"Service":     svc,
 		"Tasks":       tasks,
 		"Hostnames":   hostnames,

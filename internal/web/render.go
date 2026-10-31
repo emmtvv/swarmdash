@@ -34,14 +34,20 @@ type layoutData struct {
 // html/template funcs can't otherwise vary per call) so inline <script>
 // blocks - scattered across page templates, not just the layout - can carry
 // the nonce that matches this response's CSP header.
-func (r *Renderer) Render(w http.ResponseWriter, page string, data any, csrfToken, nonce string) {
+//
+// lang picks the UI language: the "t"/"tHTML" translation funcs, the
+// relative-time funcs and the client-side JS catalog are bound to it the
+// same way.
+func (r *Renderer) Render(w http.ResponseWriter, page string, data any, csrfToken, nonce, lang string) {
 	tmpl, err := r.tmpl.Clone()
 	if err != nil {
 		slog.Error("template clone failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	tmpl = tmpl.Funcs(template.FuncMap{"cspNonce": func() string { return nonce }})
+	funcs := LangFuncs(lang)
+	funcs["cspNonce"] = func() string { return nonce }
+	tmpl = tmpl.Funcs(funcs)
 
 	var buf bytes.Buffer
 	if err := tmpl.ExecuteTemplate(&buf, page, data); err != nil {
@@ -59,13 +65,14 @@ func (r *Renderer) Render(w http.ResponseWriter, page string, data any, csrfToke
 // htmx partial responses (e.g. the live task table refreshed in place).
 // Like Render it executes a clone: once r.tmpl itself has executed,
 // html/template refuses to Clone it, which would break every later Render.
-func (r *Renderer) RenderFragment(w http.ResponseWriter, name string, data any) {
+func (r *Renderer) RenderFragment(w http.ResponseWriter, name string, data any, lang string) {
 	tmpl, err := r.tmpl.Clone()
 	if err != nil {
 		slog.Error("template clone failed", "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	tmpl = tmpl.Funcs(LangFuncs(lang))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := tmpl.ExecuteTemplate(w, name, data); err != nil {
 		slog.Error("fragment render failed", "template", name, "err", err)

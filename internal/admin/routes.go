@@ -1,6 +1,9 @@
 package admin
 
-import "net/http"
+import (
+	"net/http"
+	"strings"
+)
 
 // route pairs a pattern registered with http.ServeMux (e.g. "GET
 // /nodes/{id}") with its handler and an explicit RBAC decision. ViewerOK
@@ -25,6 +28,11 @@ func protectedRoutes(s *Server) []route {
 
 		{"GET /account/password", s.handleAccountPasswordPage, true},
 		{"POST /account/password", s.handleAccountPasswordChange, true},
+		{"GET /account/security", s.handleAccountSecurityPage, true},
+		{"POST /account/2fa/setup", s.handle2FASetup, true},
+		{"POST /account/2fa/enable", s.handle2FAEnable, true},
+		{"POST /account/2fa/disable", s.handle2FADisable, true},
+		{"POST /account/2fa/recovery-codes", s.handle2FARecoveryCodes, true},
 
 		{"GET /nodes", s.handleNodesPage, true},
 		{"GET /nodes/stats", s.handleNodesStatsJSON, true},
@@ -75,6 +83,9 @@ func protectedRoutes(s *Server) []route {
 
 		{"GET /topology", s.handleTopologyPage, true},
 
+		{"GET /search", s.handleSearch, true},
+		{"POST /favorites", s.handleFavoriteToggle, true},
+
 		{"GET /networks", s.handleNetworksPage, true},
 		{"POST /networks", s.handleNetworkCreate, false},
 		{"POST /networks/{id}/delete", s.handleNetworkDelete, false},
@@ -100,6 +111,16 @@ func protectedRoutes(s *Server) []route {
 		{"GET /volumes", s.handleVolumesPage, true},
 		{"POST /volumes", s.handleVolumeCreate, false},
 		{"POST /volumes/{name}/delete", s.handleVolumeDelete, false},
+		// Backups are admin-only throughout, listing included: a backup
+		// is a full copy of whatever the volume holds (databases,
+		// credentials), so not even its existence is a viewer's business.
+		{"GET /volumes/backups", s.handleVolumeBackupsPage, false},
+		{"GET /volumes/backups/jobs", s.handleVolumeBackupsJobs, false},
+		{"POST /volumes/backups/upload", s.handleVolumeBackupUpload, false},
+		{"POST /volumes/{name}/backup", s.handleVolumeBackupCreate, false},
+		{"GET /volumes/backups/{id}/download", s.handleVolumeBackupDownload, false},
+		{"POST /volumes/backups/{id}/restore", s.handleVolumeBackupRestore, false},
+		{"POST /volumes/backups/{id}/delete", s.handleVolumeBackupDelete, false},
 
 		{"GET /audit", s.handleAuditPage, true},
 		{"GET /events", s.handleEventsPage, true},
@@ -118,6 +139,7 @@ func protectedRoutes(s *Server) []route {
 		{"POST /settings/users", s.handleUserCreate, false},
 		{"POST /settings/users/{username}/delete", s.handleUserDelete, false},
 		{"POST /settings/users/{username}/password", s.handleUserResetPassword, false},
+		{"POST /settings/users/{username}/2fa/reset", s.handleUserReset2FA, false},
 
 		{"GET /settings/swarm", s.handleSwarmPage, false},
 		{"POST /settings/swarm/spec", s.handleSwarmUpdateSpec, false},
@@ -194,9 +216,10 @@ func newRBAC(routes []route) *rbac {
 
 // needsAdmin reports whether r requires the admin role.
 func (rb *rbac) needsAdmin(r *http.Request) bool {
-	// Changing your own password isn't a privileged action - every account
-	// needs it, including a viewer stuck behind MustChangePassword.
-	if r.URL.Path == "/account/password" {
+	// Managing your own account (password, two-factor) isn't a privileged
+	// action - every account needs it, including a viewer stuck behind
+	// MustChangePassword or Require 2FA.
+	if strings.HasPrefix(r.URL.Path, "/account/") {
 		return false
 	}
 	_, pattern := rb.mux.Handler(r)

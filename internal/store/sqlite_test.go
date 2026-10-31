@@ -299,8 +299,8 @@ func TestMigrateIsIdempotentAndForwardOnly(t *testing.T) {
 		versions = append(versions, v)
 	}
 	_ = rows.Close()
-	if len(versions) != 6 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 || versions[3] != 4 || versions[4] != 5 || versions[5] != 6 {
-		t.Fatalf("schema_migrations = %v, want [1 2 3 4 5 6]", versions)
+	if len(versions) != 7 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 || versions[3] != 4 || versions[4] != 5 || versions[5] != 6 || versions[6] != 7 {
+		t.Fatalf("schema_migrations = %v, want [1 2 3 4 5 6 7]", versions)
 	}
 
 	// Running migrate again against an already-migrated DB must not
@@ -488,5 +488,65 @@ func TestSQLiteStoreStackTemplates(t *testing.T) {
 	}
 	if _, err := s.GetStackTemplate("t1"); err != ErrNotFound {
 		t.Errorf("after delete err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestSQLiteStoreUserSecurityAndPreferenceFields(t *testing.T) {
+	s := openTestSQLite(t)
+
+	u := User{
+		Username:           "alice",
+		PasswordHash:       "hash",
+		Role:               "admin",
+		CreatedAt:          time.Now(),
+		TOTPSecretEnc:      []byte{1, 2, 3},
+		TOTPEnabled:        true,
+		TOTPLastStep:       12345,
+		RecoveryCodeHashes: []string{"a", "b"},
+		Favorites:          []string{"service:web", "stack:mon"},
+		Language:           "ru",
+	}
+	if err := s.PutUser(u); err != nil {
+		t.Fatalf("PutUser: %v", err)
+	}
+	got, err := s.GetUser("alice")
+	if err != nil {
+		t.Fatalf("GetUser: %v", err)
+	}
+	if !got.TOTPEnabled || got.TOTPLastStep != 12345 || string(got.TOTPSecretEnc) != string(u.TOTPSecretEnc) ||
+		len(got.RecoveryCodeHashes) != 2 || len(got.Favorites) != 2 || got.Favorites[1] != "stack:mon" || got.Language != "ru" {
+		t.Fatalf("GetUser = %+v, want fields round-tripped from %+v", got, u)
+	}
+
+	// Clearing the lists stores them as empty, not as stale values.
+	got.Favorites = nil
+	got.RecoveryCodeHashes = nil
+	if err := s.PutUser(got); err != nil {
+		t.Fatalf("PutUser (clear): %v", err)
+	}
+	users, err := s.ListUsers()
+	if err != nil || len(users) != 1 || users[0].Favorites != nil || users[0].RecoveryCodeHashes != nil {
+		t.Fatalf("ListUsers = %+v, %v; want cleared lists", users, err)
+	}
+}
+
+func TestSQLiteStoreServiceSamples(t *testing.T) {
+	s := openTestSQLite(t)
+
+	if err := s.AppendServiceSamples([]ServiceSample{
+		{ServiceName: "web", CPUCores: 0.5, MemBytes: 100, Tasks: 2},
+		{ServiceName: "db", CPUCores: 1.5, MemBytes: 900, Tasks: 1},
+	}); err != nil {
+		t.Fatalf("AppendServiceSamples: %v", err)
+	}
+	got, err := s.ListServiceSamples("web", time.Now().Add(-time.Hour))
+	if err != nil || len(got) != 1 || got[0].MemBytes != 100 || got[0].Tasks != 2 {
+		t.Fatalf("ListServiceSamples(web) = %+v, %v", got, err)
+	}
+	if err := s.PruneServiceSamples(time.Now().Add(time.Minute)); err != nil {
+		t.Fatalf("PruneServiceSamples: %v", err)
+	}
+	if got, _ := s.ListServiceSamples("db", time.Time{}); len(got) != 0 {
+		t.Fatalf("after prune ListServiceSamples(db) = %+v, want none", got)
 	}
 }

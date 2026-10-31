@@ -4,22 +4,36 @@
 		<div class="login-brand">
 			<span class="brand-mark">{{template "brand-svg"}}</span>
 			<h1>swarmdash</h1>
-			<p>Sign in to manage your cluster</p>
+			<p>{{t "Sign in to manage your cluster"}}</p>
 		</div>
-		{{if .Error}}<div class="error-box">{{.Error}}</div>{{end}}
+		{{if .Error}}<div class="error-box">{{t .Error}}</div>{{end}}
 		{{if not .LocalLoginDisabled}}
 		<form method="post" action="/login">
-			<label for="username">Username</label>
+			<label for="username">{{t "Username"}}</label>
 			<input type="text" id="username" name="username" autofocus required>
-			<label for="password">Password</label>
+			<label for="password">{{t "Password"}}</label>
 			<input type="password" id="password" name="password" required>
-			<button type="submit" class="btn" style="width:100%;margin-top:22px;">Log in</button>
+			<button type="submit" class="btn" style="width:100%;margin-top:22px;">{{t "Log in"}}</button>
 		</form>
 		{{end}}
 		{{if .SSOActive}}
-		{{if not .LocalLoginDisabled}}<div class="login-divider"><span>or</span></div>{{end}}
-		<a href="/sso/login" class="btn secondary" style="width:100%;display:block;text-align:center;box-sizing:border-box;{{if .LocalLoginDisabled}}margin-top:22px;{{end}}">Sign in with {{.SSOLabel}}</a>
+		{{if not .LocalLoginDisabled}}<div class="login-divider"><span>{{t "or"}}</span></div>{{end}}
+		<a href="/sso/login" class="btn secondary" style="width:100%;display:block;text-align:center;box-sizing:border-box;{{if .LocalLoginDisabled}}margin-top:22px;{{end}}">{{t "Sign in with %v" .SSOLabel}}</a>
 		{{end}}
+		{{template "lang-picker" "/login"}}
 	</div>
 </div>
+{{end}}
+
+{{/* lang-picker is a compact language switcher; its argument is the page
+     to come back to ("" = the page it was used on, via Referer). */}}
+{{define "lang-picker"}}
+<form method="post" action="/language" class="lang-picker">
+	{{if .}}<input type="hidden" name="return" value="{{.}}">{{end}}
+	<select name="lang" aria-label="{{t "Language"}}" data-auto-submit>
+		{{$cur := lang}}
+		{{range languages}}<option value="{{.Tag}}" {{if eq .Tag $cur}}selected{{end}}>{{.Name}}</option>{{end}}
+	</select>
+	<noscript><button type="submit" class="btn small secondary">OK</button></noscript>
+</form>
 {{end}}

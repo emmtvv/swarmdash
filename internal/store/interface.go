@@ -80,6 +80,13 @@ type Interface interface {
 	ListClusterSamples(since time.Time) ([]ClusterSample, error)
 	PruneClusterSamples(olderThan time.Time) error
 
+	// AppendServiceSamples records one poll's worth of per-service usage.
+	AppendServiceSamples(samples []ServiceSample) error
+	// ListServiceSamples returns serviceName's samples since since, oldest
+	// first.
+	ListServiceSamples(serviceName string, since time.Time) ([]ServiceSample, error)
+	PruneServiceSamples(olderThan time.Time) error
+
 	GetSSOConfig() (SSOConfig, error)
 	PutSSOConfig(c SSOConfig) error
 

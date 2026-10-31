@@ -73,6 +73,9 @@ type Server struct {
 	// load.
 	memUsageMu    sync.RWMutex
 	memUsageBytes int64
+	// serviceUsage is the same sample's per-service/per-task breakdown
+	// (see service_usage.go), guarded by memUsageMu too.
+	serviceUsage serviceUsageSnapshot
 
 	// rbacCache/rbacOnce memoize the route -> role-requirement lookup built
 	// from protectedRoutes (see routes.go and rbacTable in auth.go).
@@ -106,6 +109,11 @@ type Server struct {
 	// in Settings -> General.
 	updateCheckLoaded   sync.Once
 	updateCheckDisabled atomic.Bool
+
+	// require2FALoaded/require2FAValue cache AppSettings.Require2FA the
+	// same way - requireAuth checks it on every request (handlers_2fa.go).
+	require2FALoaded sync.Once
+	require2FAValue  atomic.Bool
 
 	// registryClient lists image tags for image updates (image_updates.go);
 	// nil means imageupdate.DefaultClient. tagCache caches its results.
@@ -170,7 +178,7 @@ func buildAgentTLSConfig(cfg Config) (*tls.Config, error) {
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data any) {
-	s.renderer.Render(w, name, data, csrfTokenFromContext(r), cspNonceFromContext(r))
+	s.renderer.Render(w, name, data, csrfTokenFromContext(r), cspNonceFromContext(r), s.requestLanguage(r))
 }
 
 func (s *Server) Handler() http.Handler {
@@ -185,6 +193,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /logout", s.handleLogout)
 	mux.HandleFunc("GET /sso/login", s.handleSSOLogin)
 	mux.HandleFunc("GET /sso/callback", s.handleSSOCallback)
+	mux.HandleFunc("GET /login/2fa", s.handleLogin2FAPage)
+	mux.Handle("POST /login/2fa", s.loginLimiter.middleware(http.HandlerFunc(s.handleLogin2FASubmit)))
+	mux.HandleFunc("POST /language", s.handleSetLanguage)
 
 	protected := http.NewServeMux()
 	for _, rt := range protectedRoutes(s) {

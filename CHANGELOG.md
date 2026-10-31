@@ -5,6 +5,40 @@ Notable changes to swarmdash are tracked here, following
 does not yet follow strict semantic versioning across releases — see the
 README's "Known gaps" section for what's still evolving.
 
+## [1.4.0] - 2026-10-31
+
+### Added
+
+- **Two-factor authentication (TOTP)** for local-password accounts: set it
+  up from the account page (the lock icon next to your name) with any
+  authenticator app, get ten one-time recovery codes, and sign in with a
+  code after your password. Settings → General can require it for every
+  local account; admins can reset a user's two-factor from Settings →
+  Users. SSO accounts and API tokens are unaffected.
+- **Global search** in the command palette (Cmd/Ctrl+K, or `/`): services
+  (by name or image), stacks, nodes (hostname, ID, address, labels), tasks
+  (by ID), networks, secrets and configs, next to the page list.
+- **Favorites**: star services, stacks and nodes; they show up with live
+  status at the top of the dashboard and first in the command palette.
+- **Per-service resource usage**: real CPU and memory per service and per
+  task on the Services list and a service's page, with a 24h chart. It's
+  collected once a minute from the same agent stats the dashboard uses.
+- **Volume backups** (Volumes → Backups): back up a volume to a `.tar.gz`
+  on the node that holds it, download it, upload one, and restore it into
+  the same or a new volume - all as background jobs, so large volumes
+  don't hold a request open. Agents keep backups in `--backup-dir`
+  (default `/var/lib/swarmdash/backups`; `deploy/stack.yml` mounts a
+  `swarmdash_backups` volume there).
+- **Interface languages**: English, Russian, Ukrainian, German, Spanish,
+  Portuguese, French, Chinese and Georgian, chosen from the selector in
+  the sidebar, on the account page or on the login page (saved on the
+  account). English is the default; the browser's language isn't used.
+
+### Changed
+
+- Rotating the cluster secret (`swarmdash rotate-cluster-secret`) and
+  restoring a configuration backup now also cover two-factor secrets.
+
 ## [1.3.0] - 2026-10-28
 
 ### Added

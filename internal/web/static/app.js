@@ -87,7 +87,9 @@
 // blocks (nonces only cover <script> elements, not event-handler attrs).
 (function () {
 	document.querySelectorAll("select[data-auto-submit]").forEach((select) => {
-		select.addEventListener("change", () => select.form.submit());
+		// requestSubmit (not submit) so the "submit" listener above still
+		// adds the CSRF token when the form is a POST (the language picker).
+		select.addEventListener("change", () => (select.form.requestSubmit ? select.form.requestSubmit() : select.form.submit()));
 	});
 })();
 
@@ -97,7 +99,7 @@
 (function () {
 	document.querySelectorAll("form[data-prompt-password]").forEach((form) => {
 		form.addEventListener("submit", (e) => {
-			const p = prompt("New password for " + form.dataset.promptPassword + ":");
+			const p = prompt(t("New password for %s:", form.dataset.promptPassword));
 			if (!p) { e.preventDefault(); return; }
 			form.password.value = p;
 		});
@@ -120,7 +122,9 @@
 // Lightweight, dependency-free search + sort for any <table data-enhance>.
 // A text input with [data-table-search] anywhere inside the same
 // `.table-wrap` filters rows by substring match across all cells;
-// clicking a header cell sorts by that column (numeric-aware).
+// clicking a header cell sorts by that column (numeric-aware; a cell's
+// data-sort attribute, when present, is sorted on instead of its text -
+// e.g. raw bytes behind a "1.2 GiB" label).
 (function () {
 	function enhanceTable(table) {
 		const wrap = table.closest(".table-wrap") || table.parentElement;
@@ -141,13 +145,14 @@
 		Array.from(table.tHead.rows[0].cells).forEach((th, idx) => {
 			if (th.dataset.noSort !== undefined) return;
 			th.style.cursor = "pointer";
-			th.title = "Click to sort";
+			th.title = t("Click to sort");
 			let asc = true;
 			th.addEventListener("click", () => {
 				const rows = Array.from(tbody.rows);
 				rows.sort((a, b) => {
-					const av = (a.cells[idx] && a.cells[idx].textContent.trim()) || "";
-					const bv = (b.cells[idx] && b.cells[idx].textContent.trim()) || "";
+					const cellVal = (c) => (c ? (c.dataset.sort !== undefined ? c.dataset.sort : c.textContent.trim()) : "");
+					const av = cellVal(a.cells[idx]);
+					const bv = cellVal(b.cells[idx]);
 					const an = parseFloat(av);
 					const bn = parseFloat(bv);
 					const bothNumeric = !isNaN(an) && !isNaN(bn) && /^-?[0-9.]+/.test(av) && /^-?[0-9.]+/.test(bv);
@@ -217,9 +222,11 @@
 	});
 })();
 
-// Command palette (Cmd/Ctrl+K): builds its list of jump targets directly
-// from the sidebar's own <a> elements, so it never drifts out of sync with
-// the nav and needs no server-side search endpoint.
+// Command palette (Cmd/Ctrl+K): page jump targets come straight from the
+// sidebar's own <a> elements (so they never drift out of sync with the
+// nav), and anything typed is also sent to /search, which looks across
+// services, stacks, nodes, tasks, networks, secrets and configs. Opening it
+// with nothing typed shows the user's favorites first.
 (function () {
 	const overlay = document.getElementById("cmdk-overlay");
 	if (!overlay) return;
@@ -228,8 +235,25 @@
 	let items = [];
 	let active = 0;
 	let lastFocus = null;
+	let remote = [];
+	let searching = false;
+	let seq = 0;
+	let timer = null;
 
-	function buildItems() {
+	const groupIcons = {
+		favorite: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 3.2 L14.7 8.7 L20.7 9.6 L16.35 13.85 L17.4 19.85 L12 17 L6.6 19.85 L7.65 13.85 L3.3 9.6 L9.3 8.7 Z"/></svg>',
+		task: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,13 8,13 10,7 14,19 16,13 21,13"/></svg>',
+	};
+	// Other result kinds borrow the icon of the sidebar link for their list
+	// page, so a service hit looks like the Services nav entry.
+	const kindPages = { service: "/services", stack: "/stacks", node: "/nodes", network: "/networks", secret: "/secrets", config: "/configs" };
+	function iconFor(kind) {
+		if (groupIcons[kind]) return groupIcons[kind];
+		const a = document.querySelector('.sidebar .nav-scroll a[href="' + kindPages[kind] + '"] svg');
+		return a ? a.outerHTML : "";
+	}
+
+	function pageGroups() {
 		const groups = [];
 		let current = null;
 		document.querySelectorAll(".sidebar .nav-scroll > *").forEach((el) => {
@@ -243,38 +267,72 @@
 		return groups;
 	}
 
-	function render(query) {
-		const q = query.trim().toLowerCase();
-		const groups = buildItems();
+	function addItem(iconHTML, label, detail, href) {
+		const row = document.createElement("div");
+		row.className = "cmdk-item";
+		row.setAttribute("role", "option");
+		row.innerHTML = iconHTML;
+		const l = document.createElement("span");
+		l.textContent = label;
+		row.appendChild(l);
+		if (detail) {
+			const d = document.createElement("span");
+			d.className = "cmdk-detail";
+			d.textContent = detail;
+			row.appendChild(d);
+		}
+		row.dataset.href = href;
+		row.addEventListener("mouseenter", () => setActive(items.indexOf(row)));
+		row.addEventListener("click", () => { window.location.href = href; });
+		list.appendChild(row);
+		items.push(row);
+	}
+
+	function addLabel(text) {
+		const label = document.createElement("div");
+		label.className = "cmdk-group-label";
+		label.textContent = text;
+		list.appendChild(label);
+	}
+
+	function render() {
+		const q = input.value.trim().toLowerCase();
 		list.innerHTML = "";
 		items = [];
-		groups.forEach((group) => {
+		remote.forEach((g) => {
+			addLabel(g.label);
+			g.hits.forEach((h) => addItem(iconFor(g.kind), h.label, h.detail, h.href));
+		});
+		pageGroups().forEach((group) => {
 			const matches = group.links.filter((a) => a.textContent.toLowerCase().includes(q));
 			if (!matches.length) return;
-			const label = document.createElement("div");
-			label.className = "cmdk-group-label";
-			label.textContent = group.label;
-			list.appendChild(label);
+			addLabel(group.label);
 			matches.forEach((a) => {
-				const row = document.createElement("div");
-				row.className = "cmdk-item";
-				row.setAttribute("role", "option");
-				row.innerHTML = (a.querySelector("svg") ? a.querySelector("svg").outerHTML : "") +
-					"<span>" + a.textContent + "</span>";
-				row.addEventListener("mouseenter", () => setActive(items.indexOf(row)));
-				row.addEventListener("click", () => { window.location.href = a.getAttribute("href"); });
-				list.appendChild(row);
-				items.push(row);
-				row.dataset.href = a.getAttribute("href");
+				addItem(a.querySelector("svg") ? a.querySelector("svg").outerHTML : "", a.textContent, "", a.getAttribute("href"));
 			});
 		});
 		if (!items.length) {
 			const empty = document.createElement("div");
 			empty.className = "cmdk-empty";
-			empty.textContent = "No matching pages.";
+			empty.textContent = searching ? t("Searching...") : (q ? t("No results.") : t("No matching pages."));
 			list.appendChild(empty);
 		}
 		setActive(0);
+	}
+
+	function search() {
+		const q = input.value.trim();
+		const mine = ++seq;
+		searching = true;
+		fetch("/search?q=" + encodeURIComponent(q), { headers: { "Accept": "application/json" } })
+			.then((r) => r.ok ? r.json() : { groups: [] })
+			.then((data) => {
+				if (mine !== seq) return; // a newer keystroke's search owns the list
+				remote = data.groups || [];
+				searching = false;
+				render();
+			})
+			.catch(() => { if (mine === seq) { searching = false; render(); } });
 	}
 
 	function setActive(idx) {
@@ -287,8 +345,10 @@
 	function open() {
 		lastFocus = document.activeElement;
 		overlay.classList.add("open");
-		render("");
 		input.value = "";
+		remote = [];
+		render();
+		search();
 		setTimeout(() => input.focus(), 10);
 		document.body.style.overflow = "hidden";
 	}
@@ -303,7 +363,13 @@
 	document.getElementById("cmdk-topbar-trigger") && document.getElementById("cmdk-topbar-trigger").addEventListener("click", open);
 	overlay.addEventListener("mousedown", (e) => { if (e.target === overlay) close(); });
 
-	input.addEventListener("input", () => render(input.value));
+	input.addEventListener("input", () => {
+		// Pages filter instantly; the cluster search waits for a pause in
+		// typing so it isn't one request per keystroke.
+		render();
+		clearTimeout(timer);
+		timer = setTimeout(search, 180);
+	});
 	input.addEventListener("keydown", (e) => {
 		if (e.key === "ArrowDown") { e.preventDefault(); setActive(active + 1); }
 		else if (e.key === "ArrowUp") { e.preventDefault(); setActive(active - 1); }
@@ -315,9 +381,52 @@
 		if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
 			e.preventDefault();
 			overlay.classList.contains("open") ? close() : open();
+		} else if (e.key === "/" && !overlay.classList.contains("open") && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName) && !document.activeElement.isContentEditable) {
+			// "/" opens search too, the way it does on GitHub and friends.
+			e.preventDefault();
+			open();
 		} else if (e.key === "Escape" && overlay.classList.contains("open")) {
 			close();
 		}
+	});
+})();
+
+// Favorite stars (partial_favorite.html): toggled in place with fetch so
+// starring something from a long table doesn't reload the page.
+(function () {
+	const csrf = document.querySelector('meta[name="csrf-token"]');
+	document.addEventListener("click", (e) => {
+		const btn = e.target.closest(".fav-star");
+		if (!btn) return;
+		e.preventDefault();
+		e.stopPropagation();
+		const body = new URLSearchParams({ kind: btn.dataset.favKind, name: btn.dataset.favName });
+		fetch("/favorites", {
+			method: "POST",
+			headers: { "Accept": "application/json", "X-CSRF-Token": csrf ? csrf.content : "" },
+			body: body,
+		}).then((r) => r.ok ? r.json() : r.text().then((msg) => { throw new Error(msg); }))
+			.then((data) => {
+				btn.classList.toggle("on", data.favorite);
+				btn.setAttribute("aria-pressed", data.favorite ? "true" : "false");
+				const label = data.favorite ? t("Remove from favorites") : t("Add to favorites");
+				btn.title = label;
+				btn.setAttribute("aria-label", label);
+			})
+			.catch((err) => { alert(err.message); });
+	});
+})();
+
+// Copy buttons: data-copy-text="..." copies that text (recovery codes).
+(function () {
+	document.addEventListener("click", (e) => {
+		const btn = e.target.closest("[data-copy-text]");
+		if (!btn || !navigator.clipboard) return;
+		navigator.clipboard.writeText(btn.dataset.copyText.trim()).then(() => {
+			const prev = btn.textContent;
+			btn.textContent = t("Copied");
+			setTimeout(() => { btn.textContent = prev; }, 1500);
+		});
 	});
 })();
 
@@ -405,13 +514,7 @@
 		if (pct >= 60) return "warn";
 		return "ok";
 	}
-	function bytesHuman(b) {
-		const units = "KMGTPE";
-		if (b < 1024) return Math.round(b) + " B";
-		let div = 1024, exp = 0;
-		for (let n = Math.floor(b / 1024); n >= 1024; n = Math.floor(n / 1024)) { div *= 1024; exp++; }
-		return (b / div).toFixed(1) + " " + units[exp] + "iB";
-	}
+	const bytesHuman = sdBytes;
 
 	function fillCell(cell, ok, pct, extra) {
 		if (!cell) return;
@@ -529,8 +632,8 @@
 		// KEY=VALUE per row: env vars, labels.
 		kv: {
 			fields: [
-				{ key: "key", placeholder: "KEY", flex: "1" },
-				{ key: "value", placeholder: "value", flex: "2" },
+				{ key: "key", placeholder: t("KEY"), flex: "1" },
+				{ key: "value", placeholder: t("value"), flex: "2" },
 			],
 			parse: (line) => {
 				const i = line.indexOf("=");
@@ -541,8 +644,8 @@
 		// name[:target-filename] per row: secrets, configs.
 		ref: {
 			fields: [
-				{ key: "name", placeholder: "name", flex: "1" },
-				{ key: "target", placeholder: "target filename (optional)", flex: "1" },
+				{ key: "name", placeholder: t("name"), flex: "1" },
+				{ key: "target", placeholder: t("target filename (optional)"), flex: "1" },
 			],
 			parse: (line) => {
 				const i = line.indexOf(":");
@@ -553,9 +656,9 @@
 		// source:target[:ro] per row: mounts.
 		mount: {
 			fields: [
-				{ key: "source", placeholder: "/host/path or volume name", flex: "2" },
-				{ key: "target", placeholder: "/container/path", flex: "2" },
-				{ key: "ro", type: "checkbox", label: "Read-only" },
+				{ key: "source", placeholder: t("/host/path or volume name"), flex: "2" },
+				{ key: "target", placeholder: t("/container/path"), flex: "2" },
+				{ key: "ro", type: "checkbox", label: t("Read-only") },
 			],
 			parse: (line) => {
 				const parts = line.split(":");
@@ -627,7 +730,7 @@
 		const removeBtn = document.createElement("button");
 		removeBtn.type = "button";
 		removeBtn.className = "list-row-remove";
-		removeBtn.setAttribute("aria-label", "Remove");
+		removeBtn.setAttribute("aria-label", t("Remove"));
 		removeBtn.textContent = "✕";
 		removeBtn.addEventListener("click", () => { row.remove(); onChange(); });
 		row.appendChild(removeBtn);
@@ -655,7 +758,7 @@
 		const addBtn = document.createElement("button");
 		addBtn.type = "button";
 		addBtn.className = "btn secondary small list-row-add";
-		addBtn.textContent = "+ Add";
+		addBtn.textContent = "+ " + t("Add");
 		wrap.appendChild(addBtn);
 
 		function sync() {

@@ -84,6 +84,7 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"MemPct":         pct(memUsed, memCapacity),
 		"HistoryJSON":    clusterHistoryJSON(history),
 		"CurrentVersion": currentVersion,
+		"Favorites":      resolveFavorites(userFromContext(r).Favorites, services, nodes),
 	})
 }
 

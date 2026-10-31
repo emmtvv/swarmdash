@@ -21,6 +21,7 @@ func newAgentCmd() *cobra.Command {
 		tlsCert    string
 		tlsKey     string
 		tlsCA      string
+		backupDir  string
 	)
 
 	cmd := &cobra.Command{
@@ -55,6 +56,7 @@ func newAgentCmd() *cobra.Command {
 				TLSCertFile:   tlsCert,
 				TLSKeyFile:    tlsKey,
 				TLSCAFile:     tlsCA,
+				BackupDir:     backupDir,
 			}, docker)
 
 			ctx, cancel := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
@@ -70,6 +72,17 @@ func newAgentCmd() *cobra.Command {
 	cmd.Flags().StringVar(&tlsCert, "tls-cert", "", "agent server certificate (from `swarmdash tls init`); enables mTLS when set with --tls-key and --tls-ca")
 	cmd.Flags().StringVar(&tlsKey, "tls-key", "", "agent server private key")
 	cmd.Flags().StringVar(&tlsCA, "tls-ca", "", "CA certificate used to verify admin's client certificate")
+	cmd.Flags().StringVar(&backupDir, "backup-dir", defaultBackupDir(), "directory volume backups are stored in on this node - mount a host directory here so they survive the agent container (env SWARMDASH_BACKUP_DIR; empty disables backups)")
 
 	return cmd
+}
+
+// defaultBackupDir is --backup-dir's default: SWARMDASH_BACKUP_DIR when set
+// (even to "", which disables backups), else the path deploy/stack.yml
+// mounts a host directory at.
+func defaultBackupDir() string {
+	if v, ok := os.LookupEnv("SWARMDASH_BACKUP_DIR"); ok {
+		return v
+	}
+	return "/var/lib/swarmdash/backups"
 }

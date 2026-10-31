@@ -62,6 +62,19 @@ func (s *Server) agentPost(ctx context.Context, nodeID, path string, body io.Rea
 }
 
 func (s *Server) agentDo(ctx context.Context, method, nodeID, path string, body io.Reader) (*http.Response, error) {
+	req, err := s.agentRequest(ctx, method, nodeID, path, body)
+	if err != nil {
+		return nil, err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	return s.agentHTTPClient().Do(req)
+}
+
+// agentRequest builds an authenticated request to a node's agent, for
+// callers that need their own client (see agentStreamClient).
+func (s *Server) agentRequest(ctx context.Context, method, nodeID, path string, body io.Reader) (*http.Request, error) {
 	base, err := s.agentBaseURL(ctx, nodeID)
 	if err != nil {
 		return nil, err
@@ -71,10 +84,7 @@ func (s *Server) agentDo(ctx context.Context, method, nodeID, path string, body 
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+s.cfg.ClusterSecret)
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	return s.agentHTTPClient().Do(req)
+	return req, nil
 }
 
 // dialAgentWS opens a websocket to the given node's agent, authenticated
@@ -126,6 +136,17 @@ type nodeResourceStats struct {
 	DiskTotalBytes int64
 	DiskUsedBytes  int64
 	Available      bool // false if the node's agent couldn't be reached
+	// Tasks is per-task-container usage on this node; empty from agents
+	// older than this field.
+	Tasks []taskResourceUsage
+}
+
+type taskResourceUsage struct {
+	TaskID      string  `json:"task_id"`
+	ServiceName string  `json:"service_name"`
+	MemBytes    int64   `json:"mem_bytes"`
+	MemLimit    int64   `json:"mem_limit"`
+	CPUCores    float64 `json:"cpu_cores"`
 }
 
 // nodeStats fetches one node's live resource usage from its agent. It
@@ -147,10 +168,11 @@ func (s *Server) nodeStats(ctx context.Context, nodeID, hostname string) nodeRes
 		return nodeResourceStats{}
 	}
 	var v struct {
-		MemUsedBytes   int64   `json:"mem_used_bytes"`
-		CPUUsedCores   float64 `json:"cpu_used_cores"`
-		DiskTotalBytes int64   `json:"disk_total_bytes"`
-		DiskUsedBytes  int64   `json:"disk_used_bytes"`
+		MemUsedBytes   int64               `json:"mem_used_bytes"`
+		CPUUsedCores   float64             `json:"cpu_used_cores"`
+		DiskTotalBytes int64               `json:"disk_total_bytes"`
+		DiskUsedBytes  int64               `json:"disk_used_bytes"`
+		Tasks          []taskResourceUsage `json:"tasks"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&v); err != nil {
 		s.log.Warn("node stats: decode failed", "node", hostname, "err", err)
@@ -162,6 +184,7 @@ func (s *Server) nodeStats(ctx context.Context, nodeID, hostname string) nodeRes
 		DiskTotalBytes: v.DiskTotalBytes,
 		DiskUsedBytes:  v.DiskUsedBytes,
 		Available:      true,
+		Tasks:          v.Tasks,
 	}
 }
 
@@ -188,14 +211,4 @@ func (s *Server) nodesStats(ctx context.Context, nodes []swarm.Node) map[string]
 	}
 	wg.Wait()
 	return out
-}
-
-// clusterMemoryUsed sums real container memory usage across every ready
-// node.
-func (s *Server) clusterMemoryUsed(ctx context.Context, nodes []swarm.Node) int64 {
-	var total int64
-	for _, st := range s.nodesStats(ctx, nodes) {
-		total += st.MemUsedBytes
-	}
-	return total
 }

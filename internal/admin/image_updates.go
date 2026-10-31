@@ -162,7 +162,7 @@ func (s *Server) handleServiceImageUpdates(w http.ResponseWriter, r *http.Reques
 			}
 		}
 	}
-	s.renderer.RenderFragment(w, "partial_image_updates.html", u)
+	s.renderer.RenderFragment(w, "partial_image_updates.html", u, s.requestLanguage(r))
 }
 
 // handleServiceAutoUpdate sets or clears the service's autoUpdateLabel. It

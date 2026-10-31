@@ -1,0 +1,20 @@
+{{define "login_2fa.html"}}
+<div class="login-page">
+	<div class="login-card">
+		<div class="login-brand">
+			<span class="brand-mark">{{template "brand-svg"}}</span>
+			<h1>swarmdash</h1>
+			<p>{{t "Two-factor authentication"}}</p>
+		</div>
+		{{if .Error}}<div class="error-box">{{t .Error}}</div>{{end}}
+		<form method="post" action="/login/2fa">
+			<label for="code">{{t "Code from your authenticator app"}}</label>
+			<input type="text" id="code" name="code" inputmode="numeric" autocomplete="one-time-code" autofocus required>
+			<p class="muted" style="font-size:12px;margin-top:8px;">{{t "Lost your phone? Enter one of your recovery codes instead."}}</p>
+			<button type="submit" class="btn" style="width:100%;margin-top:18px;">{{t "Verify"}}</button>
+		</form>
+		<p style="text-align:center;margin-top:16px;"><a href="/login" class="muted">{{t "Back to sign in"}}</a></p>
+		{{template "lang-picker" "/login/2fa"}}
+	</div>
+</div>
+{{end}}

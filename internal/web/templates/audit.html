@@ -1,7 +1,7 @@
 {{define "audit.html"}}
-<h1>Audit log</h1>
+<h1>{{t "Audit log"}}</h1>
 <table>
-	<thead><tr><th>Time</th><th>User</th><th>IP</th><th>Action</th><th>Target</th><th>Detail</th><th>Result</th></tr></thead>
+	<thead><tr><th>{{t "Time"}}</th><th>{{t "User"}}</th><th>{{t "IP"}}</th><th>{{t "Action"}}</th><th>{{t "Target"}}</th><th>{{t "Detail"}}</th><th>{{t "Result"}}</th></tr></thead>
 	<tbody>
 	{{range .Entries}}
 		<tr>
@@ -11,10 +11,10 @@
 			<td class="mono">{{.Action}}</td>
 			<td class="mono">{{.Target}}</td>
 			<td class="muted">{{.Detail}}</td>
-			<td>{{if .Success}}<span class="badge state-active">ok</span>{{else}}<span class="badge state-failed" title="{{.Error}}">failed</span>{{end}}</td>
+			<td>{{if .Success}}<span class="badge state-active">{{t "ok"}}</span>{{else}}<span class="badge state-failed" title="{{.Error}}">{{t "failed"}}</span>{{end}}</td>
 		</tr>
 	{{else}}
-		<tr><td colspan="7" class="muted">No audit entries yet.</td></tr>
+		<tr><td colspan="7" class="muted">{{t "No audit entries yet."}}</td></tr>
 	{{end}}
 	</tbody>
 </table>

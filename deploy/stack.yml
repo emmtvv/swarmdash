@@ -140,6 +140,11 @@ services:
     #     target: tls_agent_key
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      # Volume backups (Volumes -> Backups) are stored on the node that
+      # holds the volume. A named volume rather than a host path, since
+      # Swarm refuses a bind mount whose source directory doesn't already
+      # exist on every node; each node gets its own local copy.
+      - swarmdash_backups:/var/lib/swarmdash/backups
     # Host networking so admin can reach each node's agent directly at
     # <node-advertise-address>:8871, the same address Swarm itself already
     # uses for cluster control traffic - no overlay network required.
@@ -219,3 +224,4 @@ networks:
 
 volumes:
   swarmdash_data:
+  swarmdash_backups:

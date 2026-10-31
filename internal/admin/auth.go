@@ -139,7 +139,7 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	} else if wait > 0 {
-		http.Redirect(w, r, "/login?error="+url.QueryEscape(fmt.Sprintf("too many failed attempts - try again in %dm", int(wait.Minutes())+1)), http.StatusSeeOther)
+		http.Redirect(w, r, "/login?error="+url.QueryEscape(s.t(r, "too many failed attempts - try again in %dm", int(wait.Minutes())+1)), http.StatusSeeOther)
 		return
 	}
 
@@ -166,6 +166,15 @@ func (s *Server) handleLoginSubmit(w http.ResponseWriter, r *http.Request) {
 		s.recordLoginFailure(username, ip)
 		s.auditAs(r, username, "user.login", username, "", errWrongPassword)
 		http.Redirect(w, r, "/login?error=invalid+credentials", http.StatusSeeOther)
+		return
+	}
+
+	// Password is right but a second factor is still owed: no session yet,
+	// and the failed-attempt count keeps running until the code is right
+	// too (see handleLogin2FASubmit).
+	if user.TOTPEnabled {
+		s.setMFAPending(w, r, username)
+		http.Redirect(w, r, "/login/2fa", http.StatusSeeOther)
 		return
 	}
 
@@ -439,14 +448,16 @@ func (s *Server) requireAuth(next http.Handler) http.Handler {
 			http.Redirect(w, r, "/account/password", http.StatusSeeOther)
 			return
 		}
+		// Same for Settings -> General's "Require two-factor": enrollment
+		// first, everything else after.
+		if !user.MustChangePassword && s.needs2FAEnrollment(user, r.URL.Path) {
+			http.Redirect(w, r, "/account/security", http.StatusSeeOther)
+			return
+		}
 		next.ServeHTTP(w, r.WithContext(newUserContext(r, user)))
 	})
 }
 
-// requireRole enforces the two-role model on top of requireAuth's
-// authentication: "viewer" accounts get read-only access. Enforced in one
-// place, wrapped around the whole protected mux (see server.go), so no
-// individual route registration can be missed.
 // requireRole enforces the two-role model on top of requireAuth's
 // authentication: "viewer" accounts get read-only access. Enforced in one
 // place, wrapped around the whole protected mux (see server.go), so no

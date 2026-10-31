@@ -20,6 +20,11 @@ type taskEventView struct {
 	Err         string `json:"err"`
 	ContainerID string `json:"containerId"`
 	UpdatedAt   string `json:"updatedAt"`
+	// CPU/Mem are the task's real usage from the poller's last sample;
+	// Usage is false when there's none (not running, or not sampled yet).
+	Usage bool    `json:"usage"`
+	CPU   float64 `json:"cpu"`
+	Mem   int64   `json:"mem"`
 }
 
 type serviceEventPayload struct {
@@ -85,12 +90,17 @@ func (s *Server) handleServiceEvents(w http.ResponseWriter, r *http.Request) {
 				payload.UpdateState = string(svc.UpdateStatus.State)
 				payload.UpdateMsg = svc.UpdateStatus.Message
 			}
+			_, taskUsage, _ := s.currentServiceUsage()
 			for _, t := range tasks {
 				containerID := ""
 				if t.Status.ContainerStatus != nil {
 					containerID = t.Status.ContainerStatus.ContainerID
 				}
+				u, hasUsage := taskUsage[t.ID]
 				payload.Tasks = append(payload.Tasks, taskEventView{
+					Usage:       hasUsage,
+					CPU:         u.CPUCores,
+					Mem:         u.MemBytes,
 					ID:          t.ID,
 					Slot:        t.Slot,
 					NodeID:      t.NodeID,

@@ -34,6 +34,28 @@ type User struct {
 	// this field was introduced (backfilled - "claimed" - on their next
 	// successful login).
 	SSOSubject string `bson:"sso_subject,omitempty" json:"sso_subject,omitempty"`
+	// TOTPSecretEnc is the account's two-factor (RFC 6238 TOTP) shared
+	// secret, as opaque ciphertext - same convention as
+	// RegistryCredential.PasswordEnc. Set as soon as enrollment starts;
+	// TOTPEnabled only flips on once the user has proven their
+	// authenticator app produces matching codes, so a half-finished
+	// enrollment never locks anyone out.
+	TOTPSecretEnc []byte `bson:"totp_secret_enc,omitempty" json:"totp_secret_enc,omitempty"`
+	TOTPEnabled   bool   `bson:"totp_enabled,omitempty" json:"totp_enabled,omitempty"`
+	// TOTPLastStep is the 30-second time step of the last code accepted, so
+	// a code observed over someone's shoulder can't be replayed within its
+	// validity window.
+	TOTPLastStep int64 `bson:"totp_last_step,omitempty" json:"totp_last_step,omitempty"`
+	// RecoveryCodeHashes are SHA-256 hashes of the one-time recovery codes
+	// shown once at 2FA enrollment; each is removed when used.
+	RecoveryCodeHashes []string `bson:"recovery_code_hashes,omitempty" json:"recovery_code_hashes,omitempty"`
+	// Favorites are the user's pinned resources, each "kind:name" (e.g.
+	// "service:web", "stack:monitoring", "node:<id>"), shown first on the
+	// dashboard and in the command palette.
+	Favorites []string `bson:"favorites,omitempty" json:"favorites,omitempty"`
+	// Language is the UI language the user picked ("en", "ru", ...); empty
+	// means follow the browser's Accept-Language.
+	Language string `bson:"language,omitempty" json:"language,omitempty"`
 }
 
 // LoginAttempt tracks recent failed local-password logins for one (username,
@@ -250,6 +272,11 @@ type AppSettings struct {
 	// service without its own swarmdash.autoupdate label - see
 	// internal/admin/image_updates.go.
 	ImageAutoUpdate string `bson:"image_auto_update" json:"image_auto_update"`
+	// Require2FA forces every local-password account to enroll in two-factor
+	// authentication before anything else is reachable (same redirect
+	// mechanism as User.MustChangePassword). SSO accounts are exempt - their
+	// second factor, if any, is the identity provider's business.
+	Require2FA bool `bson:"require_2fa" json:"require_2fa"`
 }
 
 // AppSettingsID is the fixed document ID for the singleton AppSettings.
@@ -275,4 +302,16 @@ type ClusterSample struct {
 	FailedTasks      int       `bson:"failed_tasks" json:"failed_tasks"`
 	CPUReservedPct   float64   `bson:"cpu_reserved_pct" json:"cpu_reserved_pct"`
 	MemUsedPct       float64   `bson:"mem_used_pct" json:"mem_used_pct"`
+}
+
+// ServiceSample is one service's real resource usage (summed across its
+// running tasks on every node) at one point in time, recorded by the
+// poller alongside ClusterSample from the same agent fan-out, so a
+// service's page can chart its CPU/memory over the last 24h.
+type ServiceSample struct {
+	Time        time.Time `bson:"ts" json:"time"`
+	ServiceName string    `bson:"service_name" json:"service_name"`
+	CPUCores    float64   `bson:"cpu_cores" json:"cpu_cores"`
+	MemBytes    int64     `bson:"mem_bytes" json:"mem_bytes"`
+	Tasks       int       `bson:"tasks" json:"tasks"`
 }

@@ -27,8 +27,10 @@
   whole cluster.
 - **Live rollout view**, cluster topology graph, dashboard history, and a
   public unauthenticated `/status` page for uptime monitors.
-- **Users & roles, SSO (OIDC)**, API tokens, audit log of every mutating
-  action, CI/CD deploy webhooks.
+- **Users & roles, SSO (OIDC), two-factor (TOTP)**, API tokens, audit log
+  of every mutating action, CI/CD deploy webhooks.
+- **Global search** (Cmd/Ctrl+K), **favorites**, **per-service CPU/memory
+  usage**, **volume backup/restore**, and the UI in nine languages.
 - **Hardening, all opt-in**: mTLS between admin and agent, HTTPS for the
   UI, encrypted registry credentials, backup/restore — see
   [hardening.md](hardening.md).
@@ -138,6 +140,20 @@
   (`/nodes/{id}`) for use in placement constraints/preferences.
 - **Volumes**: per-node list/create/delete, same pattern as images (both
   are local to each node's daemon, not swarm-wide).
+- **Volume backup & restore** (Volumes → Backups, admin-only): "Back up"
+  writes the volume's contents to a `.tar.gz` in the agent's
+  `--backup-dir` on the node that holds it, as a background job (at most
+  two per node at a time, one per volume) - the page polls until it's
+  done. Backups can be downloaded, deleted, uploaded (a `.tar.gz` of a
+  volume's contents, streamed to the node and checked for being a valid
+  archive with no paths outside the volume) and restored into the same or
+  another volume, created if it doesn't exist. Restore overwrites files of
+  the same name and leaves others alone; restore into a new volume for an
+  exact copy. The agent needs no shell or extra image on the node: it
+  imports an empty helper image once and uses the Docker API's archive
+  endpoints on a never-started container that mounts the volume. Files are
+  read while the volume stays in use - scale a database to 0 first for a
+  consistent copy. Downloads and every action are audited.
 - **Swarm settings** (Settings → Swarm): cluster info, cert expiry, and
   the worker/manager join tokens with one-click rotation.
 - **Rebalance** (Settings → Swarm): force-restarts every replicated
@@ -211,7 +227,56 @@
   `--cluster-secret` the backup was taken with; restore flags anything it
   can't decrypt instead of silently importing it.
 
+### Navigation, accounts and languages
+- **Global search**: the command palette (Cmd/Ctrl+K, or `/` anywhere
+  outside a text field) filters the sidebar's pages and also asks
+  `GET /search?q=` for services (by name or image), stacks, nodes
+  (hostname, ID, address, labels), tasks (by ID prefix, 4+ characters),
+  networks, secrets and configs - up to 8 hits per kind, exact matches
+  first. Volumes and images are left out: they live on each node's own
+  daemon, and searching them would mean asking every agent on every
+  keystroke. A config hit links to the Configs list for viewers, since a
+  config's own page is admin-only.
+- **Favorites**: the star next to a service, stack or node (on its page
+  and in the Services/Stacks/Nodes lists) pins it to a Favorites row at the
+  top of the dashboard, with live status (running/desired tasks, stack
+  health, node state), and to the command palette's opening view. Stored
+  per user (up to 50); a favorite whose target is gone stays visible,
+  marked "not found", until it's unstarred.
+- **Two-factor authentication** (account page - the lock icon next to your
+  name): enroll any TOTP authenticator app (RFC 6238, 6 digits, 30 s) by
+  scanning a QR code, confirm with a code, and get ten single-use recovery
+  codes. Sign-in then asks for a code after the password; the
+  password-checked-but-code-pending state is a short-lived (5 min)
+  HMAC-signed cookie, not a session, and wrong codes count toward the same
+  per-(username, IP) lockout as wrong passwords. A code can't be replayed
+  within its validity window. Disabling two-factor or generating new
+  recovery codes needs the current password and a code. Settings → General
+  → "Require two-factor authentication" sends every local account without
+  it to the enrollment page before anything else (SSO accounts and API
+  tokens are exempt); admins can reset a user's two-factor from Settings →
+  Users. The secret is encrypted at rest like other credentials and is
+  re-encrypted by `swarmdash rotate-cluster-secret`.
+- **Languages**: English, Русский, Українська, Deutsch, Español,
+  Português, Français, 中文 and ქართული, picked in the UI - the selector
+  at the bottom of the sidebar, on the account page, or on the login page.
+  A signed-in user's choice is saved on the account; before signing in it
+  lives in a cookie. The browser's `Accept-Language` is not used: until
+  someone picks a language, the UI is in English. Catalogs live in
+  `internal/i18n/locales/*.json` (including `en.json`, the reference list
+  of every message), keyed by the English source text; anything missing
+  falls back to that text. Server-side technical errors (from Docker or an
+  agent) stay in English.
+
 ### Observability
+- **Per-service resource usage**: each agent's stats summary (already
+  polled once a minute for the dashboard's memory figure) also breaks usage
+  down per swarm task container, so admin sums real CPU (cores) and
+  non-cache memory per service - shown on the Services list (sortable) and,
+  per task, on a service's page together with its memory as a share of the
+  tasks' limits and a 24h chart. Kept for 14 days, like the dashboard
+  history. Needs agents from this version; older agents simply report no
+  per-service data.
 - A background poller (every 10s - Docker doesn't push any of this, same
   reasoning as the SSE rollout view) watches for:
   - **Task state transitions** → durable history at Task events (`/events`,

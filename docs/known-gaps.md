@@ -65,3 +65,15 @@
   secret, a config can be read back through the Docker API, and configs
   routinely carry credentials (htpasswd files, DSNs) - a viewer still sees
   which services use a config, not what's in it.
+- Volume restore jobs (not the backups themselves) are tracked in the
+  agent's memory: an agent restart forgets the restore history and aborts
+  a restore in progress, which then has to be started again. A backup
+  interrupted the same way is kept and marked failed.
+- Volume backups are file-level copies of a live volume - nothing pauses
+  the services using it. For databases, scale the service to 0 (or use
+  the database's own dump tool) when the copy has to be consistent.
+- Two-factor is TOTP only (authenticator apps) - no WebAuthn/passkeys or
+  SMS. A user who loses both their phone and their recovery codes needs
+  an admin to reset it (Settings → Users); if that's the only admin, the
+  way back in is clearing `totp_enabled` on their row of the `users`
+  table/collection directly.

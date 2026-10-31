@@ -146,6 +146,24 @@ func RotateClusterSecret(st store.Interface, oldSecret, newSecret string) error 
 		}
 	}
 
+	users, err := st.ListUsers()
+	if err != nil {
+		return fmt.Errorf("list users: %w", err)
+	}
+	for _, u := range users {
+		reenc, changed, err := rotateCiphertext(oldKey, newKey, u.TOTPSecretEnc)
+		if err != nil {
+			return fmt.Errorf("user %q two-factor secret: %w", u.Username, err)
+		}
+		if !changed {
+			continue
+		}
+		u.TOTPSecretEnc = reenc
+		if err := st.PutUser(u); err != nil {
+			return fmt.Errorf("save user %q: %w", u.Username, err)
+		}
+	}
+
 	cfg, err := st.GetSSOConfig()
 	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return fmt.Errorf("get sso config: %w", err)

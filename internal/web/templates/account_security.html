@@ -1,0 +1,69 @@
+{{define "account_security.html"}}
+<h1>{{t "Account"}}</h1>
+
+{{if .Required}}
+<div class="error-box">{{t "Two-factor authentication is required on this instance. Set it up below to continue."}}</div>
+{{end}}
+{{if .Error}}<div class="error-box">{{t .Error}}</div>{{end}}
+{{if .Flash}}<div class="ok-box">{{t .Flash}}</div>{{end}}
+
+<div class="card" style="max-width:640px;">
+	<h2 style="margin-top:0;">{{t "Language"}}</h2>
+	<form method="post" action="/language" class="card-row">
+		<input type="hidden" name="return" value="/account/security">
+		<select name="lang" aria-label="{{t "Language"}}">
+			{{$cur := .CurrentTag}}
+			{{range .Languages}}<option value="{{.Tag}}" {{if eq .Tag $cur}}selected{{end}}>{{.Name}}</option>{{end}}
+		</select>
+		<button type="submit" class="btn secondary">{{t "Save"}}</button>
+	</form>
+</div>
+
+<div class="card" style="max-width:640px;">
+	<h2 style="margin-top:0;">{{t "Two-factor authentication"}}</h2>
+	{{if .SSO}}
+		<p class="muted">{{t "This account signs in via SSO - two-factor is handled by your identity provider."}}</p>
+	{{else if .User.TOTPEnabled}}
+		<p><span class="badge state-running">{{t "Enabled"}}</span></p>
+		<p class="muted">{{t "Sign-in asks for a code from your authenticator app after your password."}} {{t "%d unused recovery codes left." .Remaining}}</p>
+		<form method="post" action="/account/2fa/recovery-codes" style="margin-top:16px;">
+			<h3>{{t "New recovery codes"}}</h3>
+			<p class="muted">{{t "Replaces all existing recovery codes."}}</p>
+			<div class="card-row">
+				<input type="password" name="password" placeholder="{{t "Current password"}}" required autocomplete="current-password">
+				<input type="text" name="code" placeholder="{{t "Code"}}" inputmode="numeric" required autocomplete="one-time-code" style="width:120px;">
+				<button type="submit" class="btn secondary">{{t "Generate"}}</button>
+			</div>
+		</form>
+		<form method="post" action="/account/2fa/disable" style="margin-top:16px;" data-confirm="{{t "Turn off two-factor authentication?"}}">
+			<h3>{{t "Disable two-factor"}}</h3>
+			<div class="card-row">
+				<input type="password" name="password" placeholder="{{t "Current password"}}" required autocomplete="current-password">
+				<input type="text" name="code" placeholder="{{t "Code"}}" inputmode="numeric" required autocomplete="one-time-code" style="width:120px;">
+				<button type="submit" class="btn danger">{{t "Disable"}}</button>
+			</div>
+		</form>
+	{{else if .Enrolling}}
+		<p>{{t "1. Scan this QR code with an authenticator app (Google Authenticator, Authy, 1Password, Bitwarden...)."}}</p>
+		<div class="qr-box">{{.QR}}</div>
+		<p class="muted">{{t "Can't scan it? Enter this key manually:"}} <span class="mono">{{.Secret}}</span></p>
+		<p style="margin-top:16px;">{{t "2. Enter the 6-digit code the app shows to finish."}}</p>
+		<form method="post" action="/account/2fa/enable" class="card-row">
+			<input type="text" name="code" placeholder="123456" inputmode="numeric" autocomplete="one-time-code" required autofocus style="width:140px;">
+			<button type="submit" class="btn">{{t "Enable two-factor"}}</button>
+		</form>
+		<form method="post" action="/account/2fa/disable" style="margin-top:12px;">
+			<button type="submit" class="link-btn">{{t "Cancel setup"}}</button>
+		</form>
+	{{else}}
+		<p class="muted">{{t "Protect this account with a second step at sign-in: a 6-digit code from an authenticator app on your phone."}}</p>
+		<form method="post" action="/account/2fa/setup">
+			<button type="submit" class="btn">{{t "Set up two-factor"}}</button>
+		</form>
+	{{end}}
+</div>
+
+{{if not .SSO}}
+<p><a href="/account/password">{{t "Change password"}} &rarr;</a></p>
+{{end}}
+{{end}}

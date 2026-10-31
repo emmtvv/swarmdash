@@ -1,53 +1,53 @@
 {{define "gitops.html"}}
-<h1>GitOps deploy</h1>
-<p class="muted">Deploy a stack straight from a git repo instead of pasting compose YAML by hand. "Sync now" or a poll interval re-fetches the compose file and re-applies it whenever the commit at the configured ref changes.</p>
+<h1>{{t "GitOps deploy"}}</h1>
+<p class="muted">{{t "Deploy a stack straight from a git repo instead of pasting compose YAML by hand. \"Sync now\" or a poll interval re-fetches the compose file and re-applies it whenever the commit at the configured ref changes."}}</p>
 
 <div class="card">
-	<h2 style="margin-top:0;">Add GitOps stack</h2>
+	<h2 style="margin-top:0;">{{t "Add GitOps stack"}}</h2>
 	<form method="post" action="/stacks/gitops">
 		<div class="card-row">
 			<div>
-				<label for="name">Stack name</label>
-				<input type="text" id="name" name="name" placeholder="my-app" required>
+				<label for="name">{{t "Stack name"}}</label>
+				<input type="text" id="name" name="name" placeholder="{{t "my-app"}}" required>
 			</div>
 			<div>
-				<label for="repo_url">Repo URL</label>
-				<input type="text" id="repo_url" name="repo_url" placeholder="https://github.com/org/repo.git" required style="width:320px;">
+				<label for="repo_url">{{t "Repo URL"}}</label>
+				<input type="text" id="repo_url" name="repo_url" placeholder="{{t "https://github.com/org/repo.git"}}" required style="width:320px;">
 			</div>
 			<div>
-				<label for="ref">Branch</label>
-				<input type="text" id="ref" name="ref" placeholder="main" value="main" style="width:120px;">
+				<label for="ref">{{t "Branch"}}</label>
+				<input type="text" id="ref" name="ref" placeholder="{{t "main"}}" value="main" style="width:120px;">
 			</div>
 			<div>
-				<label for="compose_path">Compose path</label>
-				<input type="text" id="compose_path" name="compose_path" placeholder="docker-compose.yml" value="docker-compose.yml" style="width:200px;">
+				<label for="compose_path">{{t "Compose path"}}</label>
+				<input type="text" id="compose_path" name="compose_path" placeholder="{{t "docker-compose.yml"}}" value="docker-compose.yml" style="width:200px;">
 			</div>
 		</div>
 		<div class="card-row" style="margin-top:12px;">
 			<div>
-				<label for="token">Access token (optional, private repos)</label>
-				<input type="password" id="token" name="token" placeholder="personal access token" style="width:260px;">
+				<label for="token">{{t "Access token (optional, private repos)"}}</label>
+				<input type="password" id="token" name="token" placeholder="{{t "personal access token"}}" style="width:260px;">
 			</div>
 			<div>
-				<label for="poll_seconds">Auto-sync</label>
+				<label for="poll_seconds">{{t "Auto-sync"}}</label>
 				<select id="poll_seconds" name="poll_seconds" style="width:160px;">
-					<option value="0">Manual only</option>
-					<option value="60">Every minute</option>
-					<option value="300" selected>Every 5 minutes</option>
-					<option value="900">Every 15 minutes</option>
-					<option value="3600">Every hour</option>
+					<option value="0">{{t "Manual only"}}</option>
+					<option value="60">{{t "Every minute"}}</option>
+					<option value="300" selected>{{t "Every 5 minutes"}}</option>
+					<option value="900">{{t "Every 15 minutes"}}</option>
+					<option value="3600">{{t "Every hour"}}</option>
 				</select>
 			</div>
 			<div>
 				<label>&nbsp;</label>
-				<button type="submit" class="btn">Add</button>
+				<button type="submit" class="btn">{{t "Add"}}</button>
 			</div>
 		</div>
 	</form>
 </div>
 
 <table>
-	<thead><tr><th>Stack</th><th>Repo</th><th>Ref</th><th>Last commit</th><th>Last deployed</th><th>Status</th><th></th></tr></thead>
+	<thead><tr><th>{{t "Stack"}}</th><th>{{t "Repo"}}</th><th>{{t "Ref"}}</th><th>{{t "Last commit"}}</th><th>{{t "Last deployed"}}</th><th>{{t "Status"}}</th><th></th></tr></thead>
 	<tbody>
 	{{range .Stacks}}
 		<tr>
@@ -58,24 +58,24 @@
 			<td class="muted">{{ago .LastDeployedAt}}</td>
 			<td>
 				{{if .LastError}}
-					<span class="badge state-failed" title="{{.LastError}}">error</span>
+					<span class="badge state-failed" title="{{.LastError}}">{{t "error"}}</span>
 				{{else if .LastDeployedAt.IsZero}}
-					<span class="badge">pending</span>
+					<span class="badge">{{t "pending"}}</span>
 				{{else}}
-					<span class="badge state-running">ok</span>
+					<span class="badge state-running">{{t "ok"}}</span>
 				{{end}}
 			</td>
 			<td>
 				<form class="inline" method="post" action="/stacks/gitops/{{.ID}}/sync">
-					<button type="submit" class="btn secondary small">Sync now</button>
+					<button type="submit" class="btn secondary small">{{t "Sync now"}}</button>
 				</form>
-				<form class="inline" method="post" action="/stacks/gitops/{{.ID}}/delete" data-confirm="Remove GitOps config for {{.StackName}}? This does not delete the deployed services.">
-					<button type="submit" class="btn danger small">Remove</button>
+				<form class="inline" method="post" action="/stacks/gitops/{{.ID}}/delete" data-confirm="{{t "Remove GitOps config for %v? This does not delete the deployed services." .StackName}}">
+					<button type="submit" class="btn danger small">{{t "Remove"}}</button>
 				</form>
 			</td>
 		</tr>
 	{{else}}
-		<tr><td colspan="7" class="muted">No GitOps stacks configured.</td></tr>
+		<tr><td colspan="7" class="muted">{{t "No GitOps stacks configured."}}</td></tr>
 	{{end}}
 	</tbody>
 </table>

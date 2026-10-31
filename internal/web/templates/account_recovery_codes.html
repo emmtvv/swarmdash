@@ -1,0 +1,12 @@
+{{define "account_recovery_codes.html"}}
+<h1>{{t "Recovery codes"}}</h1>
+<div class="warn-box">{{t "Save these codes somewhere safe. Each one signs you in once if you lose access to your authenticator app. They won't be shown again."}}</div>
+<div class="card" style="max-width:420px;">
+	<ul class="recovery-codes mono">
+		{{range .Codes}}<li>{{.}}</li>{{end}}
+	</ul>
+	<button type="button" class="btn secondary small" data-copy-text="{{range .Codes}}{{.}}
+{{end}}">{{t "Copy"}}</button>
+</div>
+<a href="/account/security" class="btn">{{t "Done"}}</a>
+{{end}}

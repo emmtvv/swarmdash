@@ -12,6 +12,7 @@ export SWARMDASH_CLUSTER_SECRET=$(openssl rand -hex 32)
 
 docker run -d --name swarmdash-agent --network host \
   -v /var/run/docker.sock:/var/run/docker.sock \
+  -v swarmdash-backups:/var/lib/swarmdash/backups \
   -e SWARMDASH_CLUSTER_SECRET \
   emmtvv/swarmdash agent
 

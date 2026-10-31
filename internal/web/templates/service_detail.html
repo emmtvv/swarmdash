@@ -1,26 +1,26 @@
 {{define "service_detail.html"}}
 {{$stack := index .Service.Spec.Labels "com.docker.stack.namespace"}}
 <div class="breadcrumb">
-	<a href="/services">Services</a>{{if $stack}} / <a href="/stacks/{{$stack}}">{{$stack}}</a>{{end}} / {{.Service.Spec.Name}}
+	<a href="/services">{{t "Services"}}</a>{{if $stack}} / <a href="/stacks/{{$stack}}">{{$stack}}</a>{{end}} / {{.Service.Spec.Name}}
 </div>
 
 <div class="page-header">
-	<h1>{{.Service.Spec.Name}}</h1>
+	<h1>{{.Service.Spec.Name}} {{template "fav-star" (dict "User" .User "Kind" "service" "Name" .Service.Spec.Name)}}</h1>
 	<div class="actions">
-		<a href="/services/{{.Service.Spec.Name}}/export.yml" class="btn secondary">Export compose</a>
-		<a href="/services/new?from={{.Service.Spec.Name}}" class="btn secondary">Clone</a>
-		<a href="/services/{{.Service.Spec.Name}}/logs" class="btn secondary">Logs</a>
-		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/restart" data-confirm="Force-restart all tasks?">
-			<button type="submit" class="btn secondary">Restart</button>
+		<a href="/services/{{.Service.Spec.Name}}/export.yml" class="btn secondary">{{t "Export compose"}}</a>
+		<a href="/services/new?from={{.Service.Spec.Name}}" class="btn secondary">{{t "Clone"}}</a>
+		<a href="/services/{{.Service.Spec.Name}}/logs" class="btn secondary">{{t "Logs"}}</a>
+		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/restart" data-confirm="{{t "Force-restart all tasks?"}}">
+			<button type="submit" class="btn secondary">{{t "Restart"}}</button>
 		</form>
-		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/update-latest" data-confirm="Re-pull the latest image for this tag and redeploy?">
-			<button type="submit" class="btn secondary">Update to latest</button>
+		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/update-latest" data-confirm="{{t "Re-pull the latest image for this tag and redeploy?"}}">
+			<button type="submit" class="btn secondary">{{t "Update to latest"}}</button>
 		</form>
-		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/rollback" data-confirm="Roll back to the previous version?">
-			<button type="submit" class="btn secondary" {{if not .Service.PreviousSpec}}disabled{{end}}>Rollback</button>
+		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/rollback" data-confirm="{{t "Roll back to the previous version?"}}">
+			<button type="submit" class="btn secondary" {{if not .Service.PreviousSpec}}disabled{{end}}>{{t "Rollback"}}</button>
 		</form>
-		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/delete" data-confirm="Delete service {{.Service.Spec.Name}}?">
-			<button type="submit" class="btn danger">Delete</button>
+		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/delete" data-confirm="{{t "Delete service %v?" .Service.Spec.Name}}">
+			<button type="submit" class="btn danger">{{t "Delete"}}</button>
 		</form>
 	</div>
 </div>
@@ -30,62 +30,90 @@
 <div class="card">
 	<div class="card-row" style="justify-content:space-between;">
 		<div class="field">
-			<div class="muted">Image</div>
+			<div class="muted">{{t "Image"}}</div>
 			<div class="mono">{{imageName .Service.Spec.TaskTemplate.ContainerSpec.Image}}</div>
 		</div>
 		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/image">
-			<input type="text" name="image" placeholder="new-image:tag" value="{{.Service.Spec.TaskTemplate.ContainerSpec.Image}}" style="width:320px;">
-			<button type="submit" class="btn">Update image</button>
+			<input type="text" name="image" placeholder="{{t "new-image:tag"}}" value="{{.Service.Spec.TaskTemplate.ContainerSpec.Image}}" style="width:320px;">
+			<button type="submit" class="btn">{{t "Update image"}}</button>
 		</form>
 	</div>
-	<div id="image-updates"><div class="muted small" style="margin-top:16px;">Checking for newer versions...</div></div>
+	<div id="image-updates"><div class="muted small" style="margin-top:16px;">{{t "Checking for newer versions..."}}</div></div>
 
 	{{if not .IsGlobal}}
 	<div class="card-row" style="margin-top:16px;">
-		<div class="muted">Replicas: {{.Replicas}}</div>
+		<div class="muted">{{t "Replicas: %v" .Replicas}}</div>
 		<form class="inline" method="post" action="/services/{{.Service.Spec.Name}}/scale">
 			<input type="number" name="replicas" value="{{.Replicas}}" min="0" style="width:80px;">
-			<button type="submit" class="btn secondary">Scale</button>
+			<button type="submit" class="btn secondary">{{t "Scale"}}</button>
 		</form>
 	</div>
 	{{end}}
 </div>
 
+<div class="card">
+	<div class="card-row" style="justify-content:space-between;align-items:flex-start;">
+		<h2 style="margin:0;">{{t "Resource usage"}}</h2>
+		{{if not .UsageAt.IsZero}}<span class="muted small">{{t "updated %v" (ago .UsageAt)}}</span>{{end}}
+	</div>
+	{{if .HasUsage}}
+	<div class="field-row" style="margin-top:12px;">
+		<div class="field"><div class="muted">{{t "CPU"}}</div><div class="mono">{{t "%v cores" (cores .Usage.CPUCores)}}</div></div>
+		<div class="field"><div class="muted">{{t "Memory"}}</div><div class="mono">{{bytesHuman .Usage.MemBytes}} <span class="usage-{{levelClass .Usage.MemPct}}">{{t "(%v%% of limit)" (round .Usage.MemPct)}}</span></div></div>
+		<div class="field"><div class="muted">{{t "Tasks sampled"}}</div><div>{{.Usage.Tasks}}</div></div>
+	</div>
+	{{else}}
+	<p class="muted">{{t "No usage data yet - it's collected from every node's agent about once a minute, for running tasks only."}}</p>
+	{{end}}
+	<div class="card-row" style="margin-top:12px;">
+		<div style="flex:1;min-width:240px;">
+			<div class="muted">{{t "CPU, cores (last 24h)"}}</div>
+			<canvas id="svc-cpu-chart" height="80" style="width:100%;height:80px;"></canvas>
+			<div id="svc-cpu-legend" class="muted" style="font-size:12px;margin-top:6px;"></div>
+		</div>
+		<div style="flex:1;min-width:240px;">
+			<div class="muted">{{t "Memory (last 24h)"}}</div>
+			<canvas id="svc-mem-chart" height="80" style="width:100%;height:80px;"></canvas>
+			<div id="svc-mem-legend" class="muted" style="font-size:12px;margin-top:6px;"></div>
+		</div>
+	</div>
+</div>
+
 <details class="card">
-	<summary style="cursor:pointer;font-weight:600;">Advanced settings</summary>
+	<summary style="cursor:pointer;font-weight:600;">{{t "Advanced settings"}}</summary>
 	<form method="post" action="/services/{{.Service.Spec.Name}}/spec" style="margin-top:16px;">
 		{{template "service_fields" .Editor}}
-		<button type="submit" class="btn" style="margin-top:16px;">Save advanced settings</button>
+		<button type="submit" class="btn" style="margin-top:16px;">{{t "Save advanced settings"}}</button>
 	</form>
 </details>
 
 <div class="card">
-	<h2 style="margin-top:0;">CI/CD deploy webhook</h2>
-	<p class="muted">POST to this URL (optionally with a JSON body <span class="mono">{"image":"repo/name:tag"}</span>) to trigger a redeploy from CI - no session or API token needed, the URL itself is the credential. By default an <span class="mono">image</span> override may only change the tag/digest of the service's current repository; a hook created with "allow full image override" may switch to any repository.</p>
+	<h2 style="margin-top:0;">{{t "CI/CD deploy webhook"}}</h2>
+	<p class="muted">{{tHTML "POST to this URL (optionally with a JSON body <span class=\"mono\">{\"image\":\"repo/name:tag\"}</span>) to trigger a redeploy from CI - no session or API token needed, the URL itself is the credential. By default an <span class=\"mono\">image</span> override may only change the tag/digest of the service's current repository; a hook created with \"allow full image override\" may switch to any repository."}}</p>
 
 	{{if .NewDeployHookURL}}
 	<div class="card" style="border-color:var(--green);">
-		<strong>Webhook created - copy it now, it won't be shown again:</strong>
+		<strong>{{t "Webhook created - copy it now, it won't be shown again:"}}</strong>
 		<div class="mono" style="margin-top:8px;padding:8px;background:var(--bg);border-radius:6px;word-break:break-all;">{{.NewDeployHookURL}}</div>
 	</div>
 	{{end}}
 
 	<table>
-		<thead><tr><th>Created</th><th>Last triggered</th><th>Image override</th><th></th></tr></thead>
+		<thead><tr><th>{{t "Created"}}</th><th>{{t "Last triggered"}}</th><th>{{t "Image override"}}</th><th></th></tr></thead>
 		<tbody>
 		{{range .DeployHooks}}
 			<tr>
 				<td class="muted">{{ago .CreatedAt}}</td>
 				<td class="muted">{{ago .LastUsedAt}}</td>
-				<td class="muted">{{if .AllowImageOverride}}any repository{{else}}same repository only{{end}}</td>
+				<td class="muted">{{if .AllowImageOverride}}{{t "any repository"}}{{else}}{{t "same repository only"}}{{end}}</td>
 				<td>
-					<form class="inline" method="post" action="/services/{{$.Service.Spec.Name}}/deploy-hooks/{{.ID}}/delete" data-confirm="Delete this deploy webhook?">
-						<button type="submit" class="btn danger small">Delete</button>
+					<form class="inline" method="post" action="/services/{{$.Service.Spec.Name}}/deploy-hooks/{{.ID}}/delete" data-confirm="{{t "Delete this deploy webhook?"}}">
+						<button type="submit" class="btn danger small">{{t "Delete"}}</button>
 					</form>
 				</td>
 			</tr>
 		{{else}}
-			<tr><td colspan="4" class="muted">No deploy webhooks yet.</td></tr>
+			<tr><td colspan="4" class="muted">{{t "No deploy webhooks yet."}}</td></tr>
 		{{end}}
 		</tbody>
 	</table>
@@ -93,17 +121,17 @@
 	<form method="post" action="/services/{{.Service.Spec.Name}}/deploy-hooks" style="margin-top:12px;">
 		<label style="display:flex;align-items:center;gap:8px;font-weight:400;margin-bottom:8px;">
 			<input type="checkbox" name="allow_image_override" style="width:auto;">
-			Allow this hook to switch to a different image repository, not just a different tag
+			{{t "Allow this hook to switch to a different image repository, not just a different tag"}}
 		</label>
-		<button type="submit" class="btn secondary">Create deploy webhook</button>
+		<button type="submit" class="btn secondary">{{t "Create deploy webhook"}}</button>
 	</form>
 </div>
 
-<h2>Tasks</h2>
+<h2>{{t "Tasks"}}</h2>
 <div class="table-wrap">
-<input type="text" class="table-search" data-table-search placeholder="Filter tasks...">
+<input type="text" class="table-search" data-table-search placeholder="{{t "Filter tasks..."}}">
 <table data-enhance>
-	<thead><tr><th>Slot</th><th>Node</th><th>State</th><th>Desired</th><th>Container</th><th>Updated</th><th>Message</th><th data-no-sort></th></tr></thead>
+	<thead><tr><th>{{t "Slot"}}</th><th>{{t "Node"}}</th><th>{{t "State"}}</th><th>{{t "Desired"}}</th><th>{{t "Container"}}</th><th>{{t "CPU"}}</th><th>{{t "Memory"}}</th><th>{{t "Updated"}}</th><th>{{t "Message"}}</th><th data-no-sort></th></tr></thead>
 	<tbody id="tasks-body">
 	{{range .Tasks}}
 		<tr>
@@ -112,9 +140,10 @@
 			<td><span class="badge state-{{.Status.State}}">{{.Status.State}}</span></td>
 			<td class="muted">{{.DesiredState}}</td>
 			<td class="mono muted">{{if .Status.ContainerStatus}}{{shortID .Status.ContainerStatus.ContainerID}}{{end}}</td>
+			{{with index $.TaskUsage .ID}}<td class="mono" data-sort="{{.CPUCores}}">{{cores .CPUCores}}</td><td class="mono" data-sort="{{.MemBytes}}">{{bytesHuman .MemBytes}}</td>{{else}}<td class="muted" data-sort="-1">&mdash;</td><td class="muted" data-sort="-1">&mdash;</td>{{end}}
 			<td class="muted">{{ago .Status.Timestamp}}</td>
 			<td class="muted">{{.Status.Err}}{{.Status.Message}}</td>
-			<td>{{if eq .Status.State "running"}}<a href="/exec/{{.ID}}" class="btn small secondary">Console</a> <a href="/logs/{{.ID}}" class="btn small secondary">Logs</a>{{end}}</td>
+			<td>{{if eq .Status.State "running"}}<a href="/exec/{{.ID}}" class="btn small secondary">{{t "Console"}}</a> <a href="/logs/{{.ID}}" class="btn small secondary">{{t "Logs"}}</a>{{end}}</td>
 		</tr>
 	{{end}}
 	</tbody>
@@ -128,6 +157,23 @@
 		.then(r => r.ok ? r.text() : Promise.reject(r.statusText))
 		.then(html => { box.innerHTML = html; })
 		.catch(() => { box.innerHTML = ""; });
+})();
+(function() {
+	const samples = {{.UsageJSON}};
+	if (samples.length < 2) {
+		const msg = t("Not enough history yet - check back in a few minutes.");
+		document.getElementById("svc-cpu-legend").textContent = msg;
+		document.getElementById("svc-mem-legend").textContent = msg;
+		return;
+	}
+	const style = getComputedStyle(document.documentElement);
+	const accent = style.getPropertyValue("--accent").trim() || "#4f8cff";
+	const yellow = style.getPropertyValue("--yellow").trim() || "#e0b93a";
+	const last = samples[samples.length - 1];
+	sdChart.draw("svc-cpu-chart", [{ values: samples.map(s => s.cpu), color: accent }], 0, v => v.toFixed(2));
+	sdChart.legend("svc-cpu-legend", [{ color: accent, label: t("Now"), value: last.cpu.toFixed(2) }]);
+	sdChart.draw("svc-mem-chart", [{ values: samples.map(s => s.mem), color: yellow }], 0, sdBytes);
+	sdChart.legend("svc-mem-legend", [{ color: yellow, label: t("Now"), value: sdBytes(last.mem) }]);
 })();
 (function() {
 	const src = new EventSource("/services/{{.Service.Spec.Name}}/events");
@@ -148,16 +194,18 @@
 		}
 
 		let rows = "";
-		for (const t of (d.tasks || [])) {
+		for (const tk of (d.tasks || [])) {
 			rows += "<tr>" +
-				"<td>" + t.slot + "</td>" +
-				"<td>" + esc(t.node) + "</td>" +
-				"<td>" + stateBadge(t.state) + "</td>" +
-				"<td class=\"muted\">" + esc(t.desiredState) + "</td>" +
-				"<td class=\"mono muted\">" + esc((t.containerId || "").slice(0, 12)) + "</td>" +
-				"<td class=\"muted\">" + esc(t.updatedAt) + "</td>" +
-				"<td class=\"muted\">" + esc(t.err || t.message) + "</td>" +
-				"<td>" + (t.state === "running" ? '<a href="/exec/' + t.id + '" class="btn small secondary">Console</a> <a href="/logs/' + t.id + '" class="btn small secondary">Logs</a>' : "") + "</td>" +
+				"<td>" + tk.slot + "</td>" +
+				"<td>" + esc(tk.node) + "</td>" +
+				"<td>" + stateBadge(tk.state) + "</td>" +
+				"<td class=\"muted\">" + esc(tk.desiredState) + "</td>" +
+				"<td class=\"mono muted\">" + esc((tk.containerId || "").slice(0, 12)) + "</td>" +
+				(tk.usage ? '<td class="mono" data-sort="' + tk.cpu + '">' + tk.cpu.toFixed(2) + '</td><td class="mono" data-sort="' + tk.mem + '">' + sdBytes(tk.mem) + "</td>"
+					: '<td class="muted" data-sort="-1">&mdash;</td><td class="muted" data-sort="-1">&mdash;</td>') +
+				"<td class=\"muted\">" + esc(tk.updatedAt) + "</td>" +
+				"<td class=\"muted\">" + esc(tk.err || tk.message) + "</td>" +
+				"<td>" + (tk.state === "running" ? '<a href="/exec/' + tk.id + '" class="btn small secondary">' + t("Console") + '</a> <a href="/logs/' + tk.id + '" class="btn small secondary">' + t("Logs") + '</a>' : "") + "</td>" +
 				"</tr>";
 		}
 		body.innerHTML = rows;

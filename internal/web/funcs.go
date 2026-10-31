@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/docker/docker/api/types/swarm"
+
+	"swarmdash/internal/i18n"
 )
 
 // NodeAddr returns a node's reachable IP. Docker sometimes reports a
@@ -48,22 +50,7 @@ var FuncMap = template.FuncMap{
 		}
 		return id
 	},
-	"ago": func(t time.Time) string {
-		if t.IsZero() {
-			return "-"
-		}
-		d := time.Since(t)
-		switch {
-		case d < time.Minute:
-			return "just now"
-		case d < time.Hour:
-			return fmt.Sprintf("%dm ago", int(d.Minutes()))
-		case d < 24*time.Hour:
-			return fmt.Sprintf("%dh ago", int(d.Hours()))
-		default:
-			return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-		}
-	},
+	"ago": func(t time.Time) string { return relativeTime(i18n.Default, t) },
 	"cpus": func(nanoCPUs int64) string {
 		return fmt.Sprintf("%.1f", float64(nanoCPUs)/1e9)
 	},
@@ -82,22 +69,7 @@ var FuncMap = template.FuncMap{
 		}
 		return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
 	},
-	"unixAgo": func(sec int64) string {
-		if sec == 0 {
-			return "-"
-		}
-		d := time.Since(time.Unix(sec, 0))
-		switch {
-		case d < time.Minute:
-			return "just now"
-		case d < time.Hour:
-			return fmt.Sprintf("%dm ago", int(d.Minutes()))
-		case d < 24*time.Hour:
-			return fmt.Sprintf("%dh ago", int(d.Hours()))
-		default:
-			return fmt.Sprintf("%dd ago", int(d.Hours()/24))
-		}
-	},
+	"unixAgo": func(sec int64) string { return unixRelative(i18n.Default, sec) },
 	"round": func(f float64) int64 {
 		return int64(f + 0.5)
 	},
@@ -117,6 +89,15 @@ var FuncMap = template.FuncMap{
 		}
 		return s
 	},
+	"isFavorite": func(favs []string, kind, name string) bool {
+		key := kind + ":" + name
+		for _, f := range favs {
+			if f == key {
+				return true
+			}
+		}
+		return false
+	},
 	"upper": strings.ToUpper,
 	"initial": func(s string) string {
 		if s == "" {
@@ -130,9 +111,113 @@ var FuncMap = template.FuncMap{
 		}
 		return strings.ToUpper(s[:1]) + s[1:]
 	},
+	// t/tHTML/lang/jsCatalog/ago/unixAgo are overridden per-request by
+	// LangFuncs; these base definitions only exist so templates parse
+	// standalone.
+	"t":     func(msg string, args ...any) string { return i18n.T(i18n.Default, msg, args...) },
+	"tHTML": func(msg string, args ...any) template.HTML { return tHTML(i18n.Default, msg, args...) },
+	"tn": func(one, other string, n int, args ...any) string {
+		return i18n.N(i18n.Default, one, other, n, args...)
+	},
+	"lang":      func() string { return i18n.Default },
+	"jsCatalog": func() map[string]string { return nil },
+	"languages": func() []i18n.Language { return i18n.Languages },
 	// cspNonce is overridden per-request by Renderer.Render (via a cloned
 	// template with its own Funcs()) so inline <script> tags can carry the
 	// nonce that matches that response's Content-Security-Policy header.
 	// The base definition here only exists so templates parse standalone.
 	"cspNonce": func() string { return "" },
+}
+
+// LangFuncs returns the template funcs bound to one UI language, for
+// Renderer to layer over FuncMap per request.
+func LangFuncs(lang string) template.FuncMap {
+	return template.FuncMap{
+		"t":         func(msg string, args ...any) string { return i18n.T(lang, msg, args...) },
+		"tHTML":     func(msg string, args ...any) template.HTML { return tHTML(lang, msg, args...) },
+		"tn":        func(one, other string, n int, args ...any) string { return i18n.N(lang, one, other, n, args...) },
+		"lang":      func() string { return lang },
+		"jsCatalog": func() map[string]string { return i18n.Catalog(lang, JSMessages) },
+		"ago":       func(t time.Time) string { return relativeTime(lang, t) },
+		"unixAgo":   func(sec int64) string { return unixRelative(lang, sec) },
+	}
+}
+
+// tHTML translates a message whose English key itself contains markup
+// (help paragraphs with inline <strong>/<span class="mono">), returning it
+// unescaped. Safe because both the key and every translation are embedded
+// in the binary at build time - never user input - while args, which can
+// be, are escaped before being formatted in.
+func tHTML(lang, msg string, args ...any) template.HTML {
+	escaped := make([]any, len(args))
+	for i, a := range args {
+		escaped[i] = template.HTMLEscapeString(fmt.Sprint(a))
+	}
+	return template.HTML(i18n.T(lang, msg, escaped...)) //nolint:gosec // see doc comment
+}
+
+func relativeTime(lang string, t time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return i18n.T(lang, "just now")
+	case d < time.Hour:
+		return i18n.T(lang, "%dm ago", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return i18n.T(lang, "%dh ago", int(d.Hours()))
+	default:
+		return i18n.T(lang, "%dd ago", int(d.Hours()/24))
+	}
+}
+
+func unixRelative(lang string, sec int64) string {
+	if sec == 0 {
+		return "-"
+	}
+	return relativeTime(lang, time.Unix(sec, 0))
+}
+
+// JSMessages lists the strings core.js/app.js and inline page scripts pass
+// to t(), so layout.html can hand the current language's translations of
+// exactly these to the browser as a JSON catalog (read by t in core.js).
+// TestJSMessagesCoverScripts keeps it in sync with the scripts.
+var JSMessages = []string{
+	"Not enough history yet - check back in a few minutes.",
+	"Running",
+	"Desired",
+	"CPU",
+	"Memory",
+	"Download",
+	"Now",
+	"Console",
+	"Logs",
+	"%d selected",
+	"Click a node for details.",
+	"Backup uploaded",
+	"Upload failed:",
+	"network error",
+	"New password for %s:",
+	"Click to sort",
+	"Searching...",
+	"No results.",
+	"No matching pages.",
+	"Remove from favorites",
+	"Add to favorites",
+	"Copied",
+	"KEY",
+	"value",
+	"name",
+	"target filename (optional)",
+	"/host/path or volume name",
+	"/container/path",
+	"Read-only",
+	"Remove",
+	"Add",
+	// Passed to t() as a variable (the websocket status badges).
+	"connected",
+	"reconnecting",
+	"done",
 }

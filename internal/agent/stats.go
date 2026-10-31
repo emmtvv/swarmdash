@@ -51,6 +51,18 @@ type statsSummary struct {
 	DiskTotalBytes int64   `json:"disk_total_bytes"`
 	DiskUsedBytes  int64   `json:"disk_used_bytes"`
 	Containers     int     `json:"containers"`
+	// Tasks breaks the totals down per swarm task container, so admin can
+	// aggregate real usage per service (see sampleCluster). Containers not
+	// started by swarm (no task label) count toward the totals only.
+	Tasks []taskUsage `json:"tasks"`
+}
+
+type taskUsage struct {
+	TaskID      string  `json:"task_id"`
+	ServiceName string  `json:"service_name"`
+	MemBytes    int64   `json:"mem_bytes"`
+	MemLimit    int64   `json:"mem_limit,omitempty"`
+	CPUCores    float64 `json:"cpu_cores"`
 }
 
 // handleStatsSummary reports total non-cache memory usage, CPU usage (in
@@ -69,20 +81,30 @@ func (s *Server) handleStatsSummary(w http.ResponseWriter, r *http.Request) {
 		mu       sync.Mutex
 		memTotal int64
 		cpuTotal float64
+		tasks    []taskUsage
 	)
 	for _, c := range containers {
 		wg.Add(1)
-		go func(id string) {
+		go func(c container.Summary) {
 			defer wg.Done()
-			mem, cpu, err := s.containerResourceUsage(r.Context(), id)
+			u, err := s.containerResourceUsage(r.Context(), c.ID)
 			if err != nil {
 				return
 			}
 			mu.Lock()
-			memTotal += mem
-			cpuTotal += cpu
+			memTotal += u.mem
+			cpuTotal += u.cpu
+			if taskID := c.Labels["com.docker.swarm.task.id"]; taskID != "" {
+				tasks = append(tasks, taskUsage{
+					TaskID:      taskID,
+					ServiceName: c.Labels["com.docker.swarm.service.name"],
+					MemBytes:    u.mem,
+					MemLimit:    u.memLimit,
+					CPUCores:    u.cpu,
+				})
+			}
 			mu.Unlock()
-		}(c.ID)
+		}(c)
 	}
 	wg.Wait()
 
@@ -97,6 +119,7 @@ func (s *Server) handleStatsSummary(w http.ResponseWriter, r *http.Request) {
 		DiskTotalBytes: diskTotal,
 		DiskUsedBytes:  diskUsed,
 		Containers:     len(containers),
+		Tasks:          tasks,
 	})
 }
 
@@ -129,10 +152,16 @@ func (s *Server) diskUsage() (total, used int64, err error) {
 // shows - raw cgroup usage includes reclaimable page cache, which would
 // make idle containers look like they're using far more memory than they
 // actually need.
-func (s *Server) containerResourceUsage(ctx context.Context, id string) (memUsed int64, cpuCores float64, err error) {
+type containerUsage struct {
+	mem      int64
+	memLimit int64
+	cpu      float64
+}
+
+func (s *Server) containerResourceUsage(ctx context.Context, id string) (containerUsage, error) {
 	resp, err := s.docker.ContainerStats(ctx, id, true)
 	if err != nil {
-		return 0, 0, err
+		return containerUsage{}, err
 	}
 	defer resp.Body.Close()
 
@@ -141,23 +170,23 @@ func (s *Server) containerResourceUsage(ctx context.Context, id string) (memUsed
 
 	var first, second container.StatsResponse
 	if !sc.Scan() {
-		return 0, 0, fmt.Errorf("container %s: no stats sample (stream closed: %v)", id, sc.Err())
+		return containerUsage{}, fmt.Errorf("container %s: no stats sample (stream closed: %v)", id, sc.Err())
 	}
 	if err := json.Unmarshal(sc.Bytes(), &first); err != nil {
-		return 0, 0, err
+		return containerUsage{}, err
 	}
 	if !sc.Scan() {
-		return 0, 0, fmt.Errorf("container %s: only one stats sample (stream closed: %v)", id, sc.Err())
+		return containerUsage{}, fmt.Errorf("container %s: only one stats sample (stream closed: %v)", id, sc.Err())
 	}
 	if err := json.Unmarshal(sc.Bytes(), &second); err != nil {
-		return 0, 0, err
+		return containerUsage{}, err
 	}
 
 	cache := second.MemoryStats.Stats["cache"]
 	if cache == 0 {
 		cache = second.MemoryStats.Stats["inactive_file"] // cgroup v2
 	}
-	memUsed = int64(second.MemoryStats.Usage) - int64(cache)
+	memUsed := int64(second.MemoryStats.Usage) - int64(cache)
 	if memUsed < 0 {
 		memUsed = 0
 	}
@@ -168,8 +197,9 @@ func (s *Server) containerResourceUsage(ctx context.Context, id string) (memUsed
 	if onlineCPUs == 0 {
 		onlineCPUs = float64(len(second.CPUStats.CPUUsage.PercpuUsage))
 	}
+	var cpuCores float64
 	if systemDelta > 0 && cpuDelta > 0 {
 		cpuCores = (cpuDelta / systemDelta) * onlineCPUs
 	}
-	return memUsed, cpuCores, nil
+	return containerUsage{mem: memUsed, memLimit: int64(second.MemoryStats.Limit), cpu: cpuCores}, nil
 }

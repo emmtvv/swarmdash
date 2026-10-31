@@ -17,6 +17,7 @@ package store
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -119,37 +120,89 @@ func notFoundSQL(err error) error {
 	return err
 }
 
+const userColumns = `username, password_hash, role, created_at, auth_source, must_change_password, sso_subject,
+	totp_secret_enc, totp_enabled, totp_last_step, recovery_code_hashes, favorites, language`
+
 func (s *SQLiteStore) PutUser(u User) error {
-	_, err := s.db.Exec(`
-		INSERT INTO users (username, password_hash, role, created_at, auth_source, must_change_password, sso_subject)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+	recovery, err := marshalStrings(u.RecoveryCodeHashes)
+	if err != nil {
+		return err
+	}
+	favorites, err := marshalStrings(u.Favorites)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(`
+		INSERT INTO users (`+userColumns+`)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(username) DO UPDATE SET
 			password_hash = excluded.password_hash,
 			role = excluded.role,
 			created_at = excluded.created_at,
 			auth_source = excluded.auth_source,
 			must_change_password = excluded.must_change_password,
-			sso_subject = excluded.sso_subject`,
-		u.Username, u.PasswordHash, u.Role, u.CreatedAt, u.AuthSource, u.MustChangePassword, u.SSOSubject)
+			sso_subject = excluded.sso_subject,
+			totp_secret_enc = excluded.totp_secret_enc,
+			totp_enabled = excluded.totp_enabled,
+			totp_last_step = excluded.totp_last_step,
+			recovery_code_hashes = excluded.recovery_code_hashes,
+			favorites = excluded.favorites,
+			language = excluded.language`,
+		u.Username, u.PasswordHash, u.Role, u.CreatedAt, u.AuthSource, u.MustChangePassword, u.SSOSubject,
+		u.TOTPSecretEnc, u.TOTPEnabled, u.TOTPLastStep, recovery, favorites, u.Language)
 	return err
 }
 
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanUser(row rowScanner) (User, error) {
+	var (
+		u                   User
+		recovery, favorites string
+	)
+	if err := row.Scan(&u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.AuthSource, &u.MustChangePassword, &u.SSOSubject,
+		&u.TOTPSecretEnc, &u.TOTPEnabled, &u.TOTPLastStep, &recovery, &favorites, &u.Language); err != nil {
+		return User{}, err
+	}
+	var err error
+	if u.RecoveryCodeHashes, err = unmarshalStrings(recovery); err != nil {
+		return User{}, err
+	}
+	if u.Favorites, err = unmarshalStrings(favorites); err != nil {
+		return User{}, err
+	}
+	return u, nil
+}
+
+// marshalStrings/unmarshalStrings store a []string as a JSON array in a
+// TEXT column - SQLite has no array type, and these lists are small and
+// only ever read and written whole.
+func marshalStrings(v []string) (string, error) {
+	if len(v) == 0 {
+		return "[]", nil
+	}
+	b, err := json.Marshal(v)
+	return string(b), err
+}
+
+func unmarshalStrings(s string) ([]string, error) {
+	if s == "" || s == "[]" {
+		return nil, nil
+	}
+	var v []string
+	err := json.Unmarshal([]byte(s), &v)
+	return v, err
+}
+
 func (s *SQLiteStore) GetUser(username string) (User, error) {
-	var u User
-	err := s.db.QueryRow(`SELECT username, password_hash, role, created_at, auth_source, must_change_password, sso_subject FROM users WHERE username = ?`, username).
-		Scan(&u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.AuthSource, &u.MustChangePassword, &u.SSOSubject)
+	u, err := scanUser(s.db.QueryRow(`SELECT `+userColumns+` FROM users WHERE username = ?`, username))
 	return u, notFoundSQL(err)
 }
 
-// GetUserBySSOSubject looks up the user record pinned to an OIDC `sub`
-// claim (see User.SSOSubject's doc comment). ErrNotFound if no user has
-// bound that subject yet - either because they haven't logged in since
-// migration 0004 backfilled the column, or because this is their first
-// login ever.
 func (s *SQLiteStore) GetUserBySSOSubject(subject string) (User, error) {
-	var u User
-	err := s.db.QueryRow(`SELECT username, password_hash, role, created_at, auth_source, must_change_password, sso_subject FROM users WHERE sso_subject = ? AND sso_subject != ''`, subject).
-		Scan(&u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.AuthSource, &u.MustChangePassword, &u.SSOSubject)
+	u, err := scanUser(s.db.QueryRow(`SELECT `+userColumns+` FROM users WHERE sso_subject = ? AND sso_subject != ''`, subject))
 	return u, notFoundSQL(err)
 }
 
@@ -160,15 +213,15 @@ func (s *SQLiteStore) HasAnyUser() (bool, error) {
 }
 
 func (s *SQLiteStore) ListUsers() ([]User, error) {
-	rows, err := s.db.Query(`SELECT username, password_hash, role, created_at, auth_source, must_change_password, sso_subject FROM users ORDER BY username`)
+	rows, err := s.db.Query(`SELECT ` + userColumns + ` FROM users ORDER BY username`)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 	var out []User
 	for rows.Next() {
-		var u User
-		if err := rows.Scan(&u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt, &u.AuthSource, &u.MustChangePassword, &u.SSOSubject); err != nil {
+		u, err := scanUser(rows)
+		if err != nil {
 			return nil, err
 		}
 		out = append(out, u)
@@ -569,6 +622,49 @@ func (s *SQLiteStore) PruneClusterSamples(olderThan time.Time) error {
 	return err
 }
 
+func (s *SQLiteStore) AppendServiceSamples(samples []ServiceSample) error {
+	if len(samples) == 0 {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	now := time.Now()
+	for _, ss := range samples {
+		if _, err := tx.Exec(`INSERT INTO service_samples (ts, service_name, cpu_cores, mem_bytes, tasks) VALUES (?, ?, ?, ?, ?)`,
+			now, ss.ServiceName, ss.CPUCores, ss.MemBytes, ss.Tasks); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *SQLiteStore) ListServiceSamples(serviceName string, since time.Time) ([]ServiceSample, error) {
+	rows, err := s.db.Query(`
+		SELECT ts, service_name, cpu_cores, mem_bytes, tasks
+		FROM service_samples WHERE service_name = ? AND ts >= ? ORDER BY ts`, serviceName, since)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []ServiceSample
+	for rows.Next() {
+		var ss ServiceSample
+		if err := rows.Scan(&ss.Time, &ss.ServiceName, &ss.CPUCores, &ss.MemBytes, &ss.Tasks); err != nil {
+			return nil, err
+		}
+		out = append(out, ss)
+	}
+	return out, rows.Err()
+}
+
+func (s *SQLiteStore) PruneServiceSamples(olderThan time.Time) error {
+	_, err := s.db.Exec(`DELETE FROM service_samples WHERE ts < ?`, olderThan)
+	return err
+}
+
 func (s *SQLiteStore) GetSSOConfig() (SSOConfig, error) {
 	var c SSOConfig
 	err := s.db.QueryRow(`
@@ -602,19 +698,20 @@ func (s *SQLiteStore) PutSSOConfig(c SSOConfig) error {
 
 func (s *SQLiteStore) GetAppSettings() (AppSettings, error) {
 	var a AppSettings
-	err := s.db.QueryRow(`SELECT id, update_check_disabled, image_auto_update FROM app_settings WHERE id = ?`, AppSettingsID).
-		Scan(&a.ID, &a.UpdateCheckDisabled, &a.ImageAutoUpdate)
+	err := s.db.QueryRow(`SELECT id, update_check_disabled, image_auto_update, require_2fa FROM app_settings WHERE id = ?`, AppSettingsID).
+		Scan(&a.ID, &a.UpdateCheckDisabled, &a.ImageAutoUpdate, &a.Require2FA)
 	return a, notFoundSQL(err)
 }
 
 func (s *SQLiteStore) PutAppSettings(a AppSettings) error {
 	a.ID = AppSettingsID
 	_, err := s.db.Exec(`
-		INSERT INTO app_settings (id, update_check_disabled, image_auto_update)
-		VALUES (?, ?, ?)
+		INSERT INTO app_settings (id, update_check_disabled, image_auto_update, require_2fa)
+		VALUES (?, ?, ?, ?)
 		ON CONFLICT(id) DO UPDATE SET update_check_disabled = excluded.update_check_disabled,
-			image_auto_update = excluded.image_auto_update`,
-		a.ID, a.UpdateCheckDisabled, a.ImageAutoUpdate)
+			image_auto_update = excluded.image_auto_update,
+			require_2fa = excluded.require_2fa`,
+		a.ID, a.UpdateCheckDisabled, a.ImageAutoUpdate, a.Require2FA)
 	return err
 }
 

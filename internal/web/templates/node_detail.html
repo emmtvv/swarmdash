@@ -1,17 +1,17 @@
 {{define "node_detail.html"}}
-<div class="breadcrumb"><a href="/nodes">Nodes</a> / {{.Node.Description.Hostname}}</div>
-<h1>{{.Node.Description.Hostname}}</h1>
+<div class="breadcrumb"><a href="/nodes">{{t "Nodes"}}</a> / {{.Node.Description.Hostname}}</div>
+<h1>{{.Node.Description.Hostname}} {{template "fav-star" (dict "User" .User "Kind" "node" "Name" .Node.ID)}}</h1>
 
 <div class="card">
 	<div class="field-row">
-		<div class="field"><div class="muted">Role</div><div>{{.Node.Spec.Role}}</div></div>
-		<div class="field"><div class="muted">Status</div><div><span class="badge state-{{.Node.Status.State}}">{{.Node.Status.State}}</span></div></div>
-		<div class="field"><div class="muted">Availability</div><div><span class="badge state-{{.Node.Spec.Availability}}">{{.Node.Spec.Availability}}</span></div></div>
-		<div class="field"><div class="muted">Address</div><div class="mono">{{nodeAddr .Node.Node}}</div></div>
-		<div class="field"><div class="muted">CPUs</div><div>{{cpus .Node.Description.Resources.NanoCPUs}}</div></div>
-		<div class="field"><div class="muted">Memory</div><div>{{bytesHuman .Node.Description.Resources.MemoryBytes}}</div></div>
-		<div class="field"><div class="muted">Engine</div><div>{{.Node.Description.Engine.EngineVersion}}</div></div>
-		<div class="field"><div class="muted">OS/Arch</div><div>{{.Node.Description.Platform.OS}}/{{.Node.Description.Platform.Architecture}}</div></div>
+		<div class="field"><div class="muted">{{t "Role"}}</div><div>{{.Node.Spec.Role}}</div></div>
+		<div class="field"><div class="muted">{{t "Status"}}</div><div><span class="badge state-{{.Node.Status.State}}">{{.Node.Status.State}}</span></div></div>
+		<div class="field"><div class="muted">{{t "Availability"}}</div><div><span class="badge state-{{.Node.Spec.Availability}}">{{.Node.Spec.Availability}}</span></div></div>
+		<div class="field"><div class="muted">{{t "Address"}}</div><div class="mono">{{nodeAddr .Node.Node}}</div></div>
+		<div class="field"><div class="muted">{{t "CPUs"}}</div><div>{{cpus .Node.Description.Resources.NanoCPUs}}</div></div>
+		<div class="field"><div class="muted">{{t "Memory"}}</div><div>{{bytesHuman .Node.Description.Resources.MemoryBytes}}</div></div>
+		<div class="field"><div class="muted">{{t "Engine"}}</div><div>{{.Node.Description.Engine.EngineVersion}}</div></div>
+		<div class="field"><div class="muted">{{t "OS/Arch"}}</div><div>{{.Node.Description.Platform.OS}}/{{.Node.Description.Platform.Architecture}}</div></div>
 	</div>
 </div>
 
@@ -23,24 +23,24 @@
 	<div class="ring-grid">
 		<div class="ring-card">
 			<div class="ring" style="--pct:0"><div class="ring-pct node-stat-loading">&hellip;</div></div>
-			<div class="ring-info"><div class="l">CPU used</div><div class="n muted node-stat-loading">Loading&hellip;</div></div>
+			<div class="ring-info"><div class="l">{{t "CPU used"}}</div><div class="n muted node-stat-loading">{{t "Loading…"}}</div></div>
 		</div>
 		<div class="ring-card">
 			<div class="ring" style="--pct:0"><div class="ring-pct node-stat-loading">&hellip;</div></div>
-			<div class="ring-info"><div class="l">Memory used</div><div class="n muted node-stat-loading">Loading&hellip;</div></div>
+			<div class="ring-info"><div class="l">{{t "Memory used"}}</div><div class="n muted node-stat-loading">{{t "Loading…"}}</div></div>
 		</div>
 		<div class="ring-card">
 			<div class="ring" style="--pct:0"><div class="ring-pct node-stat-loading">&hellip;</div></div>
-			<div class="ring-info"><div class="l">Disk used</div><div class="n muted node-stat-loading">Loading&hellip;</div></div>
+			<div class="ring-info"><div class="l">{{t "Disk used"}}</div><div class="n muted node-stat-loading">{{t "Loading…"}}</div></div>
 		</div>
 	</div>
 </div>
 
-<h2 id="tasks">Tasks</h2>
+<h2 id="tasks">{{t "Tasks"}}</h2>
 <div class="table-wrap">
-<input type="text" class="table-search" data-table-search placeholder="Filter tasks...">
+<input type="text" class="table-search" data-table-search placeholder="{{t "Filter tasks..."}}">
 <table data-enhance>
-	<thead><tr><th>Task</th><th>State</th><th>Desired</th><th>Image</th><th>Container</th><th>Updated</th><th>Message</th><th data-no-sort></th></tr></thead>
+	<thead><tr><th>{{t "Task"}}</th><th>{{t "State"}}</th><th>{{t "Desired"}}</th><th>{{t "Image"}}</th><th>{{t "Container"}}</th><th>{{t "Updated"}}</th><th>{{t "Message"}}</th><th data-no-sort></th></tr></thead>
 	<tbody>
 	{{range .Tasks}}
 		<tr>
@@ -51,19 +51,19 @@
 			<td class="mono muted">{{if .Status.ContainerStatus}}{{shortID .Status.ContainerStatus.ContainerID}}{{end}}</td>
 			<td class="muted">{{ago .Status.Timestamp}}</td>
 			<td class="muted">{{.Status.Err}}{{.Status.Message}}</td>
-			<td>{{if eq .Status.State "running"}}<a href="/exec/{{.ID}}" class="btn small secondary">Console</a> <a href="/logs/{{.ID}}" class="btn small secondary">Logs</a>{{end}}</td>
+			<td>{{if eq .Status.State "running"}}<a href="/exec/{{.ID}}" class="btn small secondary">{{t "Console"}}</a> <a href="/logs/{{.ID}}" class="btn small secondary">{{t "Logs"}}</a>{{end}}</td>
 		</tr>
 	{{else}}
-		<tr><td colspan="8" class="muted">No tasks scheduled on this node.</td></tr>
+		<tr><td colspan="8" class="muted">{{t "No tasks scheduled on this node."}}</td></tr>
 	{{end}}
 	</tbody>
 </table>
 </div>
 
-<h2>Labels</h2>
-<p class="muted">Used for placement constraints (<span class="mono">node.labels.zone==a</span>) and spread preferences.</p>
+<h2>{{t "Labels"}}</h2>
+<p class="muted">{{tHTML "Used for placement constraints (<span class=\"mono\">node.labels.zone==a</span>) and spread preferences."}}</p>
 <table>
-	<thead><tr><th>Key</th><th>Value</th><th></th></tr></thead>
+	<thead><tr><th>{{t "Key"}}</th><th>{{t "Value"}}</th><th></th></tr></thead>
 	<tbody>
 	{{range $k, $v := .Node.Spec.Annotations.Labels}}
 		<tr>
@@ -71,22 +71,22 @@
 			<td class="mono">{{$v}}</td>
 			<td>
 				<form class="inline" method="post" action="/nodes/{{$.Node.ID}}/labels/{{$k}}/delete">
-					<button type="submit" class="btn danger small">Remove</button>
+					<button type="submit" class="btn danger small">{{t "Remove"}}</button>
 				</form>
 			</td>
 		</tr>
 	{{else}}
-		<tr><td colspan="3" class="muted">No labels set.</td></tr>
+		<tr><td colspan="3" class="muted">{{t "No labels set."}}</td></tr>
 	{{end}}
 	</tbody>
 </table>
 
 <div class="card" style="margin-top:20px;">
-	<h2 style="margin-top:0;">Add label</h2>
+	<h2 style="margin-top:0;">{{t "Add label"}}</h2>
 	<form class="inline" method="post" action="/nodes/{{.Node.ID}}/labels">
-		<input type="text" name="key" placeholder="zone" required>
-		<input type="text" name="value" placeholder="us-east-1a">
-		<button type="submit" class="btn">Add</button>
+		<input type="text" name="key" placeholder="{{t "zone"}}" required>
+		<input type="text" name="value" placeholder="{{t "us-east-1a"}}">
+		<button type="submit" class="btn">{{t "Add"}}</button>
 	</form>
 </div>
 {{end}}

@@ -1,46 +1,46 @@
 {{define "partial_image_updates.html"}}
 <div class="card-row" style="justify-content:space-between;margin-top:16px;">
 	<div class="field">
-		<div class="muted">Newer versions</div>
+		<div class="muted">{{t "Newer versions"}}</div>
 		{{if .Err}}
-		<div class="muted">Couldn't check the registry: {{.Err}}</div>
+		<div class="muted">{{t "Couldn't check the registry: %v" .Err}}</div>
 		{{else if not .IsVersion}}
-		<div class="muted">Tag <span class="mono">{{.Ref.Tag}}</span> isn't a version number - use "Update to latest" to re-pull it.</div>
+		<div class="muted">{{tHTML "Tag <span class=\"mono\">%v</span> isn't a version number - use \"Update to latest\" to re-pull it." .Ref.Tag}}</div>
 		{{else if not .Major}}
-		<div class="muted"><span class="mono">{{.Ref.Tag}}</span> is the newest version.</div>
+		<div class="muted">{{tHTML "<span class=\"mono\">%v</span> is the newest version." .Ref.Tag}}</div>
 		{{else}}
 		<div class="card-row" style="gap:8px;">
 			{{if .Patch}}
 			<form class="inline" method="post" action="/services/{{.ServiceName}}/image">
 				<input type="hidden" name="image" value="{{.PatchImage}}">
-				<button type="submit" class="btn secondary small">Update to {{.Patch}} <span class="muted">(patch)</span></button>
+				<button type="submit" class="btn secondary small">{{t "Update to %v" .Patch}} <span class="muted">{{t "(patch)"}}</span></button>
 			</form>
 			{{end}}
 			{{if and .Minor (ne .Minor .Patch)}}
 			<form class="inline" method="post" action="/services/{{.ServiceName}}/image">
 				<input type="hidden" name="image" value="{{.MinorImage}}">
-				<button type="submit" class="btn secondary small">Update to {{.Minor}} <span class="muted">(minor)</span></button>
+				<button type="submit" class="btn secondary small">{{t "Update to %v" .Minor}} <span class="muted">{{t "(minor)"}}</span></button>
 			</form>
 			{{end}}
 			{{if ne .Major .Minor}}
 			<form class="inline" method="post" action="/services/{{.ServiceName}}/image">
 				<input type="hidden" name="image" value="{{.MajorImage}}">
-				<button type="submit" class="btn secondary small">Update to {{.Major}} <span class="muted">(major)</span></button>
+				<button type="submit" class="btn secondary small">{{t "Update to %v" .Major}} <span class="muted">{{t "(major)"}}</span></button>
 			</form>
 			{{end}}
 		</div>
 		{{end}}
 	</div>
 	<form class="inline" method="post" action="/services/{{.ServiceName}}/autoupdate">
-		<label class="muted small" for="autoupdate-policy">Auto-update</label>
+		<label class="muted small" for="autoupdate-policy">{{t "Auto-update"}}</label>
 		<select id="autoupdate-policy" name="policy" style="width:220px;">
-			<option value="" {{if eq .Policy ""}}selected{{end}}>Cluster default ({{.DefaultPolicy}})</option>
-			<option value="off" {{if eq .Policy "off"}}selected{{end}}>Off</option>
-			<option value="patch" {{if eq .Policy "patch"}}selected{{end}}>Patch versions</option>
-			<option value="minor" {{if eq .Policy "minor"}}selected{{end}}>Minor versions</option>
-			<option value="major" {{if eq .Policy "major"}}selected{{end}}>Major versions</option>
+			<option value="" {{if eq .Policy ""}}selected{{end}}>{{t "Cluster default (%v)" .DefaultPolicy}}</option>
+			<option value="off" {{if eq .Policy "off"}}selected{{end}}>{{t "Off"}}</option>
+			<option value="patch" {{if eq .Policy "patch"}}selected{{end}}>{{t "Patch versions"}}</option>
+			<option value="minor" {{if eq .Policy "minor"}}selected{{end}}>{{t "Minor versions"}}</option>
+			<option value="major" {{if eq .Policy "major"}}selected{{end}}>{{t "Major versions"}}</option>
 		</select>
-		<button type="submit" class="btn secondary small">Save</button>
+		<button type="submit" class="btn secondary small">{{t "Save"}}</button>
 	</form>
 </div>
 {{end}}

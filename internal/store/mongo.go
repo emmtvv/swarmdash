@@ -92,6 +92,12 @@ func (m *MongoStore) ensureIndexes(ctx context.Context) error {
 		}
 	}
 
+	if _, err := m.col("service_samples").Indexes().CreateOne(ctx, mongo.IndexModel{
+		Keys: bson.D{{Key: "service_name", Value: 1}, {Key: "ts", Value: 1}},
+	}); err != nil {
+		return err
+	}
+
 	// Mirrors SQLiteStore's partial unique index on users.sso_subject (see
 	// migration 0004): at most one user document may claim a given OIDC
 	// `sub`, but any number may share the "not set yet" state, so the
@@ -544,6 +550,43 @@ func (m *MongoStore) ListClusterSamples(since time.Time) ([]ClusterSample, error
 	var out []ClusterSample
 	err = cur.All(ctx, &out)
 	return out, err
+}
+
+func (m *MongoStore) AppendServiceSamples(samples []ServiceSample) error {
+	if len(samples) == 0 {
+		return nil
+	}
+	ctx, cancel := ctxTimeout()
+	defer cancel()
+	now := time.Now()
+	docs := make([]any, len(samples))
+	for i, ss := range samples {
+		ss.Time = now
+		docs[i] = ss
+	}
+	_, err := m.col("service_samples").InsertMany(ctx, docs)
+	return err
+}
+
+func (m *MongoStore) ListServiceSamples(serviceName string, since time.Time) ([]ServiceSample, error) {
+	ctx, cancel := ctxTimeout()
+	defer cancel()
+	cur, err := m.col("service_samples").Find(ctx, bson.M{"service_name": serviceName, "ts": bson.M{"$gte": since}},
+		options.Find().SetSort(bson.D{{Key: "ts", Value: 1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var out []ServiceSample
+	err = cur.All(ctx, &out)
+	return out, err
+}
+
+func (m *MongoStore) PruneServiceSamples(olderThan time.Time) error {
+	ctx, cancel := ctxTimeout()
+	defer cancel()
+	_, err := m.col("service_samples").DeleteMany(ctx, bson.M{"ts": bson.M{"$lt": olderThan}})
+	return err
 }
 
 func (m *MongoStore) PruneClusterSamples(olderThan time.Time) error {

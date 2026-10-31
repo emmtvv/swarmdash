@@ -32,12 +32,20 @@ type Config struct {
 	TLSCertFile string
 	TLSKeyFile  string
 	TLSCAFile   string
+
+	// BackupDir holds this node's volume backups (see volume_backups.go);
+	// empty disables them.
+	BackupDir string
 }
 
 type Server struct {
 	cfg    Config
 	docker *client.Client
 	log    *slog.Logger
+	jobs   *volumeJobs
+	// ctx is the agent's lifetime, which background volume jobs run
+	// under (a job outlives the request that started it).
+	ctx context.Context
 }
 
 func New(cfg Config, docker *client.Client) *Server {
@@ -45,6 +53,8 @@ func New(cfg Config, docker *client.Client) *Server {
 		cfg:    cfg,
 		docker: docker,
 		log:    slog.New(slog.NewTextHandler(os.Stdout, nil)).With("component", "agent"),
+		jobs:   newVolumeJobs(cfg.BackupDir),
+		ctx:    context.Background(),
 	}
 }
 
@@ -61,6 +71,12 @@ func (s *Server) Handler() http.Handler {
 	mux.Handle("GET /v1/volumes", s.auth(http.HandlerFunc(s.handleVolumes)))
 	mux.Handle("POST /v1/volumes", s.auth(http.HandlerFunc(s.handleVolumeCreate)))
 	mux.Handle("POST /v1/volumes/{name}/delete", s.auth(http.HandlerFunc(s.handleVolumeDelete)))
+	mux.Handle("POST /v1/volumes/{name}/backup", s.auth(http.HandlerFunc(s.handleVolumeBackupStart)))
+	mux.Handle("GET /v1/volume-backups", s.auth(http.HandlerFunc(s.handleVolumeBackups)))
+	mux.Handle("POST /v1/volume-backups/upload", s.auth(http.HandlerFunc(s.handleVolumeBackupUpload)))
+	mux.Handle("GET /v1/volume-backups/{id}/download", s.auth(http.HandlerFunc(s.handleVolumeBackupDownload)))
+	mux.Handle("POST /v1/volume-backups/{id}/restore", s.auth(http.HandlerFunc(s.handleVolumeBackupRestore)))
+	mux.Handle("POST /v1/volume-backups/{id}/delete", s.auth(http.HandlerFunc(s.handleVolumeBackupDelete)))
 	mux.Handle("POST /v1/system/prune", s.auth(http.HandlerFunc(s.handleSystemPrune)))
 	mux.Handle("POST /v1/containers/{id}/remove", s.auth(http.HandlerFunc(s.handleContainerRemove)))
 	mux.Handle("GET /v1/containers/{id}/files", s.auth(http.HandlerFunc(s.handleListFiles)))
@@ -72,6 +88,13 @@ func (s *Server) Handler() http.Handler {
 }
 
 func (s *Server) ListenAndServe(ctx context.Context) error {
+	s.ctx = ctx
+	if err := s.jobs.load(); err != nil {
+		// Not fatal: exec/logs/stats don't need it. Backups report the
+		// error themselves when they try to write.
+		s.log.Warn("volume backups unavailable", "dir", s.cfg.BackupDir, "err", err)
+	}
+
 	srv := &http.Server{
 		Addr:              s.cfg.ListenAddr,
 		Handler:           s.Handler(),

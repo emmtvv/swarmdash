@@ -143,10 +143,12 @@ func (s *Server) pollOnce(ctx context.Context, st *pollerState) {
 		}
 	}
 
-	st.tick++
+	// Sample on the very first tick too, so per-service usage shows up
+	// seconds after a restart rather than a minute later.
 	if st.tick%clusterSampleEvery == 0 {
 		s.sampleCluster(ctx, nodes, services, tasks)
 	}
+	st.tick++
 
 	st.seeded = true
 }
@@ -184,11 +186,28 @@ func (s *Server) sampleCluster(ctx context.Context, nodes []swarm.Node, services
 	desired := sumDesiredTasks(services)
 	cpuCapacity, memCapacity := clusterCapacity(nodes)
 	cpuReserved := reservedResources(services)
-	memUsed := s.clusterMemoryUsed(ctx, nodes)
+	perNode := s.nodesStats(ctx, nodes)
+	var memUsed int64
+	for _, st := range perNode {
+		memUsed += st.MemUsedBytes
+	}
+	usage := aggregateServiceUsage(perNode)
 
 	s.memUsageMu.Lock()
 	s.memUsageBytes = memUsed
+	s.serviceUsage = usage
 	s.memUsageMu.Unlock()
+
+	samples := make([]store.ServiceSample, 0, len(usage.services))
+	for name, u := range usage.services {
+		samples = append(samples, store.ServiceSample{ServiceName: name, CPUCores: u.CPUCores, MemBytes: u.MemBytes, Tasks: u.Tasks})
+	}
+	if err := s.store.AppendServiceSamples(samples); err != nil {
+		s.log.Warn("poller: append service samples", "err", err)
+	}
+	if err := s.store.PruneServiceSamples(time.Now().Add(-clusterSampleRetention)); err != nil {
+		s.log.Warn("poller: prune service samples", "err", err)
+	}
 
 	if err := s.store.AppendClusterSample(store.ClusterSample{
 		NodeCount:        len(nodes),

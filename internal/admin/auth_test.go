@@ -480,6 +480,23 @@ var wantAdminOnlyByRoute = map[string]bool{
 	"GET /account/password":  false,
 	"POST /account/password": false,
 
+	"GET /volumes/backups":               true,
+	"GET /volumes/backups/jobs":          true,
+	"POST /volumes/backups/upload":       true,
+	"POST /volumes/{name}/backup":        true,
+	"GET /volumes/backups/{id}/download": true,
+	"POST /volumes/backups/{id}/restore": true,
+	"POST /volumes/backups/{id}/delete":  true,
+
+	"GET /search":     false,
+	"POST /favorites": false,
+
+	"GET /account/security":            false,
+	"POST /account/2fa/setup":          false,
+	"POST /account/2fa/enable":         false,
+	"POST /account/2fa/disable":        false,
+	"POST /account/2fa/recovery-codes": false,
+
 	"GET /nodes":                           false,
 	"GET /nodes/stats":                     false,
 	"GET /nodes/{id}":                      false,
@@ -565,10 +582,11 @@ var wantAdminOnlyByRoute = map[string]bool{
 	"POST /settings/tokens":             true,
 	"POST /settings/tokens/{id}/delete": true,
 
-	"GET /settings/users":                      true,
-	"POST /settings/users":                     true,
-	"POST /settings/users/{username}/delete":   true,
-	"POST /settings/users/{username}/password": true,
+	"GET /settings/users":                       true,
+	"POST /settings/users":                      true,
+	"POST /settings/users/{username}/delete":    true,
+	"POST /settings/users/{username}/password":  true,
+	"POST /settings/users/{username}/2fa/reset": true,
 
 	"GET /settings/swarm":                      true,
 	"POST /settings/swarm/spec":                true,

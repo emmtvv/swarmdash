@@ -1066,3 +1066,38 @@ label:has(> input[type=checkbox]) {
 	.hero-card { flex-direction: column; align-items: flex-start; }
 	.hero-metrics { align-self: stretch; justify-content: space-between; }
 }
+
+/* Two-factor enrollment */
+.qr-box { width: 200px; height: 200px; margin: 12px 0; padding: 8px; background: #fff; border-radius: 8px; }
+.qr-box svg { width: 100%; height: 100%; display: block; }
+.recovery-codes { list-style: none; padding: 0; margin: 0 0 14px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 18px; font-size: 14px; }
+
+/* Favorites: star toggle + dashboard cards */
+.fav-star { background: none; border: none; padding: 2px; margin: 0 6px 0 0; color: var(--text-faint); cursor: pointer; vertical-align: -3px; border-radius: 4px; line-height: 0; }
+.fav-star svg { width: 15px; height: 15px; }
+h1 .fav-star { margin-left: 4px; vertical-align: 1px; }
+h1 .fav-star svg { width: 20px; height: 20px; }
+.fav-star:hover { color: var(--yellow); }
+.fav-star.on { color: var(--yellow); }
+.fav-star.on svg path { fill: currentColor; }
+.fav-star:focus-visible { box-shadow: 0 0 0 3px var(--accent-dim); outline: none; }
+.fav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.fav-card { display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); text-decoration: none; min-width: 0; }
+.fav-card:hover { border-color: var(--border-strong); }
+.fav-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--text-faint); }
+.fav-ok .fav-dot { background: var(--green); }
+.fav-warn .fav-dot { background: var(--yellow); }
+.fav-crit .fav-dot { background: var(--red); }
+.fav-gone { opacity: .6; }
+.fav-body { display: flex; flex-direction: column; min-width: 0; }
+.fav-label { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fav-meta { font-size: 12px; color: var(--text-faint); }
+
+/* Command palette search results */
+.cmdk-item .cmdk-detail { margin-left: auto; font-size: 12px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 45%; }
+.cmdk-item > span:first-of-type { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.lang-picker { display: flex; justify-content: center; margin-top: 18px; }
+.lang-picker select { width: auto; font-size: 12px; padding: 4px 8px; background: transparent; color: var(--text-faint); }
+.sidebar-footer .lang-picker { justify-content: flex-start; margin: 8px 0 0; }
+.sidebar-footer .lang-picker select { width: 100%; }

@@ -140,6 +140,15 @@ func (s *Server) handleBackupRestore(w http.ResponseWriter, r *http.Request) {
 	var warnings []string
 
 	for _, u := range doc.Users {
+		if len(u.TOTPSecretEnc) > 0 {
+			if _, err := s.decryptSecret(u.TOTPSecretEnc); err != nil {
+				// An undecryptable secret would lock the account out at
+				// the code prompt, so it's reset rather than imported -
+				// the user re-enrolls (or Require 2FA makes them).
+				warnings = append(warnings, fmt.Sprintf("user %q: could not decrypt their two-factor secret with this cluster's secret - two-factor was reset for this account", u.Username))
+				u.TOTPSecretEnc, u.TOTPEnabled, u.TOTPLastStep, u.RecoveryCodeHashes = nil, false, 0, nil
+			}
+		}
 		if err := s.store.PutUser(u); err != nil {
 			http.Error(w, "restore user "+u.Username+": "+err.Error(), http.StatusInternalServerError)
 			return

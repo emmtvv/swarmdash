@@ -13,6 +13,7 @@ func (s *Server) handleGeneralSettingsPage(w http.ResponseWriter, r *http.Reques
 		"User":                userFromContext(r),
 		"UpdateCheckDisabled": s.isUpdateCheckDisabled(),
 		"ImageAutoUpdate":     string(s.defaultImagePolicy()),
+		"Require2FA":          s.require2FA(),
 	})
 }
 
@@ -22,18 +23,20 @@ func (s *Server) handleGeneralSettingsSave(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	disabled := r.FormValue("update_check_disabled") != ""
+	require2FA := r.FormValue("require_2fa") != ""
 	policy, ok := imageupdate.ParsePolicy(r.FormValue("image_auto_update"))
 	if !ok {
 		policy = imageupdate.PolicyOff
 	}
 
-	if err := s.store.PutAppSettings(store.AppSettings{UpdateCheckDisabled: disabled, ImageAutoUpdate: string(policy)}); err != nil {
+	if err := s.store.PutAppSettings(store.AppSettings{UpdateCheckDisabled: disabled, ImageAutoUpdate: string(policy), Require2FA: require2FA}); err != nil {
 		http.Error(w, "save settings: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	s.setUpdateCheckDisabled(disabled)
+	s.setRequire2FA(require2FA)
 
-	s.audit(r, "settings.general.save", "", "update_check_disabled="+strconv.FormatBool(disabled)+" image_auto_update="+string(policy), nil)
+	s.audit(r, "settings.general.save", "", "update_check_disabled="+strconv.FormatBool(disabled)+" image_auto_update="+string(policy)+" require_2fa="+strconv.FormatBool(require2FA), nil)
 	redirect(w, r, "/settings/general")
 }
 
