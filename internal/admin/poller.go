@@ -154,13 +154,11 @@ func (s *Server) pollOnce(ctx context.Context, st *pollerState) {
 }
 
 // sampleCluster records one ClusterSample for the dashboard's "Last 24h"
-// history charts, and refreshes the live memory-usage cache the dashboard
-// reads on every page load. CPU still uses reservation math
-// (clusterCapacity/reservedResources in handlers_dashboard.go) - Docker
-// gives no aggregate cgroup CPU usage cheaply - but real memory usage is
-// available per-node via each agent's /v1/stats/summary, so we fan out for
-// that instead of reporting the reservation spec (which is 0 for any
-// service that never set deploy.resources.reservations.memory).
+// history charts, and refreshes the live CPU/memory-usage cache the
+// dashboard reads on every page load. Both come from real usage reported
+// per-node by each agent's /v1/stats/summary rather than the reservation
+// spec, which is 0 for any service that never set
+// deploy.resources.reservations.* and says nothing about actual load.
 func (s *Server) sampleCluster(ctx context.Context, nodes []swarm.Node, services []swarm.Service, tasks []swarm.Task) {
 	readyNodes := 0
 	for _, n := range nodes {
@@ -188,13 +186,16 @@ func (s *Server) sampleCluster(ctx context.Context, nodes []swarm.Node, services
 	cpuReserved := reservedResources(services)
 	perNode := s.nodesStats(ctx, nodes)
 	var memUsed int64
+	var cpuUsedCores float64
 	for _, st := range perNode {
 		memUsed += st.MemUsedBytes
+		cpuUsedCores += st.CPUUsedCores
 	}
 	usage := aggregateServiceUsage(perNode)
 
 	s.memUsageMu.Lock()
 	s.memUsageBytes = memUsed
+	s.cpuUsageCores = cpuUsedCores
 	s.serviceUsage = usage
 	s.memUsageMu.Unlock()
 
@@ -218,6 +219,7 @@ func (s *Server) sampleCluster(ctx context.Context, nodes []swarm.Node, services
 		DesiredTasks:     desired,
 		FailedTasks:      failed,
 		CPUReservedPct:   pct(cpuReserved, cpuCapacity),
+		CPUUsedPct:       coresPct(cpuUsedCores, cpuCapacity),
 		MemUsedPct:       pct(memUsed, memCapacity),
 	}); err != nil {
 		s.log.Warn("poller: append cluster sample", "err", err)

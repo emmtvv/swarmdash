@@ -50,9 +50,9 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cpuCapacity, memCapacity := clusterCapacity(nodes)
-	cpuReserved := reservedResources(services)
 	s.memUsageMu.RLock()
 	memUsed := s.memUsageBytes
+	cpuUsed := s.cpuUsageCores
 	s.memUsageMu.RUnlock()
 
 	history, err := s.store.ListClusterSamples(time.Now().Add(-24 * time.Hour))
@@ -77,8 +77,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 		"FailedTasks":    failed,
 		"DegradedCount":  degraded,
 		"CPUCapacity":    cpuCapacity,
-		"CPUReserved":    cpuReserved,
-		"CPUPct":         pct(cpuReserved, cpuCapacity),
+		"CPUUsed":        cpuUsed,
+		"CPUPct":         coresPct(cpuUsed, cpuCapacity),
 		"MemCapacity":    memCapacity,
 		"MemUsed":        memUsed,
 		"MemPct":         pct(memUsed, memCapacity),
@@ -106,7 +106,7 @@ func clusterHistoryJSON(samples []store.ClusterSample) template.JS {
 			T:   s.Time.UnixMilli(),
 			Run: s.RunningTasks,
 			Des: s.DesiredTasks,
-			CPU: s.CPUReservedPct,
+			CPU: s.CPUUsedPct,
 			Mem: s.MemUsedPct,
 		})
 	}
@@ -130,11 +130,9 @@ func clusterCapacity(nodes []swarm.Node) (nanoCPUs, memoryBytes int64) {
 // reservedResources sums each service's per-task CPU reservation across
 // its desired task count. Services with no reservation set (the common
 // case) contribute zero - this mirrors what the scheduler actually
-// accounts against node capacity, not real runtime usage. Memory used to
-// be computed here too, but the dashboard now shows real usage instead
-// (see clusterMemoryUsed in agentclient.go) - CPU still uses the
-// reservation spec since Docker has no cheap way to report aggregate CPU
-// usage.
+// accounts against node capacity, not real runtime usage. The dashboard
+// shows real usage instead (see sampleCluster in poller.go); this is only
+// still recorded in ClusterSample.CPUReservedPct.
 func reservedResources(services []swarm.Service) (nanoCPUs int64) {
 	for _, svc := range services {
 		if svc.ServiceStatus == nil || svc.ServiceStatus.DesiredTasks == 0 {
@@ -163,6 +161,15 @@ func sumDesiredTasks(services []swarm.Service) int {
 		}
 	}
 	return total
+}
+
+// coresPct expresses fractional CPU cores in use as a percentage of a
+// capacity given in nano-CPUs (as reported by swarm node descriptions).
+func coresPct(cores float64, capacityNanoCPUs int64) float64 {
+	if capacityNanoCPUs <= 0 {
+		return 0
+	}
+	return cores * 1e9 / float64(capacityNanoCPUs) * 100
 }
 
 func pct(part, total int64) float64 {

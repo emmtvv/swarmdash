@@ -292,10 +292,9 @@
   memory% line charts (plain `<canvas>`, no charting library) computed
   from the same stats stream already used for the raw JSON view.
 - **Dashboard history**: the same poller samples cluster-wide task/service/
-  node health and CPU/memory *reservation* (what the scheduler accounts
-  against node capacity, not live per-container usage — that would need a
-  cluster-wide stats collector, a bigger separate feature) roughly once a
-  minute, kept for 14 days. The dashboard's "Last 24h" section renders it
+  node health and live CPU/memory *usage* (summed from every node agent's
+  stats, as a share of cluster capacity — the same numbers the Nodes and
+  Services pages show) roughly once a minute, kept for 14 days. The dashboard's "Last 24h" section renders it
   as plain-canvas line charts, same convention as the console sparklines.
 - **Public status page** at `/status` — deliberately unauthenticated (for
   uptime monitors / status pages) and deliberately minimal: aggregate

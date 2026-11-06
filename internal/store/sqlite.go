@@ -592,15 +592,15 @@ func (s *SQLiteStore) DeleteDeployHook(id string) error {
 
 func (s *SQLiteStore) AppendClusterSample(cs ClusterSample) error {
 	_, err := s.db.Exec(`
-		INSERT INTO cluster_samples (ts, node_count, ready_nodes, service_count, degraded_services, running_tasks, desired_tasks, failed_tasks, cpu_reserved_pct, mem_used_pct)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		time.Now(), cs.NodeCount, cs.ReadyNodes, cs.ServiceCount, cs.DegradedServices, cs.RunningTasks, cs.DesiredTasks, cs.FailedTasks, cs.CPUReservedPct, cs.MemUsedPct)
+		INSERT INTO cluster_samples (ts, node_count, ready_nodes, service_count, degraded_services, running_tasks, desired_tasks, failed_tasks, cpu_reserved_pct, cpu_used_pct, mem_used_pct)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		time.Now(), cs.NodeCount, cs.ReadyNodes, cs.ServiceCount, cs.DegradedServices, cs.RunningTasks, cs.DesiredTasks, cs.FailedTasks, cs.CPUReservedPct, cs.CPUUsedPct, cs.MemUsedPct)
 	return err
 }
 
 func (s *SQLiteStore) ListClusterSamples(since time.Time) ([]ClusterSample, error) {
 	rows, err := s.db.Query(`
-		SELECT seq, ts, node_count, ready_nodes, service_count, degraded_services, running_tasks, desired_tasks, failed_tasks, cpu_reserved_pct, mem_used_pct
+		SELECT seq, ts, node_count, ready_nodes, service_count, degraded_services, running_tasks, desired_tasks, failed_tasks, cpu_reserved_pct, cpu_used_pct, mem_used_pct
 		FROM cluster_samples WHERE ts >= ? ORDER BY seq`, since)
 	if err != nil {
 		return nil, err
@@ -609,7 +609,7 @@ func (s *SQLiteStore) ListClusterSamples(since time.Time) ([]ClusterSample, erro
 	var out []ClusterSample
 	for rows.Next() {
 		var cs ClusterSample
-		if err := rows.Scan(&cs.ID, &cs.Time, &cs.NodeCount, &cs.ReadyNodes, &cs.ServiceCount, &cs.DegradedServices, &cs.RunningTasks, &cs.DesiredTasks, &cs.FailedTasks, &cs.CPUReservedPct, &cs.MemUsedPct); err != nil {
+		if err := rows.Scan(&cs.ID, &cs.Time, &cs.NodeCount, &cs.ReadyNodes, &cs.ServiceCount, &cs.DegradedServices, &cs.RunningTasks, &cs.DesiredTasks, &cs.FailedTasks, &cs.CPUReservedPct, &cs.CPUUsedPct, &cs.MemUsedPct); err != nil {
 			return nil, err
 		}
 		out = append(out, cs)

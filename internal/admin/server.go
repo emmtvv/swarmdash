@@ -67,12 +67,13 @@ type Server struct {
 	renderer *web.Renderer
 	agentTLS *tls.Config
 
-	// memUsage caches the last cluster-wide real memory usage sampled by
-	// the poller (internal/admin/poller.go), so the dashboard can render
-	// instantly instead of fanning out to every node's agent on every page
-	// load.
+	// memUsage/cpuUsage cache the last cluster-wide real memory and CPU
+	// usage sampled by the poller (internal/admin/poller.go), so the
+	// dashboard can render instantly instead of fanning out to every node's
+	// agent on every page load.
 	memUsageMu    sync.RWMutex
 	memUsageBytes int64
+	cpuUsageCores float64
 	// serviceUsage is the same sample's per-service/per-task breakdown
 	// (see service_usage.go), guarded by memUsageMu too.
 	serviceUsage serviceUsageSnapshot

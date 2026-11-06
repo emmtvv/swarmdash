@@ -284,12 +284,10 @@ const AppSettingsID = "app"
 
 // ClusterSample is a periodic snapshot of cluster-wide health numbers,
 // recorded by admin's background poller (internal/admin/poller.go) so the
-// dashboard can show trends, not just a live snapshot. CPU% reflects the
-// scheduler's reservation spec (no cheap aggregate cgroup CPU usage is
-// available); Mem% reflects real, live non-cache memory usage fanned out
-// from every node's agent, since most services never set a memory
-// reservation and that field would otherwise sit at 0 regardless of actual
-// usage.
+// dashboard can show trends, not just a live snapshot. CPUUsedPct and
+// MemUsedPct reflect real, live usage fanned out from every node's agent;
+// CPUReservedPct is the scheduler's reservation spec, kept for reference
+// (most services never set a reservation, so it usually sits at 0).
 type ClusterSample struct {
 	ID               uint64    `bson:"seq" json:"id"`
 	Time             time.Time `bson:"ts" json:"time"`
@@ -301,6 +299,7 @@ type ClusterSample struct {
 	DesiredTasks     int       `bson:"desired_tasks" json:"desired_tasks"`
 	FailedTasks      int       `bson:"failed_tasks" json:"failed_tasks"`
 	CPUReservedPct   float64   `bson:"cpu_reserved_pct" json:"cpu_reserved_pct"`
+	CPUUsedPct       float64   `bson:"cpu_used_pct" json:"cpu_used_pct"`
 	MemUsedPct       float64   `bson:"mem_used_pct" json:"mem_used_pct"`
 }
 

@@ -74,8 +74,8 @@
 			<div class="ring-pct">{{round .CPUPct}}%</div>
 		</div>
 		<div class="ring-info">
-			<div class="l">{{t "dashboard.cpu_reserved"}}</div>
-			<div class="n">{{cpus .CPUReserved}} <span class="muted">{{t "dashboard.of_vcpu" (cpus .CPUCapacity)}}</span></div>
+			<div class="l">{{t "dashboard.cpu_used"}}</div>
+			<div class="n">{{cores .CPUUsed}} <span class="muted">{{t "dashboard.of_vcpu" (cpus .CPUCapacity)}}</span></div>
 		</div>
 	</div>
 	<div class="ring-card">
@@ -97,7 +97,7 @@
 		<div id="tasks-history-legend" class="muted" style="font-size:12px;margin-top:6px;"></div>
 	</div>
 	<div class="card" style="flex:1;">
-		<div class="muted">{{t "dashboard.cpu_reserved_memory_used"}}</div>
+		<div class="muted">{{t "dashboard.cpu_memory_used"}}</div>
 		<canvas id="resources-history-chart" width="900" height="90" style="width:100%;height:90px;"></canvas>
 		<div id="resources-history-legend" class="muted" style="font-size:12px;margin-top:6px;"></div>
 	</div>

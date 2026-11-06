@@ -5,6 +5,17 @@ Notable changes to swarmdash are tracked here, following
 does not yet follow strict semantic versioning across releases — see the
 README's "Known gaps" section for what's still evolving.
 
+## [1.4.1] - 2026-11-06
+
+### Changed
+
+- **Dashboard shows live CPU usage** instead of reserved CPU: the CPU ring
+  and the "Last 24h" CPU/memory chart now use real usage summed from every
+  node's agent (the same numbers the Nodes and Services pages show), as a
+  share of cluster capacity. Reserved CPU said little about actual load,
+  since most services never set a reservation. History recorded before
+  upgrading reads as 0% CPU until it ages out of the 24h window.
+
 ## [1.4.0] - 2026-10-31
 
 ### Added

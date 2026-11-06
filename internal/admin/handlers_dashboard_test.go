@@ -136,12 +136,30 @@ func TestPct(t *testing.T) {
 	}
 }
 
+func TestCoresPct(t *testing.T) {
+	tests := []struct {
+		cores    float64
+		capacity int64
+		want     float64
+	}{
+		{1.5, 0, 0},
+		{0, 4_000_000_000, 0},
+		{1, 4_000_000_000, 25},
+		{3, 2_000_000_000, 150},
+	}
+	for _, tt := range tests {
+		if got := coresPct(tt.cores, tt.capacity); got != tt.want {
+			t.Errorf("coresPct(%v, %d) = %v, want %v", tt.cores, tt.capacity, got, tt.want)
+		}
+	}
+}
+
 func TestClusterHistoryJSON(t *testing.T) {
 	samples := []store.ClusterSample{
-		{RunningTasks: 3, DesiredTasks: 4, CPUReservedPct: 12.5, MemUsedPct: 40},
+		{RunningTasks: 3, DesiredTasks: 4, CPUReservedPct: 12.5, CPUUsedPct: 37.5, MemUsedPct: 40},
 	}
 	got := string(clusterHistoryJSON(samples))
-	if !strings.Contains(got, `"run":3`) || !strings.Contains(got, `"des":4`) {
+	if !strings.Contains(got, `"run":3`) || !strings.Contains(got, `"des":4`) || !strings.Contains(got, `"cpu":37.5`) {
 		t.Errorf("clusterHistoryJSON() = %s, missing expected fields", got)
 	}
 }

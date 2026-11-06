@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -259,6 +260,26 @@ func TestSQLiteStoreClusterSamplePruning(t *testing.T) {
 	}
 }
 
+func TestSQLiteStoreClusterSampleRoundTrip(t *testing.T) {
+	s := openTestSQLite(t)
+
+	want := ClusterSample{RunningTasks: 3, DesiredTasks: 4, CPUReservedPct: 12.5, CPUUsedPct: 37.5, MemUsedPct: 40}
+	if err := s.AppendClusterSample(want); err != nil {
+		t.Fatalf("AppendClusterSample: %v", err)
+	}
+	samples, err := s.ListClusterSamples(time.Time{})
+	if err != nil {
+		t.Fatalf("ListClusterSamples: %v", err)
+	}
+	if len(samples) != 1 {
+		t.Fatalf("ListClusterSamples = %+v, want 1 sample", samples)
+	}
+	got := samples[0]
+	if got.CPUReservedPct != want.CPUReservedPct || got.CPUUsedPct != want.CPUUsedPct || got.MemUsedPct != want.MemUsedPct {
+		t.Errorf("round trip = %+v, want CPU/mem pct of %+v", got, want)
+	}
+}
+
 func TestSQLiteStoreRegistryCredentialNilBlob(t *testing.T) {
 	s := openTestSQLite(t)
 
@@ -299,8 +320,8 @@ func TestMigrateIsIdempotentAndForwardOnly(t *testing.T) {
 		versions = append(versions, v)
 	}
 	_ = rows.Close()
-	if len(versions) != 7 || versions[0] != 1 || versions[1] != 2 || versions[2] != 3 || versions[3] != 4 || versions[4] != 5 || versions[5] != 6 || versions[6] != 7 {
-		t.Fatalf("schema_migrations = %v, want [1 2 3 4 5 6 7]", versions)
+	if want := []int{1, 2, 3, 4, 5, 6, 7, 8}; !slices.Equal(versions, want) {
+		t.Fatalf("schema_migrations = %v, want %v", versions, want)
 	}
 
 	// Running migrate again against an already-migrated DB must not
