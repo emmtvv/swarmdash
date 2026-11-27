@@ -33,6 +33,12 @@
 #   2. make env   (or: cp .env.example .env and fill in your own values)
 #   3. set -a; . ./.env; set +a; docker stack deploy -c deploy/stack.yml swarmdash
 #
+# Rootless Docker: set SWARMDASH_DOCKER_SOCK in .env to the rootless
+# socket (usually /run/user/<uid>/docker.sock) - both services mount it
+# at /var/run/docker.sock inside the container. Rootless mode has no
+# overlay networks, so this only really works single-node; see
+# docs/rootless.md.
+#
 # Then read the generated admin password from the admin service's logs on
 # first run (or set SWARMDASH_ADMIN_PASSWORD in .env, see below):
 #      docker service logs -f swarmdash_admin
@@ -139,7 +145,7 @@ services:
     #   - source: swarmdash_tls_agent_key
     #     target: tls_agent_key
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ${SWARMDASH_DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
       # Volume backups (Volumes -> Backups) are stored on the node that
       # holds the volume. A named volume rather than a host path, since
       # Swarm refuses a bind mount whose source directory doesn't already
@@ -194,7 +200,7 @@ services:
     #   - source: swarmdash_tls_admin_key
     #     target: tls_admin_key
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ${SWARMDASH_DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
       # Holds the SQLite database (see SWARMDASH_DATA_DIR above). Swarm's
       # default local-disk volumes aren't shared across nodes, which is
       # exactly why admin is pinned to a single manager below rather than

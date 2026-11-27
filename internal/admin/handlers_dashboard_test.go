@@ -163,3 +163,31 @@ func TestClusterHistoryJSON(t *testing.T) {
 		t.Errorf("clusterHistoryJSON() = %s, missing expected fields", got)
 	}
 }
+
+func TestHandleDashboardRootlessBanner(t *testing.T) {
+	mux := dashboardDockerMux(nil, nil, nil)
+	mux.HandleFunc("/info", jsonHandler(map[string]any{
+		"SecurityOptions": []string{"name=seccomp,profile=builtin", "name=rootless"},
+		"CgroupVersion":   "1",
+	}))
+	s := newTestServer(t, newFakeDocker(t, mux))
+
+	render := func() string {
+		r := withUser(httptest.NewRequest(http.MethodGet, "/", nil), testAdmin)
+		w := httptest.NewRecorder()
+		s.handleDashboard(w, r)
+		if w.Code != http.StatusOK {
+			t.Fatalf("status = %d, want 200; body: %s", w.Code, w.Body.String())
+		}
+		return w.Body.String()
+	}
+
+	if strings.Contains(render(), "docs/rootless.md") {
+		t.Fatal("rootless banner shown before detection")
+	}
+	s.detectRuntime(t.Context())
+	body := render()
+	if !strings.Contains(body, "docs/rootless.md") || !strings.Contains(body, "cgroup v2") {
+		t.Errorf("rootless banner (with stats note) missing, got: %s", body)
+	}
+}

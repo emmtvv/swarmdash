@@ -5,6 +5,23 @@ Notable changes to swarmdash are tracked here, following
 does not yet follow strict semantic versioning across releases — see the
 README's "Known gaps" section for what's still evolving.
 
+## [1.4.2] - 2026-11-27
+
+### Added
+
+- **Rootless Docker support**: `admin` and `agent` detect a rootless
+  daemon at startup and log what it limits, and the dashboard shows a
+  warning when admin's own daemon is rootless (plus a note when container
+  CPU/memory stats will read 0 because cgroup v2 isn't available). The
+  agent's `/v1/info` now reports `rootless` and `cgroup_version`.
+  `deploy/stack.yml` takes the host socket path from
+  `SWARMDASH_DOCKER_SOCK` (default `/var/run/docker.sock`), so it can
+  point at a rootless socket such as `/run/user/<uid>/docker.sock`.
+  Rootless mode has no overlay networks, so this is single-node only. See
+  [docs/rootless.md](docs/rootless.md).
+- **Support chat** on Telegram, linked from the README and the Docker Hub
+  page: https://t.me/swarmdash_support_bot
+
 ## [1.4.1] - 2026-11-06
 
 ### Changed

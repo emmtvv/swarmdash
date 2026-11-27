@@ -8,6 +8,10 @@
 {{end}}
 <h1>{{t "common.dashboard"}}</h1>
 
+{{if .Rootless}}
+<div class="warn-box">{{tHTML "dashboard.rootless_warning"}}{{if .RootlessNoStats}} {{t "dashboard.rootless_no_stats"}}{{end}}</div>
+{{end}}
+
 <div class="hero-card {{if .DegradedCount}}crit{{else}}ok{{end}}">
 	<div class="hero-status">
 		<span class="hero-dot"></span>

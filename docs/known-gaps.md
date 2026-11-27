@@ -1,5 +1,9 @@
 # Known gaps / next steps
 
+- **Rootless Docker** is single-node only: rootless mode has no overlay
+  networks, so there's no multi-node swarm or ingress mesh. The rootless
+  warning is shown for admin's own daemon only; other nodes' agents just
+  log it. See [rootless.md](rootless.md).
 - **Multi-cluster** — one admin instance manages exactly one swarm; running
   against several clusters means running several admin instances.
 - The degraded-service/node-down poller state (and its 2-minute alert

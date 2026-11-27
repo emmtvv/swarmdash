@@ -167,6 +167,8 @@
  "dashboard.not_found": "未找到",
  "dashboard.of": "共 %v",
  "dashboard.of_vcpu": "共 %v vCPU",
+ "dashboard.rootless_no_stats": "rootless 模式下，容器的 CPU/内存统计需要 cgroup v2，因此此处的使用率将显示为 0。",
+ "dashboard.rootless_warning": "此管理节点的 Docker 守护进程以 rootless 模式运行：overlay 网络和 ingress 路由网格不可用，其他节点上的 agent 可能无法访问。参见 <a href=\"https://github.com/emmtvv/swarmdash/blob/main/docs/rootless.md\" target=\"_blank\" rel=\"noopener noreferrer\">Rootless Docker</a>。",
  "dashboard.running": "运行中",
  "dashboard.tasks_running": "运行中的任务",
  "dashboard.tasks_running_desired": "运行中 / 期望的任务",

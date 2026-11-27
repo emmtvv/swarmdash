@@ -148,6 +148,8 @@
  "dashboard.not_found": "introuvable",
  "dashboard.of": "sur %v",
  "dashboard.of_vcpu": "sur %v vCPU",
+ "dashboard.rootless_no_stats": "En mode rootless, les statistiques CPU/mémoire des conteneurs nécessitent cgroup v2 : l'utilisation affichée ici sera donc de 0.",
+ "dashboard.rootless_warning": "Le daemon Docker de ce manager fonctionne en mode rootless : les réseaux overlay et l'ingress routing mesh ne sont pas disponibles, et les agents des autres nœuds peuvent être injoignables. Voir <a href=\"https://github.com/emmtvv/swarmdash/blob/main/docs/rootless.md\" target=\"_blank\" rel=\"noopener noreferrer\">Rootless Docker</a>.",
  "dashboard.running": "En cours",
  "dashboard.tasks_running": "Tâches en cours",
  "dashboard.tasks_running_desired": "Tâches en cours / souhaitées",

@@ -167,6 +167,8 @@
  "dashboard.not_found": "ვერ მოიძებნა",
  "dashboard.of": "%v-დან",
  "dashboard.of_vcpu": "%v vCPU-დან",
+ "dashboard.rootless_no_stats": "rootless რეჟიმში კონტეინერების CPU/მეხსიერების სტატისტიკას სჭირდება cgroup v2, ამიტომ დატვირთვა აქ 0-ს აჩვენებს.",
+ "dashboard.rootless_warning": "ამ მენეჯერის Docker დემონი მუშაობს rootless რეჟიმში: overlay ქსელები და ingress routing mesh მიუწვდომელია, ხოლო სხვა კვანძების აგენტები შეიძლება მიუწვდომელი იყოს. იხილეთ <a href=\"https://github.com/emmtvv/swarmdash/blob/main/docs/rootless.md\" target=\"_blank\" rel=\"noopener noreferrer\">Rootless Docker</a>.",
  "dashboard.running": "გაშვებული",
  "dashboard.tasks_running": "გაშვებული ამოცანები",
  "dashboard.tasks_running_desired": "ამოცანები გაშვებული / საჭირო",

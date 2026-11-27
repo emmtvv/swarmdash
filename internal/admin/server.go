@@ -20,6 +20,7 @@ import (
 	"github.com/docker/docker/client"
 	"golang.org/x/time/rate"
 
+	"swarmdash/internal/dockerutil"
 	"swarmdash/internal/imageupdate"
 	"swarmdash/internal/store"
 	"swarmdash/internal/web"
@@ -66,6 +67,10 @@ type Server struct {
 	log      *slog.Logger
 	renderer *web.Renderer
 	agentTLS *tls.Config
+
+	// runtime is this admin's own Docker daemon setup (rootless, cgroup
+	// version), detected once at startup - see detectRuntime.
+	runtime dockerutil.Runtime
 
 	// memUsage/cpuUsage cache the last cluster-wide real memory and CPU
 	// usage sampled by the poller (internal/admin/poller.go), so the
@@ -223,6 +228,8 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	if err := s.ensureBootstrapUser(); err != nil {
 		return err
 	}
+
+	s.detectRuntime(ctx)
 
 	go s.runPoller(ctx)
 	go s.runGitOpsPoller(ctx)

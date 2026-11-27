@@ -14,7 +14,8 @@
   <b><a href="https://hub.docker.com/r/emmtvv/swarmdash">Docker Hub</a></b> &nbsp;·&nbsp;
   <b><a href="docs/quickstart.md">Quickstart</a></b> &nbsp;·&nbsp;
   <b><a href="docs/features.md">Features</a></b> &nbsp;·&nbsp;
-  <b><a href="docs">Docs</a></b>
+  <b><a href="docs">Docs</a></b> &nbsp;·&nbsp;
+  <b><a href="https://t.me/swarmdash_support_bot">Support chat</a></b>
 </p>
 
 <p align="center">
@@ -78,6 +79,7 @@ See [docs/comparison.md](docs/comparison.md) for the full table and caveats.
 - [Features](docs/features.md) — full feature list
 - [Architecture](docs/architecture.md) — why the agent/admin split
 - [Hardening](docs/hardening.md) — mTLS, HTTPS, storage backends, migrations
+- [Rootless Docker](docs/rootless.md) — running against a rootless daemon, and its limits
 - [Comparison](docs/comparison.md) — swarmdash vs. Portainer CE vs. Swarmpit
 - [Known gaps / next steps](docs/known-gaps.md)
 - [Testing](docs/testing.md)
@@ -85,8 +87,9 @@ See [docs/comparison.md](docs/comparison.md) for the full table and caveats.
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and feature requests:
-[open an issue](https://github.com/emmtvv/swarmdash/issues). This project
-follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+[open an issue](https://github.com/emmtvv/swarmdash/issues). Questions and
+help: the [support chat on Telegram](https://t.me/swarmdash_support_bot).
+This project follows the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## Security
 

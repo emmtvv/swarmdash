@@ -167,6 +167,8 @@
  "dashboard.not_found": "не найден",
  "dashboard.of": "из %v",
  "dashboard.of_vcpu": "из %v vCPU",
+ "dashboard.rootless_no_stats": "В rootless-режиме статистике CPU/памяти контейнеров нужен cgroup v2, поэтому загрузка здесь будет показывать 0.",
+ "dashboard.rootless_warning": "Docker на этом менеджере работает в rootless-режиме: overlay-сети и ingress routing mesh недоступны, агенты на других узлах могут быть недостижимы. Подробнее: <a href=\"https://github.com/emmtvv/swarmdash/blob/main/docs/rootless.md\" target=\"_blank\" rel=\"noopener noreferrer\">Rootless Docker</a>.",
  "dashboard.running": "Запущено",
  "dashboard.tasks_running": "Задач запущено",
  "dashboard.tasks_running_desired": "Задачи запущено / требуется",

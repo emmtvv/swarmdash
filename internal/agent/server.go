@@ -18,6 +18,7 @@ import (
 
 	"github.com/docker/docker/client"
 
+	"swarmdash/internal/dockerutil"
 	"swarmdash/internal/httpx"
 )
 
@@ -94,6 +95,7 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 		// error themselves when they try to write.
 		s.log.Warn("volume backups unavailable", "dir", s.cfg.BackupDir, "err", err)
 	}
+	s.warnRootless(ctx)
 
 	srv := &http.Server{
 		Addr:              s.cfg.ListenAddr,
@@ -188,11 +190,32 @@ func (s *Server) handleInfo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
+	rt := dockerutil.RuntimeFromInfo(info)
 	httpx.WriteJSON(w, map[string]any{
 		"name":            info.Name,
 		"id":              info.ID,
 		"server_version":  info.ServerVersion,
 		"n_containers":    info.Containers,
 		"n_containers_up": info.ContainersRunning,
+		"rootless":        rt.Rootless,
+		"cgroup_version":  rt.CgroupVersion,
 	})
+}
+
+// warnRootless logs what a rootless Docker daemon on this node limits (see
+// docs/rootless.md). Best effort: a failed `docker info` is just skipped.
+func (s *Server) warnRootless(ctx context.Context) {
+	info, err := s.docker.Info(ctx)
+	if err != nil {
+		return
+	}
+	rt := dockerutil.RuntimeFromInfo(info)
+	if !rt.Rootless {
+		return
+	}
+	s.log.Warn("docker daemon runs in rootless mode: overlay networks are unavailable, and admin can only reach this agent "+
+		"if its listen port is forwarded to the host (see docs/rootless.md)", "listen", s.cfg.ListenAddr, "cgroup_version", rt.CgroupVersion)
+	if rt.StatsUnavailable() {
+		s.log.Warn("rootless docker without cgroup v2: container CPU/memory stats will be empty")
+	}
 }
